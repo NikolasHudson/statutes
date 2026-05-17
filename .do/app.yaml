@@ -4,9 +4,10 @@
 # root Dockerfile on every push to `branch`. Repo + cluster_name are
 # already filled in for NikolasHudson/statutes + the `iowa-db` cluster.
 #
-# Apply:
-#   doctl apps create            --spec deploy/app.yaml   # first time
-#   doctl apps update <APP_ID>   --spec deploy/app.yaml    # subsequent
+# At .do/app.yaml so App Platform auto-detects it when the repo is
+# connected in the web UI. CLI equivalent:
+#   doctl apps create            --spec .do/app.yaml   # first time
+#   doctl apps update <APP_ID>   --spec .do/app.yaml    # subsequent
 #
 # Secrets (SECRET_KEY, OPENAI_API_KEY, VOYAGE_API_KEY, optional
 # ANTHROPIC_API_KEY) are NOT in this file — set them as encrypted env vars

@@ -154,22 +154,18 @@ fix and re-run (the script is idempotent: `--clean --if-exists`).
 
 ---
 
-## 6. Point the spec at your repo and cluster
+## 6. The spec — already wired (no action)
 
-Edit `deploy/app.yaml` and replace the three placeholders:
+The spec lives at **`.do/app.yaml`** (the path App Platform auto-detects
+when you connect the repo, so the web UI ingests the whole config — you
+only enter the 4 secrets). It is already filled in and pushed:
 
-| Placeholder | Replace with | Where |
-|---|---|---|
-| `YOUR_GH_USER/statutes` | your repo slug | `services[web].github.repo` |
-| `YOUR_GH_USER/statutes` | same slug | `jobs[migrate].github.repo` |
-| `iowa-corpus-db` | the cluster name from step 4 | `databases[0].cluster_name` |
+| Field | Value |
+|---|---|
+| `services[web].github.repo`, `jobs[migrate].github.repo` | `NikolasHudson/statutes` |
+| `databases[0].cluster_name` | `iowa-db` |
 
-Commit and push the edit (the spec is read from your machine on `create`,
-but keeping it in git means future `doctl apps update` matches reality):
-
-```bash
-git commit -am "deploy: wire app.yaml to repo + DB cluster" && git push
-```
+If you ever rename the repo or DB cluster, edit `.do/app.yaml` and push.
 
 ---
 
@@ -194,16 +190,25 @@ Have ready:
 
 ## 8. Create the app
 
+**Web UI (what you're using):** <https://cloud.digitalocean.com/apps> →
+**Create App** → **GitHub** → pick `NikolasHudson/statutes`, branch
+`main`. Because `.do/app.yaml` exists in the repo, App Platform reads it
+and pre-fills the web service, the `migrate` job, the Valkey cache, the
+`iowa-db` attachment, routes, health check, and all non-secret env vars.
+Click through to **Create** — you set the secret values in step 9.
+
+**CLI alternative:**
+
 ```bash
-doctl apps create --spec deploy/app.yaml
+doctl apps create --spec .do/app.yaml
 doctl apps list --format ID,Spec.Name,DefaultIngress
 ```
 
-Note the **ID** and **DefaultIngress** (your live URL,
+Either way, note the **ID** and **DefaultIngress** (your live URL,
 `https://iowa-legal-corpus-XXXXX.ondigitalocean.app`):
 
 ```bash
-APP_ID=<the-id>
+APP_ID=<the-id>     # UI: app → Settings → App-level → the ID in the URL
 ```
 
 This first build will run but the app will be **unhealthy until you set
@@ -305,7 +310,7 @@ deploys are schema-stable, but keep it in mind.)
 **Scale:** keep `instance_count: 1` until you've confirmed the chat quota
 holds (it's Valkey-backed, so it *will* hold across instances — but verify
 once before scaling). Change `instance_count` / `instance_size_slug` in
-`app.yaml`, push, redeploy.
+`.do/app.yaml`, push, redeploy.
 
 **DB backups:** Managed Postgres takes daily backups automatically;
 confirm/point-in-time settings in the DO panel under the cluster →
@@ -332,7 +337,7 @@ hard ceiling on OpenAI spend — tune them before launch.
 
 | Symptom | Cause / fix |
 |---|---|
-| Build fails fetching repo | DO GitHub app not authorized for `statutes`, or `github.repo` slug wrong in `app.yaml` (step 3 / 6). |
+| Build fails fetching repo | DO GitHub app not authorized for `statutes` (step 3), or `github.repo` slug wrong in `.do/app.yaml`. |
 | Container won't start, `SECRET_KEY` error in run logs | Secret values not set yet (step 9), incl. on the **migrate** job. |
 | Deploy fails health check; `DisallowedHost` in logs | App Platform health probe Host not in `ALLOWED_HOSTS`. Quick unblock: set `ALLOWED_HOSTS=*` (acceptable here — TLS terminates at the managed edge and CSRF is pinned via `CSRF_TRUSTED_ORIGINS`), then narrow later. |
 | Infinite HTTPS redirect / "too many redirects" | Edge isn't forwarding `X-Forwarded-Proto`. App Platform does by default; if you fronted it with something else, ensure that header is set (settings honors `SECURE_PROXY_SSL_HEADER`). |
