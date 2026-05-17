@@ -1,10 +1,8 @@
 # DigitalOcean App Platform spec — Iowa Legal Corpus.
 #
 # Source: a connected GitHub repo (deploy_on_push). App Platform builds the
-# root Dockerfile on every push to `branch`.
-#
-# >>> EDIT ME: set `repo` on BOTH the web service and the migrate job to
-#     your "<github-user>/<repo>" before applying. <<<
+# root Dockerfile on every push to `branch`. Repo + cluster_name are
+# already filled in for NikolasHudson/statutes + the `iowa-db` cluster.
 #
 # Apply:
 #   doctl apps create            --spec deploy/app.yaml   # first time
@@ -26,7 +24,7 @@ databases:
   - name: iowa-db
     engine: PG
     production: true
-    cluster_name: iowa-corpus-db # <<< the real DO cluster name from step 2
+    cluster_name: iowa-db # the standalone Managed Postgres cluster
     db_name: defaultdb
     db_user: doadmin
   - name: iowa-cache
@@ -37,7 +35,7 @@ databases:
 services:
   - name: web
     github:
-      repo: YOUR_GH_USER/statutes # <<< EDIT
+      repo: NikolasHudson/statutes
       branch: main
       deploy_on_push: true
     dockerfile_path: Dockerfile
@@ -93,7 +91,7 @@ jobs:
   - name: migrate
     kind: PRE_DEPLOY
     github:
-      repo: YOUR_GH_USER/statutes # <<< EDIT (same repo as the web service)
+      repo: NikolasHudson/statutes # same repo as the web service
       branch: main
     dockerfile_path: Dockerfile
     source_dir: /
