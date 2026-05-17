@@ -4,7 +4,7 @@ Three retrievers, all returning ``[(node_version_id, score), ...]`` in
 descending relevance:
 
     fts_search       — Postgres tsvector (English config) on search_vector
-    trigram_search   — pg_trgm fuzzy on Node.heading + NodeVersion.body_text
+    trigram_search   — pg_trgm fuzzy on Node.heading (typo / partial titles)
     vector_search    — pgvector cosine on embedding
 
 ``hybrid_search`` runs all three in parallel and fuses with Reciprocal Rank
@@ -127,12 +127,20 @@ def trigram_search(
     similarity_threshold: float = 0.1,
     source_slug: str | None = None,
 ) -> list[tuple[int, float]]:
-    """Fuzzy match against Node.heading and NodeVersion.body_text using
-    pg_trgm similarity. Heading similarity is doubled because a hit there is
-    a much stronger signal than a body hit.
+    """Fuzzy match against Node.heading using pg_trgm similarity — this is the
+    typo / partial-title retriever ("incorportion" → "Incorporation").
 
-    The threshold is intentionally low — RRF will downrank weak matches
-    naturally, and we don't want to lose recall."""
+    Body text is deliberately *not* trigram-matched. A GIN trigram index over
+    full statute bodies is near-useless at any recall-friendly threshold: at
+    0.1, ``body_text % q`` matched ~75% of the corpus, and the bitmap heap
+    recheck then recomputes ``similarity()`` over megabytes of text — that was
+    a fixed ~10 s full-scan on every search regardless of query. FTS already
+    covers body content well (sub-300 ms via the search_vector GIN index), so
+    body fuzzy match was almost pure cost for recall RRF mostly downranked
+    anyway. Trigram now does only what trigram is good at: short strings.
+
+    The threshold stays low — RRF downranks weak matches naturally and a
+    heading-only scan is cheap, so we keep recall."""
 
     if not query.strip():
         return []
@@ -142,13 +150,12 @@ def trigram_search(
     # autocommit ends the transaction immediately and the threshold is lost. We
     # wrap both statements in atomic() to keep them in a single tx.
     sql = f"""
-        SELECT nv.id,
-               (similarity(n.heading, %s) * 2 + similarity(nv.body_text, %s)) AS score
+        SELECT nv.id, similarity(n.heading, %s) AS score
         FROM corpus_nodeversion nv
         JOIN corpus_node n ON n.id = nv.node_id
         {src_join}
         WHERE nv.effective_to IS NULL
-          AND (n.heading %% %s OR nv.body_text %% %s)
+          AND n.heading %% %s
           {visibility}
           {src_where}
         ORDER BY score DESC
@@ -156,7 +163,7 @@ def trigram_search(
     """
     with transaction.atomic(), connection.cursor() as cur:
         cur.execute("SET LOCAL pg_trgm.similarity_threshold = %s;", [similarity_threshold])
-        cur.execute(sql, [query, query, query, query, *vis_params, *src_params, limit])
+        cur.execute(sql, [query, query, *vis_params, *src_params, limit])
         return [(int(row[0]), float(row[1])) for row in cur.fetchall()]
 
 

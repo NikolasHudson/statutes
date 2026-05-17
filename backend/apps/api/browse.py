@@ -294,7 +294,7 @@ def search(request, q: str, source: str | None = None, limit: int = SEARCH_LIMIT
     )
     empty = {"query": q, "scope": source, "count": 0, "results": []}
     if len(q) < SEARCH_MIN_QUERY_LEN:
-        return empty
+        return _cached_json(request, empty)
 
     results: list[dict] = []
     pinned_node_id: int | None = None
@@ -335,7 +335,14 @@ def search(request, q: str, source: str | None = None, limit: int = SEARCH_LIMIT
         if len(results) >= limit:
             break
 
-    return {"query": q, "scope": source, "count": len(results), "results": results}
+    # Search visibility is identical to the rest of browse (approved + current
+    # only), so it earns the same edge cache. The ETag covers query + scope +
+    # results, so the CDN keys per distinct query and a revalidation of a
+    # repeated search comes back as a 304 instead of paying the retrievers.
+    return _cached_json(
+        request,
+        {"query": q, "scope": source, "count": len(results), "results": results},
+    )
 
 
 def _intkey(s: str) -> tuple:

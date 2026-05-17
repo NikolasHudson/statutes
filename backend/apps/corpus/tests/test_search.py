@@ -128,8 +128,13 @@ class SearchRetrieverTests(TestCase):
 
     def test_hybrid_search_combines_retrievers(self):
         run_embedding_job(client=FakeEmbeddingClient())
+        # FakeEmbeddingClient produces hash vectors with no semantic meaning,
+        # so the vector retriever is pure noise here. Use a query the two
+        # meaningful retrievers agree on (heading "Consumer fraud" → both FTS
+        # weight-A and heading trigram point at 714.16) so the assertion tests
+        # RRF fusion, not which doc the fake vectors happened to hash near.
         hits = hybrid_search(
-            "deceptive practice",
+            "consumer fraud",
             client=FakeEmbeddingClient(),
             limit=5,
         )
