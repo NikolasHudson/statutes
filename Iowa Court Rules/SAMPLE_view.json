@@ -1,0 +1,134 @@
+{
+  "edition_date": "2026-02-27",
+  "source_base_url": "https://www.legis.iowa.gov/docs/ACO/CR/LINC/02-27-2026.chapter.{chapter}.pdf",
+  "summary": {
+    "chapters_probed": 70,
+    "chapters_ok": 43,
+    "total_rules": 1205
+  },
+  "samples": [
+    {
+      "chapter": "4",
+      "chapter_title": "Protective and No Contact Orders",
+      "reserved": false,
+      "chapter_pdf_url": "https://www.legis.iowa.gov/docs/ACO/CR/LINC/02-27-2026.chapter.4.pdf",
+      "page_count": 4,
+      "rule_count": 5,
+      "rules": [
+        {
+          "number": "4.100",
+          "heading": "Form orders for elder abuse protective orders",
+          "division": "DIVISION I",
+          "body_text": "Iowa courts must use the following form civil protective orders, as the supreme court has approved, in actions under Iowa Code chapter 235F concerning elder abuse. Filed template orders may not display all form options available to the court. Form 4.101 Temporary Protective Order—Elder Abuse (Iowa Code chapter 235F) Form 4.102 Final Protective Order—Elder Abuse (Iowa Code chapter 235F) Form 4.103 Cancellation, Modification, or Extension of Protective Order—Elder Abuse (Iowa Code chapter 235F) Form 4.104 Order Appointing Guardian Ad Litem—Elder Abuse (Iowa Code chapter 235F)",
+          "body_chars": 580,
+          "comment_text": "",
+          "comment_chars": 0,
+          "history_brackets": [
+            "[Court Order November 29, 2022, effective January 1, 2023]"
+          ],
+          "reserved": false
+        },
+        {
+          "number": "4.200",
+          "heading": "Form orders for domestic abuse civil protective orders",
+          "division": "DIVISION II",
+          "body_text": "Iowa courts must use the following form civil protective orders, as the supreme court has approved, in actions under Iowa Code chapter 236 concerning domestic abuse. Filed template orders may not display all form options available to the court. Form 4.201 Temporary Protective Order—Domestic Abuse (Iowa Code chapter 236) Form 4.202 Final Protective Order—Domestic Abuse (Iowa Code chapter 236) Form 4.203 Cancellation, Modification, or Extension of Protective Order—Domestic Abuse (Iowa Code chapter 236) Form 4.204 Final Protective Order by Consent Agreement—Domestic Abuse",
+          "body_chars": 575,
+          "comment_text": "",
+          "comment_chars": 0,
+          "history_brackets": [
+            "[Court Order November 29, 2022, effective January 1, 2023]"
+          ],
+          "reserved": false
+        },
+        {
+          "number": "4.300",
+          "heading": "Form orders for sexual abuse civil protective orders",
+          "division": "DIVISION III",
+          "body_text": "Iowa courts must use the following form civil protective orders, as the supreme court has approved, in actions under Iowa Code chapter 236A. Filed template orders may not display all form options available to the court. Form 4.301 Temporary Protective Order—Sexual Abuse (Iowa Code chapter 236A) Form 4.302 Final Protective Order—Sexual Abuse (Iowa Code chapter 236A) Form 4.303 Cancellation, Modification, or Extension of Protective Order—Sexual Abuse (Iowa Code chapter 236A) Form 4.304 Final Protective Order by Consent Agreement—Sexual Abuse",
+          "body_chars": 545,
+          "comment_text": "",
+          "comment_chars": 0,
+          "history_brackets": [
+            "[Court Order November 29, 2022, effective January 1, 2023]"
+          ],
+          "reserved": false
+        },
+        {
+          "number": "4.400",
+          "heading": "Form orders for civil protective orders in dissolution actions",
+          "division": "DIVISION IV",
+          "body_text": "Iowa courts must use the following form civil protective orders, as the supreme court has approved, in actions under Iowa Code chapter 598. Filed template orders may not display all form options available to the court. Form 4.401 Temporary Protective Order—Dissolution (Ex Parte) (Iowa Code chapter 598) Form 4.402 Temporary Protective Order—Dissolution (Hearing) (Iowa Code chapter 598) Form 4.403 Domestic Abuse Protective Order Accompanying Dissolution Decree (Iowa Code chapter 598) Form 4.404 Cancellation, Modification, or Extension of Protective Order—Dissolution (Iowa Code chapter 598)",
+          "body_chars": 594,
+          "comment_text": "",
+          "comment_chars": 0,
+          "history_brackets": [
+            "[Court Order November 29, 2022, effective January 1, 2023]"
+          ],
+          "reserved": false
+        },
+        {
+          "number": "4.500",
+          "heading": "Form orders for criminal no contact orders",
+          "division": "DIVISION V",
+          "body_text": "Iowa courts must use the following form criminal no contact orders as the supreme court has approved. Filed template orders may not display all form options available to the court. Form 4.501 Temporary No Contact Order and Order Setting Contempt Hearing (Iowa Code section 664A.7) Form 4.502 Entry or Modification of No Contact Order (Iowa Code section 664A.5) Form 4.503 Extension of No Contact Order (Iowa Code section 664A.8) Form 4.504 Termination of No Contact Order Form 4.505 Order to Show Cause—Violation of No Contact Order",
+          "body_chars": 532,
+          "comment_text": "",
+          "comment_chars": 0,
+          "history_brackets": [
+            "[Court Order November 29, 2022, effective January 1, 2023]"
+          ],
+          "reserved": false
+        }
+      ],
+      "parse_notes": []
+    },
+    {
+      "chapter": "32",
+      "chapter_title": "Iowa Rules of Professional Conduct",
+      "reserved": false,
+      "chapter_pdf_url": "https://www.legis.iowa.gov/docs/ACO/CR/LINC/02-27-2026.chapter.32.pdf",
+      "page_count": 89,
+      "rule_count": 59,
+      "parse_notes": [],
+      "rules": [
+        {
+          "number": "32:1.0",
+          "heading": "Terminology",
+          "division": "PREAMBLE AND SCOPE",
+          "body_text": "(a) “Belief” or “believes” denotes that the person involved actually supposed the fact in question to be true. A person’s belief may be inferred from circumstances. (b) “Confirmed in writing,” when used in reference to the informed consent of a person, denotes informed consent that is given in writing by the person or a writing that a lawyer promptly transmits to the person confirming an oral informed consent. See paragraph (e) for the definition of “informed consent.” If it is not feasible to obtain or transmit the writing at the time the person gives informed consent, then the lawyer must obtain or transmit it within a reasonable time thereafter. (c) “Firm” or “law firm” denotes a lawyer or lawyers in a law partnership, professional corporation, sole proprietorship, or other association authorized to practice law; or lawyers employed in a legal services organization or the legal department of a corporation or other organization. (d) “Fraud” or “fraudulent” denotes conduct that is fraudulent under the substantive or procedural law of the applicable jurisdiction and has a purpose to deceive. (e) “Informed consent” denotes the agreement by a person to a proposed course of conduct after the lawyer has communicated adequate information and explanation about the material risks of and reasonably available alternatives to the proposed course of conduct. (f) “Knowingly,” “known,” or “knows” denotes actual knowledge of the fact in question. A person’s knowledge may be inferred from circumstances. (g) “Partner” denotes a member of a partnership, a shareholder in a law firm organized as a professional corporation, or a member of an association authorized to practice law. (h) “Reasonable” or “reasonably” when used in relation to conduct by a lawyer denotes the conduct of a reasonably prudent and competent lawyer. (i) “Reasonable belief” or “reasonably believes” when used in reference to a lawyer denotes that the lawyer believes the matter in question and that the circumstances are such that the belief is reasonable. (j) “Reasonably should know” when used in reference to a lawyer denotes that a lawyer of reasonable prudence and competence would ascertain the matter in question. (k) “Screened” denotes the isolation of a lawyer from any participation in a matter through the timely imposition of procedures within a firm that are reasonably adequate under the circumstances to protect information that the isolated lawyer is obligated to protect under these rules or other law. (l) “Substantial” when used in reference to degree or extent denotes a material matter of clear and weighty importance. (m) “Tribunal” denotes a court, an arbitrator in a binding arbitration proceeding, or a legislative body, administrative agency, or other body acting in an adjudicative capacity. A legislative body, administrative agency, or other body acts in an adjudicative capacity when a neutral official, after the presentation of evidence or legal argument by a party or parties, will render a binding legal judgment directly affecting a party’s interests in a particular matter. (n) “Writing” or “written” denotes a tangible or electronic record of a communication or representation, including handwriting, typewriting, printing, photostating, photography, audio or videorecording, and electronic communications. A “signed” writing includes an electronic sound, symbol, or process attached to or logically associated with a writing and executed or adopted by a person with the intent to sign the writing.",
+          "body_chars": 3519,
+          "comment_text": "Confirmed in Writing\n\n[1] If it is not feasible to obtain or transmit a written confirmation at the time the client gives informed consent, then the lawyer must obtain or transmit it within a reasonable time thereafter. If a lawyer has obtained a client’s informed consent, the lawyer may act in reliance on that consent so long as it is confirmed in writing within a reasonable time thereafter. Firm\n\n[2] Whether two or more lawyers constitute a firm within paragraph (c) can depend on the specific facts. For example, two practitioners who share office space and occasionally consult or assist each other ordinarily would not be regarded as constituting a firm. However, if they present themselves to the public in a way that suggests that they are a firm or conduct themselves as a firm, they should be regarded as a firm for purposes of the rules. The terms of any formal agreement between associated lawyers are relevant in determining whether they are a firm, as is the fact that they have mutual access to information concerning the clients they serve. Furthermore, it is relevant in doubtful cases to consider the underlying purpose of the rule that is involved. A group of lawyers could be regarded as a firm for purposes of the rule that the same lawyer should not represent opposing parties in litigation, while it might not be so regarded for purposes of the rule that information acquired by one lawyer is attributed to another.\n\n[3] With respect to the law department of an organization, including the government, there is ordinarily no question that the members of the department constitute a firm within the meaning of the Iowa Rules of Professional Conduct. There can be uncertainty, however, as to the identity of the client. For example, it may not be clear whether the law department of a corporation represents a subsidiary or an affiliated corporation, as well as the corporation by which the members of the department are directly employed. A similar question can arise concerning an unincorporated association and its local affiliates.\n\n[4] Similar questions can also arise with respect to lawyers in legal aid and legal services organizations. Depending upon the structure of the organization, the entire organization or different components of it may constitute a firm or firms for purposes of these rules. Fraud\n\n[5] When used in these rules, the terms “fraud” or “fraudulent” refer to conduct that is characterized as such under the substantive or procedural law of the applicable jurisdiction and has a purpose to deceive. This does not include merely negligent misrepresentation or negligent failure to apprise another of relevant information. For purposes of these rules, it is not necessary that anyone has suffered damages or relied on the misrepresentation or failure to inform. Informed Consent\n\n[6] Many of the Iowa Rules of Professional Conduct require the lawyer to obtain the informed consent of a client or other person (e.g., a former client or, under certain circumstances, a prospective client) before accepting or continuing representation or pursuing a course of conduct. See, e.g., rules 32:1.2(c), 32:1.6(a), 32:1.7(b), 32:1.9(a), 32:1.11(a), 32:1.12(a), and 32:1.18(d). The communication necessary to obtain such consent will vary according to the rule involved and the circumstances giving rise to the need to obtain informed consent. The lawyer must make reasonable efforts to ensure that the client or other person possesses information reasonably adequate to make an informed decision. Ordinarily, this will require communication that includes a disclosure of the facts and circumstances giving rise to the situation, any explanation reasonably necessary to inform the client or other person of the material advantages and disadvantages of the proposed course of conduct, and a discussion of the client’s or other person’s options and alternatives. In some circumstances it may be appropriate for a lawyer to advise a client or other person to seek the advice of other counsel. A lawyer need not inform a client or other person of facts or implications already known to the client or other person; nevertheless, a lawyer who does not personally inform the client or other person assumes the risk that the client or other person is inadequately informed and the consent is invalid. In determining whether the information and explanation provided are reasonably adequate, relevant factors include whether the client or other person is experienced in legal matters generally and in making decisions of the type involved, and whether the client or other person is independently represented by other counsel in giving the consent. Normally, such persons need less information and explanation than others, and generally a client or other person who is independently represented by other counsel in giving the consent should be assumed to have given informed consent.\n\n[7] Obtaining informed consent will usually require an affirmative response by the client or other person. In general, a lawyer may not assume consent from a client’s or other person’s silence. Consent may be inferred, however, from the conduct of a client or other person who has reasonably adequate information about the matter. A number of rules require that a person’s consent be confirmed in writing. See rules 32:1.7(b), 32:1.9(a), 32:1.11(a), 32:1.12(a), and 32:1.18(d). For a definition of “writing” and “confirmed in writing,” see paragraphs (n) and (b). Other rules require that a client’s consent be obtained in a writing signed by the client. See, e.g., rules 32:1.8(a) and (g). For a definition of “signed,” see paragraph (n). Screened\n\n[8] This definition applies to situations where screening of a personally disqualified lawyer is permitted to remove imputation of a conflict of interest under rule 32:1.10, 32:1.11, 32:1.12, or 32:1.18.\n\n[9] The purpose of screening is to assure the affected parties that confidential information known by the personally disqualified lawyer remains protected. The personally disqualified lawyer should acknowledge the obligation not to communicate with any of the other lawyers in the firm with respect to the matter. Similarly, other lawyers in the firm who are working on the matter should be informed that the screening is in place and that they may not communicate with the personally disqualified lawyer with respect to the matter. Additional screening measures that are appropriate for the particular matter will depend on the circumstances. To implement, reinforce, and remind all affected lawyers of the presence of the screening, it may be appropriate for the firm to undertake such procedures as a written undertaking by the screened lawyer to avoid any communication with other firm personnel and any contact with any firm files or other information, including information in electronic form, relating to the matter, written notice and instructions to all other firm personnel forbidding any communication with the screened lawyer relating to the matter, denial of access by the screened lawyer to firm files or other information, including information in electronic form, relating to the matter, and periodic reminders of the screen to the screened lawyer and all other firm personnel.\n\n[10] In order to be effective, screening measures must be implemented as soon as practical after a lawyer or law firm knows or reasonably should know that there is a need for screening.",
+          "comment_chars": 7449,
+          "history_brackets": [
+            "[Court Order April 20, 2005, effective July 1, 2005; October 15, 2015]"
+          ],
+          "reserved": false
+        }
+      ],
+      "_note": "only 1 of 59 rules shown"
+    },
+    {
+      "chapter": "18",
+      "chapter_title": "Reserved",
+      "reserved": true,
+      "chapter_pdf_url": "https://www.legis.iowa.gov/docs/ACO/CR/LINC/02-27-2026.chapter.18.pdf",
+      "page_count": 1,
+      "rule_count": 0,
+      "rules": [],
+      "parse_notes": []
+    },
+    {
+      "chapter": "3",
+      "chapter_title": "Standard Forms of Pleadings for Small Claims Actions",
+      "reserved": false,
+      "chapter_pdf_url": "https://www.legis.iowa.gov/docs/ACO/CR/LINC/02-27-2026.chapter.3.pdf",
+      "page_count": 37,
+      "rule_count": 0,
+      "rules": [],
+      "parse_notes": [
+        "no Rule N.M headers detected — chapter likely uses a non-Rule structure (Forms, Canons, Roman-numeral standards)"
+      ]
+    }
+  ]
+}

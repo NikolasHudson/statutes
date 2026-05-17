@@ -1,0 +1,166 @@
+{
+  "_": [
+    "Eval set for hybrid search. Each entry: { query, expected_paths }.",
+    "expected_paths is the list of Iowa Code section paths an attorney would",
+    "consider a top-K hit for the query. Order does not matter.",
+    "",
+    "All paths target sections in the probe sample (chapters 1, 4, 12C, 29C,",
+    "97B, 232, 257, 455B, 600, 709, 902). When the corpus expands, append",
+    "queries — do not delete existing rows so we can track regressions.",
+    "",
+    "precision@5 is reported per-query and overall. Tags let us slice perf",
+    "(keyword vs paraphrase vs natural-language)."
+  ],
+  "queries": [
+    {
+      "query": "state boundaries of Iowa",
+      "expected_paths": ["1.1"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "rules of statutory construction",
+      "expected_paths": ["4.1", "4.2", "4.6"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "ambiguous statute interpretation",
+      "expected_paths": ["4.6"],
+      "tags": ["paraphrase"]
+    },
+    {
+      "query": "deposit of public funds definitions",
+      "expected_paths": ["12C.1"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "emergency management coordinator powers",
+      "expected_paths": ["29C.10", "29C.9"],
+      "tags": ["paraphrase"]
+    },
+    {
+      "query": "fraud against IPERS retirement benefits",
+      "expected_paths": ["97B.40"],
+      "tags": ["paraphrase"]
+    },
+    {
+      "query": "what age qualifies as a child for juvenile justice",
+      "expected_paths": ["232.2"],
+      "tags": ["natural-language"]
+    },
+    {
+      "query": "taking a child into custody",
+      "expected_paths": ["232.19"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "founded child abuse central registry",
+      "expected_paths": ["232.71D"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "child in need of assistance petition",
+      "expected_paths": ["232.87"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "sexual abuse first degree",
+      "expected_paths": ["709.2"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "what is sexual abuse under iowa law",
+      "expected_paths": ["709.1"],
+      "tags": ["natural-language"]
+    },
+    {
+      "query": "class A felony sentencing",
+      "expected_paths": ["902.1"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "indeterminate sentence for felonies",
+      "expected_paths": ["902.3"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "minimum sentence for using a dangerous weapon",
+      "expected_paths": ["902.7"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "habitual offender mandatory minimum",
+      "expected_paths": ["902.8"],
+      "tags": ["paraphrase"]
+    },
+    {
+      "query": "consents required for adoption",
+      "expected_paths": ["600.7"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "who can file an adoption petition",
+      "expected_paths": ["600.4"],
+      "tags": ["natural-language"]
+    },
+    {
+      "query": "definitions in school finance chapter",
+      "expected_paths": ["257.2"],
+      "tags": ["paraphrase"]
+    },
+    {
+      "query": "foundation property tax for schools",
+      "expected_paths": ["257.3"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "presumption of enactment",
+      "expected_paths": ["4.4"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "concurrent jurisdiction with federal government",
+      "expected_paths": ["1.3"],
+      "tags": ["paraphrase"]
+    },
+    {
+      "query": "iowa indian child welfare",
+      "expected_paths": ["232.7"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "investment standards for retirement fund",
+      "expected_paths": ["97B.7A"],
+      "tags": ["paraphrase"]
+    },
+    {
+      "query": "early retirement date IPERS",
+      "expected_paths": ["97B.47"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "jury instructions for sexual abuse offenses",
+      "expected_paths": ["709.6"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "place of confinement for felons",
+      "expected_paths": ["902.5"],
+      "tags": ["keyword"]
+    },
+    {
+      "query": "rules referring to other statutes",
+      "expected_paths": ["4.3"],
+      "tags": ["paraphrase"]
+    },
+    {
+      "query": "general versus special statutes conflict",
+      "expected_paths": ["4.7"],
+      "tags": ["paraphrase"]
+    },
+    {
+      "query": "construction of adoption chapter",
+      "expected_paths": ["600.1"],
+      "tags": ["keyword"]
+    }
+  ]
+}

@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="x-ua-compatible" content="ie=edge" />         <meta http-equiv="cache-control" content="no-cache" />          <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1" />
+        <meta name="author" content="Iowa Legislative Services Agency" />
+        <meta name="description" content="Information pertaining to the Iowa Legislature as well as the Executive and Judicial branch in as much as they relate to the legislative branch" />
+                        <title>Iowa Legislature - Code Chapter Listings</title>
+        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/ui-lightness/jquery-ui.min.css"/>
+                <link rel="stylesheet" href="/cached/202604281100/css/govicons.min.css"/>
+                <link rel="stylesheet" href="/cached/202604281100/css/master.combined.css"/>
+                                        
+                <script type="text/javascript" src="/cached/11/scripts/preload.js"></script>
+    </head>
+    <body class="">
+        <div id="outerWrapper" class="container_12 ">
+            <input type="hidden" id="masterURL" value=""/>
+            <input type="hidden" id="dashboardURL" value=""/>
+            <header class="site_header container_12">
+    <form id="searchForm" class="autoLabels" action="/publications/search" method="GET">
+        <input type="hidden" id="searchPage" value="false"/>
+        <input type="hidden" name="facet.pivot" value="l1,l2"/>
+        <input type="hidden" name="fq" value="-status:Reserved"/>
+        <input type="hidden" name="fq" value='current:"true"'/>
+        <input type="hidden" name="tab" value="true"/>
+        <input type="hidden" name="tc" value="true"/>                <div id="blackBar" class="container_12">
+            <div id="blackBarName">
+                <a href="/" aria-label="Iowa Legislature Home" title="Iowa Legislature Home">
+                    <i style="display:none;" class="gi gi-capitol"></i>
+                    <img  alt="Iowa Legislature"> src="/images/theme/capitolYellow.png"/>
+                    <span aria-label="Iowa Legislature">Iowa Legislature</span>
+                </a>
+            </div>
+            <div id="appMessage" style="float:left;margin-left:25px;color:white;line-height:40px"></div>
+            <div id="search">
+                <select name="fq" title="Select the type of search you would like to do within this website." aria-label="Search type">
+                    <option value=''>Publications</option>
+                    <option value='site'>Site</option>
+                                        <option value='l2:"law:code:1474|year?"' data-year='true' data-nyr='true' selected="selected">Iowa Code:2026</option>
+                                    </select>
+                <input class="q" type="search" aria-label="Search" name="q" placeholder="(Enter Search Term)" value=''/>
+                <input aria-label="SearchSubmit" id="searchSubmit" type="submit" value=""/>
+            </div>
+                    </div>
+                <div id="banner" class="container_12">
+            <a class="logo" href="/" title="Iowa Legislature Home" aria-label="Iowa Legislature Home"></a>
+        </div>
+        <nav id="header_nav" class="container_12">
+            <div id="mobile_nav">
+        
+        <select title="Legis Website Sections" aria-label="Legis Site Sections">
+            <option id="top" value="">Sections...</option>
+            <option value="/chambers" >Senate/House</option>
+            <option value="/legislators" >Legislators</option>
+            <option value="/legislation" >Legislation</option>
+            <option value="/committees" >Committees</option>
+            <option value="/law"  selected>Iowa Law &amp; Rules</option>
+            <option value="/agencies" >Legislative Agencies</option>
+            <option value="/publications" >Publications</option>
+            <option value="/resources/tourCapitol" >Capitol Tours &amp; Resources</option>
+            <option value="/lobbyist" >Lobbyist Information</option>
+            <option value="/archives" >Archives</option>
+        </select>
+    </div>
+    <ul id="nav_group1">
+        <li class="alpha"><a href="/chambers">Senate/House</a></li>
+        <li class=""><a href="/legislators">Legislators</a></li>
+        <li class=""><a href="/legislation">Legislation</a></li>
+        <li class="double small"><a href="/committees">Committees<div>&amp; Schedules</div></a></li>
+        <li class="double omega selected"><a href="/law">Iowa Law<div>&amp; Rules</div></a></li>
+    </ul>
+    <ul id="nav_group2">
+        <li class="double small alpha"><a href="/agencies">Legislative<div>Agencies</div></a></li>
+        <li class=""><a href="/publications">Publications</a></li>
+        <li class="double small"><a href="/resources/tourCapitol">Capitol Tours<div>&amp; Resources</div></a></li>
+        <li class="double small"><a href="/lobbyist">Lobbyist<div>Information</div></a></li>
+        <li class="omega"><a href="/archives">Archives</a></li>
+    </ul>
+</nav>
+<div id="header_nav_underlay" style="position:static;z-index: -1;display: none;" class="container_12">
+</div>
+    </form>
+</header>
+<div class="breadCrumb "><span class='path'><a href='/'>The Iowa Legislature</a> &gt; <a href='/law'>Iowa Law & Rules</a> &gt; <a href='/law/iowaCode'>Iowa Code</a> &gt; Code Chapter Listings</span>    <a class="print" href="javascript:window.print()" title="Click to print current page"><img src="/images/printIcon.png" alt="Print Icon" width="16" height="16"/>&nbsp;Print</a>    <a id="permaLink" style="float:right;margin-right:10px" href="/perma"><img src="/images/link2.png" alt="Chain Link Icon"/>&nbsp;Permanent Link</a>
+                </div>
+            <div class="notificationBar" role="alert"><span></span><a href="#remove">X</a></div>            <div id="innerWrapper" style="">
+                <div id="content">
+                    <div class="grid_3 alpha">
+    <div id="scroll-left" class="grid_3 alpha omega">
+                <div class="widget navigation">            <div class="content">                <nav class="link_list codeChapters">                                                        <a class="navLevel1" href="/law/statutory">Iowa Law</a>                                                <a class="navLevel2" href="/law/statutory">Iowa Code</a>                                                            <a class="navLevel2" href="/law/statutory/acts">Iowa Acts and Passed Legislation</a>                                                                                                                                                            <a class="navLevel2" href="/law/statutory/constitution">Constitution</a>                                                <a class="navLevel3" href="/law/statutory/constitution/pca">Proposed Constitutional Amendment</a>                                                                                                                        <a class="navLevel2" href="/law/statutory/additionalInfoLaw">Related Information</a>                                                                                                                        <a class="navLevel1" href="/law/administrativeRules">Iowa Administrative Rules</a>                                                <a class="navLevel2" href="/law/administrativeRules/howDoRulesWork">Learn How Rules Work</a>                                                            <a class="navLevel2" href="/law/administrativeRules/ruleWriterInfo">Rule Writer Tool Kit</a>                                                                        <a class="navLevel2" href="/law/administrativeRules/rulesManagementSystem">Rules Management System (RMS)</a>                                                            <a class="navLevel2" href="/law/administrativeRules/arrc">Administrative Rules Review Committee (ARRC)</a>                                                                                                                        <a class="navLevel2" href="/law/administrativeRules/researchtracking">Research & Tracking Resources</a>                                                                                                                                                                                                                                                                                                                        <a class="navLevel1" href="/law/courtRules">Iowa Court Rules</a>                                                                                    <a class="navLevel1" href="/chambers/rules">Chamber Rules</a>                                                            <a class="navLevel1" href="/publications/otherResources/executiveOrders">Executive Orders</a>                                                            <a class="navLevel1" href="/law/hyperlinkDownloads">Hyperlink Legal Downloads</a>                                                                        <a class="navLevel1" href="/law/information">Order Legal Publications</a>                                                                                    <a class="navLevel1" href="/law/officialAndUnofficialEditions">Official and Unofficial Editions</a>                                                            <a class="navLevel1" href="/law/authenticate">Document Authentication</a>                                                                                </nav>            </div>        </div>                            </div>
+</div>
+<section class="grid_9 omega">
+    <h2>Iowa Code - 2026</h2>
+    <div class="divideVert">Title XI - NATURAL RESOURCES | <a href="/law/iowaCode?year=2026">Back to Title Listing</a></div>
+    <div class="divideVert">Any chapter numbers omitted from the following list are reserved chapters in this publication year. To show all chapter numbers, click the "Show All Chapters" link.</div>
+    <div class="divideVert"><a style="float:right" class="showHideReservedChapters">Show All Chapters</a></div>
+    <table id="iacList" class="standard divideVert">
+            <thead>
+                <tr>
+                    <th>Code Chapter</th>
+                    <th>Sections</th>
+                    <th>PDF</th>
+                    <th>Enhanced Accessibility PDF</th>
+                    <th>RTF</th>
+                                    </tr>
+            </thead>
+            <tbody>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 455 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455A - DEPARTMENT OF NATURAL RESOURCES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455B - JURISDICTION OF DEPARTMENT OF NATURAL RESOURCES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455C - BEVERAGE CONTAINERS CONTROL</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455D - WASTE VOLUME REDUCTION AND RECYCLING</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455D&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455D.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455D_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455D.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455E - GROUNDWATER PROTECTION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455E&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455E.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455E_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455E.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455F - HOUSEHOLD HAZARDOUS MATERIAL</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455F&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455F.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455F_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455F.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455G - FUEL STORAGE TANKS AND DISPENSING INFRASTRUCTURE</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455G&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455G.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455G_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455G.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455H - LAND RECYCLING AND REMEDIATION STANDARDS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455H&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455H.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455H_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455H.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455I - UNIFORM ENVIRONMENTAL COVENANTS ACT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455I&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455I.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455I_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455I.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455J - ENVIRONMENTAL MANAGEMENT SYSTEMS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455J&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455J.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455J_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455J.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 455K - ENVIRONMENTAL AUDIT PRIVILEGE AND IMMUNITY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=455K&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/455K.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/455K_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/455K.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 456 - GEOLOGICAL SURVEY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=456&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/456.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/456_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/456.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 456A - REGULATION AND FUNDING — NATURAL RESOURCES DEPARTMENT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=456A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/456A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/456A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/456A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 456B - SPECIAL PROVISIONS — NATURAL RESOURCES DEPARTMENT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=456B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/456B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/456B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/456B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 457 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=457&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/457.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/457_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/457.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 457A - CONSERVATION EASEMENTS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=457A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/457A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/457A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/457A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 457B - MIDWEST INTERSTATE LOW-LEVEL RADIOACTIVE WASTE COMPACT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=457B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/457B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/457B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/457B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 458 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=458&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/458.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/458_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/458.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 458A - OIL, GAS, AND OTHER MINERALS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=458A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/458A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/458A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/458A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 459 - ANIMAL AGRICULTURE COMPLIANCE ACT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=459&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/459.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/459_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/459.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 459A -  OPEN FEEDLOT OPERATIONS AND ANIMAL TRUCK WASH FACILITIES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=459A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/459A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/459A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/459A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 459B - DRY BEDDED CONFINEMENT FEEDING OPERATIONS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=459B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/459B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/459B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/459B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 460 - AGRICULTURAL DRAINAGE WELLS AND SINKHOLES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=460&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/460.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/460_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/460.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 460A - GEOLOGICAL SURVEY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=460A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/460A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/460A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/460A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 461 - NATURAL RESOURCES AND OUTDOOR RECREATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=461&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/461.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/461_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/461.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 461A - PUBLIC LANDS AND WATERS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=461A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/461A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/461A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/461A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 461B - USE OF STATE WATERS BY NONRESIDENTS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=461B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/461B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/461B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/461B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 461C - PUBLIC USE OF PRIVATE LANDS AND WATERS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=461C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/461C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/461C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/461C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 462 - LANDOWNER LIABILITY TO TRESPASSERS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=462&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/462.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/462_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/462.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 462A - WATER NAVIGATION REGULATIONS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=462A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/462A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/462A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/462A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 462B - PROTECTED WATER AREA SYSTEM</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=462B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/462B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/462B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/462B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 463 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=463&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/463.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/463_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/463.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 463A - UPPER MISSISSIPPI RIVERWAY COMPACT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=463A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/463A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/463A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/463A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 463B - MISSOURI RIVER PRESERVATION AND LAND USE AUTHORITY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=463B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/463B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/463B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/463B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 463C - HONEY CREEK PARK DEVELOPMENT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=463C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/463C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/463C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/463C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 464 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=464&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/464.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/464_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/464.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 464A - DAMS AND SPILLWAYS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=464A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/464A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/464A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/464A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 464B - DAMS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=464B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/464B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/464B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/464B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 465 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=465&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/465.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/465_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/465.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 465A - OPEN SPACE LANDS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=465A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/465A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/465A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/465A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 465B - RECREATION TRAILS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=465B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/465B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/465B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/465B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 465C - STATE PRESERVES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=465C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/465C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/465C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/465C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 466 - IMPROVEMENT OF WATERSHED ATTRIBUTES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=466&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/466.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/466_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/466.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 466A - WATERSHED IMPROVEMENT GRANTS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=466A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/466A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/466A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/466A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 466B - SURFACE WATER PROTECTION, FLOOD MITIGATION, AND WATERSHED MANAGEMENT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=466B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/466B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/466B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/466B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 466C - IOWA FLOOD CENTER</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=466C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/466C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/466C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/466C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 467 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=467&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/467.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/467_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/467.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 467A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=467A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/467A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/467A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/467A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 467B - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=467B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/467B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/467B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/467B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 467C - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=467C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/467C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/467C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/467C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 467D - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=467D&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/467D.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/467D_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/467D.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 467E - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=467E&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/467E.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/467E_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/467E.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 467F - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=467F&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/467F.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/467F_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/467F.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 468 - LEVEE AND DRAINAGE DISTRICTS AND IMPROVEMENTS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=468&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/468.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/468_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/468.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 469 - ENERGY INDEPENDENCE INITIATIVES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=469&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/469.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/469_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/469.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 469A - HYDROELECTRIC PLANTS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=469A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/469A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/469A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/469A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 470 - LIFE CYCLE COST ANALYSIS  OF PUBLIC FACILITIES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=470&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/470.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/470_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/470.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 471 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=471&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/471.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/471_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/471.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 472 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=472&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/472.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/472_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/472.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 473 - ENERGY DEVELOPMENT AND CONSERVATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=473&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/473.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/473_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/473.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 473A - MIDWEST ENERGY COMPACT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=473A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/473A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/473A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/473A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 474 - UTILITIES COMMISSION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=474&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/474.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/474_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/474.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 475 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=475&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/475.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/475_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/475.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 475A - CONSUMER ADVOCATE</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=475A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/475A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/475A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/475A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 476 - PUBLIC UTILITY REGULATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=476&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/476.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/476_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/476.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 476A - ELECTRIC POWER GENERATION AND TRANSMISSION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=476A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/476A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/476A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/476A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 476B - WIND ENERGY PRODUCTION TAX CREDIT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=476B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/476B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/476B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/476B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 476C - RENEWABLE ENERGY TAX CREDIT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=476C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/476C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/476C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/476C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 476D - SOY-BASED TRANSFORMER FLUID TAX CREDIT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=476D&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/476D.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/476D_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/476D.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 477 - TELEGRAPH AND TELEPHONES — CABLE SYSTEMS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=477&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/477.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/477_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/477.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 477A - CABLE OR VIDEO SERVICE FRANCHISES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=477A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/477A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/477A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/477A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 477B - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=477B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/477B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/477B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/477B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 477C - DUAL PARTY RELAY SERVICE</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=477C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/477C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/477C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/477C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 478 - ELECTRIC TRANSMISSION LINES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=478&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/478.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/478_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/478.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 478A - GAS LAMPS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=478A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/478A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/478A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/478A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 479 - PIPELINES AND UNDERGROUND GAS STORAGE</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=479&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/479.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/479_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/479.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 479A - INTERSTATE NATURAL GAS PIPELINES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=479A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/479A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/479A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/479A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 479B - HAZARDOUS LIQUID PIPELINES  AND STORAGE FACILITIES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=479B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/479B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/479B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/479B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 480 - UNDERGROUND FACILITIES INFORMATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=480&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/480.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/480_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/480.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 480A - PUBLIC UTILITIES IN PUBLIC RIGHTS-OF-WAY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=480A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/480A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/480A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/480A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 481 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=481&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/481.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/481_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/481.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 481A - WILDLIFE CONSERVATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=481A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/481A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/481A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/481A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 481B - ENDANGERED PLANTS AND WILDLIFE</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=481B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/481B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/481B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/481B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 481C - WILD ANIMAL DEPREDATION PROCEDURES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=481C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/481C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/481C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/481C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 482 - COMMERCIAL FISHING</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=482&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/482.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/482_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/482.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 483 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=483&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/483.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/483_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/483.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 483A - FISHING AND HUNTING LICENSES, CONTRABAND, AND GUNS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=483A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/483A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/483A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/483A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 484 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=484&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/484.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/484_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/484.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 484A - MIGRATORY GAME BIRDS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=484A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/484A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/484A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/484A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 484B - HUNTING PRESERVES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=484B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/484B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/484B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/484B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 484C - PRESERVE WHITETAIL</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=484C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/484C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/484C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/484C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 485 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=485&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/485.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/485_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/485.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                            </tbody>
+    </table>
+</section>
+                </div>
+            </div>
+                        <footer class="footer" role="contentinfo">
+              <div class="footer-container">
+                <!-- Left: Logo -->
+                <div class="footer-brand">
+                  <a href="/" aria-label="Iowa Legislature Home">
+                    <img src="/images/dome.svg" alt="Iowa Legislature Logo" class="footer-logo">
+                  </a>
+                  <p>&copy; <script>document.write(new Date().getFullYear())</script> Iowa Legislature</p>
+                </div>
+
+                <!-- Right: Menus + Comments -->
+                <div class="footer-right">
+                  <!-- Top: 3-column menu -->
+                  <nav class="footer-nav" aria-label="Footer Navigation">
+                    <ul>
+                                            <li><a href="/sitemap#codeChapters">Site Map</a></li>
+                      <li><a href="/careers">Careers</a></li>
+                      <li><a href="/contacts/legisContact">Contacts</a></li>
+                      <li><a href="/portal">Applications</a></li>
+                      <li><a href="/subscribe">Subscribe</a></li>
+                      <li><a href="/misc/ada">ADA Policy</a></li>
+                      <li><a href="/misc/privacy">Online Privacy Policy</a></li>
+                      <li><a href="/law/disclaimer">Disclaimer</a></li>
+                    </ul>
+                  </nav>
+
+                  <!-- Bottom: Comments/Contact -->
+                  <div class="footer-contact">
+                    <div class="footer-comments-line">                      
+                      <span class="phone">&#9742; Senate Switchboard: 515.281.3116 or 515.281.3371</span>
+                      <span class="divider">|</span>
+                      <span class="phone">&#9742; House of Representatives Switchboard: 515.281.3221</span>
+                    </div>
+                    <div class="footer-comments-line">
+                      <strong>Comments?</strong>
+                      <span class="arrow">&#8658;</span>
+                      <a href="mailto:webmaster@legis.iowa.gov">&#9993; webmaster@legis.iowa.gov</a>
+                      <span class="divider">|</span>
+                      <span class="phone">&#9742; IT Help Desk: 515.281.6506</span>
+                      <span class="divider">|</span>
+                      <span class="reportada">&#x26A0; <a href="/misc/ada#ada">Report ADA Accessibility Issue</a></span>
+                      
+                    </div>
+
+                    <p class="footer-note">
+                      (Please remember that the webmaster does not vote on bills.
+                      Direct all comments concerning legislation to State Legislators.)
+                    </p>
+                  </div>                 
+                </div>
+              </div>
+              <div class="footer-bottom">
+                <button class="back-to-top" aria-label="Back to top">&uarr; Back to Top</button>
+              </div>
+              <input type="hidden" name="template" value="law/codeChapterList"/>
+              <input type="hidden" name="processTime" value="191450201 nanos"/>
+              <input type="hidden" name="renderTime" value="848499 nanos"/>
+              <input type="hidden" name="totalTime" value="192318401 nanos"/>
+              <input type="hidden" name="template" value="law/codeChapterList"/>
+            </footer>            
+                        <div id="permaLinkDialog" style="display: none" title="Permanent Link">
+                <div style="color:#254561">If you would like to get the permanent link to a url other than the page you are currently viewing you can paste
+                    a url inside of the destination box and hit regenerate</div>
+                <div class="divideVert">Destination: <input type="text" value="" placeholder="This page" aria-label="Destination"/></div>
+                <div>Perma Link: &nbsp;<a id="permaLink" target="_blank" aria-label="Perma Link"></a></div>
+            </div>
+        </div>
+
+       
+                        
+        <script type="text/javascript" src="/cached/11/scripts/postload.js"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+        <script type="text/javascript" src="/cached/202604281100/scripts/master.js"></script>
+        
+                <script>         (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),         m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)         })(window,document,'script','//www.google-analytics.com/analytics.js','ga');         ga('create', 'UA-38741357-1', 'auto');         ga('send', 'pageview');         </script>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-HC5JJR60WG"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+
+          gtag('config', 'G-HC5JJR60WG');
+          
+          const backToTopBtn = document.querySelector('.back-to-top');
+          window.addEventListener('scroll', () => {
+              if (window.scrollY > 200) {
+                backToTopBtn.style.display = 'inline-block';
+              } else {
+                backToTopBtn.style.display = 'none';
+              }
+          });
+
+          backToTopBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          });
+        </script>
+    </body>
+</html>

@@ -1,0 +1,114 @@
+# DigitalOcean App Platform spec — Iowa Legal Corpus.
+#
+# Source: a connected GitHub repo (deploy_on_push). App Platform builds the
+# root Dockerfile on every push to `branch`.
+#
+# >>> EDIT ME: set `repo` on BOTH the web service and the migrate job to
+#     your "<github-user>/<repo>" before applying. <<<
+#
+# Apply:
+#   doctl apps create            --spec deploy/app.yaml   # first time
+#   doctl apps update <APP_ID>   --spec deploy/app.yaml    # subsequent
+#
+# Secrets (SECRET_KEY, OPENAI_API_KEY, VOYAGE_API_KEY, optional
+# ANTHROPIC_API_KEY) are NOT in this file — set them as encrypted env vars
+# in the App Platform UI or via `doctl`. Never commit them.
+
+name: iowa-legal-corpus
+region: nyc # keep the managed DB in the same region (nyc1/nyc3) for private networking
+
+# iowa-db: an EXISTING standalone Managed Postgres cluster (created first so
+#          the corpus + embeddings are loaded before the app exists — see
+#          DEPLOY.md step 3). pgvector must be enabled on it.
+# iowa-cache: app-managed Valkey; it only holds the chat quota / rate-limit
+#          counters, nothing to preload.
+databases:
+  - name: iowa-db
+    engine: PG
+    production: true
+    cluster_name: iowa-corpus-db # <<< the real DO cluster name from step 2
+    db_name: defaultdb
+    db_user: doadmin
+  - name: iowa-cache
+    engine: VALKEY
+    version: "8"
+    production: true
+
+services:
+  - name: web
+    github:
+      repo: YOUR_GH_USER/statutes # <<< EDIT
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: Dockerfile
+    source_dir: /
+    instance_size_slug: basic-xs
+    instance_count: 1 # keep at 1 until the Redis-backed quota is verified
+    http_port: 8080
+    health_check:
+      http_path: /api/health
+    routes:
+      - path: /
+    envs:
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${iowa-db.DATABASE_URL} # injected by App Platform
+      - key: REDIS_URL
+        scope: RUN_TIME
+        value: ${iowa-cache.DATABASE_URL}
+      - key: ALLOWED_HOSTS
+        scope: RUN_TIME
+        value: ${APP_DOMAIN} # App Platform substitutes the live domain
+      - key: CSRF_TRUSTED_ORIGINS
+        scope: RUN_TIME
+        value: https://${APP_DOMAIN}
+      - key: CORS_ALLOWED_ORIGINS
+        scope: RUN_TIME
+        value: https://${APP_DOMAIN} # same-origin; kept for headless callers
+      - key: OPENAI_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: VOYAGE_API_KEY # required: vector search embeds the query at request time
+        scope: RUN_TIME
+        type: SECRET
+      - key: ANTHROPIC_API_KEY # optional: query expansion; no-op if unset
+        scope: RUN_TIME
+        type: SECRET
+      - key: CHAT_DAILY_USER_LIMIT
+        scope: RUN_TIME
+        value: "50"
+      - key: CHAT_MONTHLY_GLOBAL_LIMIT
+        scope: RUN_TIME
+        value: "20000"
+
+# Runs once per deploy, before new web containers take traffic. Because the
+# DB is preloaded from a dump (schema + HNSW index included), this should
+# report "No migrations to apply."
+jobs:
+  - name: migrate
+    kind: PRE_DEPLOY
+    github:
+      repo: YOUR_GH_USER/statutes # <<< EDIT (same repo as the web service)
+      branch: main
+    dockerfile_path: Dockerfile
+    source_dir: /
+    instance_size_slug: basic-xs
+    run_command: python manage.py migrate --noinput
+    envs:
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${iowa-db.DATABASE_URL}
+
+# NOTE: the MCP server (apps/mcp_server) is intentionally NOT deployed for
+# the initial launch — its API-key auth path needs end-to-end verification
+# first. Add it later as a second service on its own route. See DEPLOY.md.

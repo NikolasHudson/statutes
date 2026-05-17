@@ -1,0 +1,19 @@
+# Keep the build context small and never ship secrets or local state.
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+backend/.env
+backend/.env.*
+backend/staticfiles
+backend/data/raw
+frontend/dist
+.git
+.claude
+*.log
+iowa_code_probe.json
+Iowa Court Rules/
+*.docx

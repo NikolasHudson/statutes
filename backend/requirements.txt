@@ -1,0 +1,27 @@
+Django>=5.1,<5.2
+django-ninja>=1.3
+django-cors-headers>=4.6
+django-environ>=0.11
+psycopg[binary]>=3.2
+pgvector>=0.3
+# Optional at import time — embedding/expansion clients fall back to the
+# deterministic fake / no-op when these aren't installed or no API key is set.
+voyageai>=0.3
+anthropic>=0.39
+# OpenAI client used by the /api/chat test endpoint (frontend test page).
+# Only imported lazily inside that view.
+openai>=1.50
+# Iowa Code scraper strips RTF chapters into plain text.
+striprtf>=0.0.26
+# MCP server. The CLI extra pulls in uvicorn for the optional HTTP transport
+# and typer for the dev CLI.
+mcp[cli]>=1.0
+# --- Production serving (App Platform) ---
+# WSGI server for the web process.
+gunicorn>=23.0
+# Serves Django admin static + the built React SPA from the web process
+# (App Platform has no shared static volume).
+whitenoise>=6.8
+# Backs Django's RedisCache: the per-user chat quota and API rate limiter
+# must share a durable store across processes/deploys.
+redis>=5.2

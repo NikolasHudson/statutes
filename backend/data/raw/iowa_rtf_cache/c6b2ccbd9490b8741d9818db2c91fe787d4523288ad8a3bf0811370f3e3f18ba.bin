@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="x-ua-compatible" content="ie=edge" />         <meta http-equiv="cache-control" content="no-cache" />          <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1" />
+        <meta name="author" content="Iowa Legislative Services Agency" />
+        <meta name="description" content="Information pertaining to the Iowa Legislature as well as the Executive and Judicial branch in as much as they relate to the legislative branch" />
+                        <title>Iowa Legislature - Code Chapter Listings</title>
+        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/ui-lightness/jquery-ui.min.css"/>
+                <link rel="stylesheet" href="/cached/202604281100/css/govicons.min.css"/>
+                <link rel="stylesheet" href="/cached/202604281100/css/master.combined.css"/>
+                                        
+                <script type="text/javascript" src="/cached/11/scripts/preload.js"></script>
+    </head>
+    <body class="">
+        <div id="outerWrapper" class="container_12 ">
+            <input type="hidden" id="masterURL" value=""/>
+            <input type="hidden" id="dashboardURL" value=""/>
+            <header class="site_header container_12">
+    <form id="searchForm" class="autoLabels" action="/publications/search" method="GET">
+        <input type="hidden" id="searchPage" value="false"/>
+        <input type="hidden" name="facet.pivot" value="l1,l2"/>
+        <input type="hidden" name="fq" value="-status:Reserved"/>
+        <input type="hidden" name="fq" value='current:"true"'/>
+        <input type="hidden" name="tab" value="true"/>
+        <input type="hidden" name="tc" value="true"/>                <div id="blackBar" class="container_12">
+            <div id="blackBarName">
+                <a href="/" aria-label="Iowa Legislature Home" title="Iowa Legislature Home">
+                    <i style="display:none;" class="gi gi-capitol"></i>
+                    <img  alt="Iowa Legislature"> src="/images/theme/capitolYellow.png"/>
+                    <span aria-label="Iowa Legislature">Iowa Legislature</span>
+                </a>
+            </div>
+            <div id="appMessage" style="float:left;margin-left:25px;color:white;line-height:40px"></div>
+            <div id="search">
+                <select name="fq" title="Select the type of search you would like to do within this website." aria-label="Search type">
+                    <option value=''>Publications</option>
+                    <option value='site'>Site</option>
+                                        <option value='l2:"law:code:1474|year?"' data-year='true' data-nyr='true' selected="selected">Iowa Code:2026</option>
+                                    </select>
+                <input class="q" type="search" aria-label="Search" name="q" placeholder="(Enter Search Term)" value=''/>
+                <input aria-label="SearchSubmit" id="searchSubmit" type="submit" value=""/>
+            </div>
+                    </div>
+                <div id="banner" class="container_12">
+            <a class="logo" href="/" title="Iowa Legislature Home" aria-label="Iowa Legislature Home"></a>
+        </div>
+        <nav id="header_nav" class="container_12">
+            <div id="mobile_nav">
+        
+        <select title="Legis Website Sections" aria-label="Legis Site Sections">
+            <option id="top" value="">Sections...</option>
+            <option value="/chambers" >Senate/House</option>
+            <option value="/legislators" >Legislators</option>
+            <option value="/legislation" >Legislation</option>
+            <option value="/committees" >Committees</option>
+            <option value="/law"  selected>Iowa Law &amp; Rules</option>
+            <option value="/agencies" >Legislative Agencies</option>
+            <option value="/publications" >Publications</option>
+            <option value="/resources/tourCapitol" >Capitol Tours &amp; Resources</option>
+            <option value="/lobbyist" >Lobbyist Information</option>
+            <option value="/archives" >Archives</option>
+        </select>
+    </div>
+    <ul id="nav_group1">
+        <li class="alpha"><a href="/chambers">Senate/House</a></li>
+        <li class=""><a href="/legislators">Legislators</a></li>
+        <li class=""><a href="/legislation">Legislation</a></li>
+        <li class="double small"><a href="/committees">Committees<div>&amp; Schedules</div></a></li>
+        <li class="double omega selected"><a href="/law">Iowa Law<div>&amp; Rules</div></a></li>
+    </ul>
+    <ul id="nav_group2">
+        <li class="double small alpha"><a href="/agencies">Legislative<div>Agencies</div></a></li>
+        <li class=""><a href="/publications">Publications</a></li>
+        <li class="double small"><a href="/resources/tourCapitol">Capitol Tours<div>&amp; Resources</div></a></li>
+        <li class="double small"><a href="/lobbyist">Lobbyist<div>Information</div></a></li>
+        <li class="omega"><a href="/archives">Archives</a></li>
+    </ul>
+</nav>
+<div id="header_nav_underlay" style="position:static;z-index: -1;display: none;" class="container_12">
+</div>
+    </form>
+</header>
+<div class="breadCrumb "><span class='path'><a href='/'>The Iowa Legislature</a> &gt; <a href='/law'>Iowa Law & Rules</a> &gt; <a href='/law/iowaCode'>Iowa Code</a> &gt; Code Chapter Listings</span>    <a class="print" href="javascript:window.print()" title="Click to print current page"><img src="/images/printIcon.png" alt="Print Icon" width="16" height="16"/>&nbsp;Print</a>    <a id="permaLink" style="float:right;margin-right:10px" href="/perma"><img src="/images/link2.png" alt="Chain Link Icon"/>&nbsp;Permanent Link</a>
+                </div>
+            <div class="notificationBar" role="alert"><span></span><a href="#remove">X</a></div>            <div id="innerWrapper" style="">
+                <div id="content">
+                    <div class="grid_3 alpha">
+    <div id="scroll-left" class="grid_3 alpha omega">
+                <div class="widget navigation">            <div class="content">                <nav class="link_list codeChapters">                                                        <a class="navLevel1" href="/law/statutory">Iowa Law</a>                                                <a class="navLevel2" href="/law/statutory">Iowa Code</a>                                                            <a class="navLevel2" href="/law/statutory/acts">Iowa Acts and Passed Legislation</a>                                                                                                                                                            <a class="navLevel2" href="/law/statutory/constitution">Constitution</a>                                                <a class="navLevel3" href="/law/statutory/constitution/pca">Proposed Constitutional Amendment</a>                                                                                                                        <a class="navLevel2" href="/law/statutory/additionalInfoLaw">Related Information</a>                                                                                                                        <a class="navLevel1" href="/law/administrativeRules">Iowa Administrative Rules</a>                                                <a class="navLevel2" href="/law/administrativeRules/howDoRulesWork">Learn How Rules Work</a>                                                            <a class="navLevel2" href="/law/administrativeRules/ruleWriterInfo">Rule Writer Tool Kit</a>                                                                        <a class="navLevel2" href="/law/administrativeRules/rulesManagementSystem">Rules Management System (RMS)</a>                                                            <a class="navLevel2" href="/law/administrativeRules/arrc">Administrative Rules Review Committee (ARRC)</a>                                                                                                                        <a class="navLevel2" href="/law/administrativeRules/researchtracking">Research & Tracking Resources</a>                                                                                                                                                                                                                                                                                                                        <a class="navLevel1" href="/law/courtRules">Iowa Court Rules</a>                                                                                    <a class="navLevel1" href="/chambers/rules">Chamber Rules</a>                                                            <a class="navLevel1" href="/publications/otherResources/executiveOrders">Executive Orders</a>                                                            <a class="navLevel1" href="/law/hyperlinkDownloads">Hyperlink Legal Downloads</a>                                                                        <a class="navLevel1" href="/law/information">Order Legal Publications</a>                                                                                    <a class="navLevel1" href="/law/officialAndUnofficialEditions">Official and Unofficial Editions</a>                                                            <a class="navLevel1" href="/law/authenticate">Document Authentication</a>                                                                                </nav>            </div>        </div>                            </div>
+</div>
+<section class="grid_9 omega">
+    <h2>Iowa Code - 2026</h2>
+    <div class="divideVert">Title III - PUBLIC SERVICES AND REGULATION | <a href="/law/iowaCode?year=2026">Back to Title Listing</a></div>
+    <div class="divideVert">Any chapter numbers omitted from the following list are reserved chapters in this publication year. To show all chapter numbers, click the "Show All Chapters" link.</div>
+    <div class="divideVert"><a style="float:right" class="showHideReservedChapters">Show All Chapters</a></div>
+    <table id="iacList" class="standard divideVert">
+            <thead>
+                <tr>
+                    <th>Code Chapter</th>
+                    <th>Sections</th>
+                    <th>PDF</th>
+                    <th>Enhanced Accessibility PDF</th>
+                    <th>RTF</th>
+                                    </tr>
+            </thead>
+            <tbody>
+                                    <tr >
+                        <td>Chapter 80 - DEPARTMENT OF PUBLIC SAFETY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=80&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/80.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/80_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/80.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 80A - PRIVATE INVESTIGATIVE AGENCIES AND SECURITY AGENTS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=80A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/80A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/80A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/80A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 80B - LAW ENFORCEMENT ACADEMY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=80B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/80B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/80B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/80B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 80C - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=80C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/80C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/80C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/80C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 80D - RESERVE PEACE OFFICERS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=80D&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/80D.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/80D_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/80D.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 80E - DRUG ENFORCEMENT AND ABUSE PREVENTION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=80E&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/80E.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/80E_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/80E.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 80F - RIGHTS OF PEACE OFFICERS AND PUBLIC SAFETY  AND EMERGENCY PERSONNEL</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=80F&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/80F.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/80F_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/80F.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 80G - UNDERCOVER LAW ENFORCEMENT OFFICERS — PRIVILEGE — CONFIDENTIALITY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=80G&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/80G.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/80G_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/80G.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 80H - BLUE ALERT PROGRAM</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=80H&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/80H.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/80H_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/80H.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 81 - DNA PROFILING</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=81&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/81.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/81_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/81.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 82 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=82&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/82.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/82_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/82.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 83 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=83&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/83.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/83_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/83.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 83A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=83A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/83A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/83A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/83A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 84 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=84&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/84.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/84_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/84.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 84A - DEPARTMENT OF WORKFORCE DEVELOPMENT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=84A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/84A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/84A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/84A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 84B - WORKFORCE DEVELOPMENT CENTERS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=84B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/84B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/84B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/84B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 84C - WORKER ADJUSTMENT AND RETRAINING NOTIFICATION ACT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=84C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/84C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/84C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/84C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 84D - REGISTERED APPRENTICESHIP ACT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=84D&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/84D.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/84D_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/84D.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 84E - APPRENTICESHIP TRAINING PROGRAM</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=84E&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/84E.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/84E_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/84E.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 84F - FUTURE READY IOWA APPRENTICESHIP PROGRAMS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=84F&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/84F.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/84F_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/84F.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 84G - WORKFORCE DEVELOPMENT FUND PROGRAM</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=84G&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/84G.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/84G_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/84G.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 84H - VOCATIONAL REHABILITATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=84H&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/84H.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/84H_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/84H.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 84I - EMPLOYMENT AGENCIES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=84I&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/84I.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/84I_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/84I.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 85 - WORKERS’ COMPENSATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=85&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/85.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/85_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/85.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 85A - OCCUPATIONAL DISEASE COMPENSATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=85A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/85A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/85A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/85A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 85B - OCCUPATIONAL HEARING LOSS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=85B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/85B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/85B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/85B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 86 - DIVISION OF WORKERS’ COMPENSATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=86&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/86.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/86_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/86.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 87 - WORKERS’ COMPENSATION OR EMPLOYERS’ LIABILITY INSURANCE</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=87&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/87.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/87_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/87.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 88 - OCCUPATIONAL SAFETY AND HEALTH</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=88&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/88.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/88_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/88.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 88A - SAFETY INSPECTION OF AMUSEMENT RIDES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=88A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/88A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/88A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/88A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 88B - ASBESTOS REMOVAL AND ENCAPSULATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=88B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/88B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/88B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/88B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 89 - BOILERS AND UNFIRED STEAM PRESSURE VESSELS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=89&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/89.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/89_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/89.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 89A - ELEVATORS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=89A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/89A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/89A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/89A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 89B - HAZARDOUS CHEMICALS RISKS — RIGHT TO KNOW</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=89B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/89B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/89B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/89B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 90 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=90&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/90.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/90_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/90.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 90A - BOXING, MIXED MARTIAL ARTS, AND WRESTLING</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=90A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/90A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/90A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/90A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 91 - LABOR SERVICES DIVISION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=91&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/91.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/91_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/91.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 91A - WAGE PAYMENT COLLECTION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=91A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/91A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/91A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/91A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 91B - PERSONNEL INFORMATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=91B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/91B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/91B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/91B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 91C - CONSTRUCTION CONTRACTORS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=91C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/91C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/91C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/91C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 91D - MINIMUM WAGE</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=91D&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/91D.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/91D_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/91D.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 91E - NON-ENGLISH SPEAKING EMPLOYEES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=91E&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/91E.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/91E_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/91E.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 92 - CHILD LABOR</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=92&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/92.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/92_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/92.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 93 - MARKETPLACE CONTRACTORS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=93&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/93.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/93_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/93.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 94 - COVID-19 VACCINATION REQUIREMENTS BY EMPLOYERS — WAIVER</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=94&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/94.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/94_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/94.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 94A - EMPLOYMENT AGENCIES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=94A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/94A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/94A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/94A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 95 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=95&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/95.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/95_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/95.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 96 - EMPLOYMENT SECURITY — UNEMPLOYMENT COMPENSATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=96&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/96.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/96_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/96.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 97 - OLD-AGE AND SURVIVORS’ INSURANCE SYSTEM</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=97&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/97.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/97_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/97.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 97A - PUBLIC SAFETY PEACE OFFICERS’ RETIREMENT,  ACCIDENT, AND DISABILITY SYSTEM</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=97A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/97A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/97A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/97A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 97B - IOWA PUBLIC EMPLOYEES’ RETIREMENT SYSTEM (IPERS)</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=97B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/97B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/97B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/97B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 97C - FEDERAL SOCIAL SECURITY ENABLING ACT</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=97C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/97C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/97C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/97C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 97D - PUBLIC RETIREMENT SYSTEMS GENERALLY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=97D&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/97D.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/97D_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/97D.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 98 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=98&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/98.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/98_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/98.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 98A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=98A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/98A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/98A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/98A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 99 - HOUSES USED FOR PROSTITUTION OR GAMBLING</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=99&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/99.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/99_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/99.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 99A - POSSESSION OF GAMBLING DEVICES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=99A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/99A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/99A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/99A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 99B - SOCIAL AND CHARITABLE GAMBLING</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=99B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/99B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/99B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/99B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 99C - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=99C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/99C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/99C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/99C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 99D - PARI-MUTUEL WAGERING</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=99D&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/99D.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/99D_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/99D.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 99E - INTERNET FANTASY SPORTS CONTESTS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=99E&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/99E.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/99E_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/99E.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 99F - GAMBLING GAMES AND SPORTS WAGERING REGULATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=99F&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/99F.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/99F_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/99F.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 99G - IOWA LOTTERY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=99G&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/99G.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/99G_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/99G.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 100 - STATE FIRE MARSHAL</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=100&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/100.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/100_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/100.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 100A - ARSON INVESTIGATION</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=100A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/100A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/100A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/100A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 100B - FIRE, EMERGENCY RESPONSE, AND LAW ENFORCEMENT — SERVICES, TRAINING, AND VOLUNTEER BENEFITS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=100B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/100B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/100B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/100B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 100C - FIRE EXTINGUISHING AND ALARM SYSTEMS CONTRACTORS AND INSTALLERS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=100C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/100C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/100C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/100C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 100D - FIRE PROTECTION SYSTEM INSTALLATION  AND MAINTENANCE</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=100D&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/100D.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/100D_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/100D.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 101 - COMBUSTIBLE AND FLAMMABLE LIQUIDS AND LIQUEFIED GASES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=101&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/101.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/101_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/101.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 101A - EXPLOSIVE MATERIALS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=101A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/101A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/101A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/101A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 101B - CIGARETTE FIRE SAFETY STANDARDS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=101B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/101B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/101B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/101B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 101C - IOWA PROPANE EDUCATION AND RESEARCH COUNCIL</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=101C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/101C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/101C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/101C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 102 - FIRE SCENES — AUTHORITY</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=102&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/102.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/102_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/102.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 103 - ELECTRICIANS AND ELECTRICAL CONTRACTORS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=103&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/103.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/103_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/103.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 103A - STATE BUILDING CODE</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=103A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/103A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/103A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/103A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 104 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=104&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/104.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/104_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/104.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 104A - ACCESSIBILITY FOR PERSONS WITH DISABILITIES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=104A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/104A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/104A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/104A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 104B - MINIMUM PLUMBING FACILITIES</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=104B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/104B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/104B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/104B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr >
+                        <td>Chapter 105 - PLUMBERS, MECHANICAL PROFESSIONALS, AND CONTRACTORS</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=105&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/105.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/105_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/105.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 106 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=106&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/106.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/106_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/106.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 106A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=106A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/106A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/106A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/106A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 107 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=107&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/107.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/107_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/107.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 108 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=108&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/108.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/108_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/108.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 108A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=108A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/108A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/108A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/108A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 108B - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=108B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/108B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/108B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/108B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 109 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=109&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/109.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/109_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/109.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 109B - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=109B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/109B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/109B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/109B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 110 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=110&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/110.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/110_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/110.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 110A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=110A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/110A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/110A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/110A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 111 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=111&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/111.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/111_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/111.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 111A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=111A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/111A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/111A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/111A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 111B - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=111B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/111B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/111B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/111B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 111C - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=111C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/111C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/111C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/111C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 111D - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=111D&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/111D.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/111D_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/111D.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 111E - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=111E&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/111E.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/111E_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/111E.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 111F - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=111F&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/111F.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/111F_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/111F.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 112 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=112&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/112.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/112_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/112.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 113 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=113&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/113.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/113_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/113.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 114 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=114&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/114.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/114_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/114.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 114A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=114A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/114A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/114A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/114A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 115 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=115&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/115.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/115_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/115.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 116 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=116&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/116.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/116_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/116.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 117 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=117&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/117.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/117_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/117.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 117A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=117A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/117A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/117A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/117A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 117B - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=117B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/117B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/117B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/117B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 118 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=118&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/118.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/118_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/118.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 118A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=118A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/118A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/118A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/118A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 119 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=119&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/119.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/119_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/119.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 120 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=120&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/120.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/120_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/120.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 121 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=121&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/121.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/121_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/121.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 122 - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=122&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/122.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/122_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/122.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 122A - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=122A&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/122A.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/122A_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/122A.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 122B - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=122B&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/122B.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/122B_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/122B.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                                    <tr class='reservedChapterRow' style='display:none'>
+                        <td>Chapter 122C - RESERVED</td>
+                        <td><a href="/law/iowaCode/sections?codeChapter=122C&year=2026">Sections</a></td>
+                        <td><a href="/docs/code/2026/122C.pdf" target="_blank">PDF</a></td>
+                        <td><a href="/docs/publications/ICC/2026/attachments/122C_ADA.pdf" target="_blank" title="These PDFs include accessibility features to improve usability. If you need help accessing a document, please email webmaster@legis.iowa.gov.">PDF</a></td>
+                        <td><a href="/docs/code/2026/122C.rtf" target="_blank">RTF</a></td>
+                                            </tr>
+                            </tbody>
+    </table>
+</section>
+                </div>
+            </div>
+                        <footer class="footer" role="contentinfo">
+              <div class="footer-container">
+                <!-- Left: Logo -->
+                <div class="footer-brand">
+                  <a href="/" aria-label="Iowa Legislature Home">
+                    <img src="/images/dome.svg" alt="Iowa Legislature Logo" class="footer-logo">
+                  </a>
+                  <p>&copy; <script>document.write(new Date().getFullYear())</script> Iowa Legislature</p>
+                </div>
+
+                <!-- Right: Menus + Comments -->
+                <div class="footer-right">
+                  <!-- Top: 3-column menu -->
+                  <nav class="footer-nav" aria-label="Footer Navigation">
+                    <ul>
+                                            <li><a href="/sitemap#codeChapters">Site Map</a></li>
+                      <li><a href="/careers">Careers</a></li>
+                      <li><a href="/contacts/legisContact">Contacts</a></li>
+                      <li><a href="/portal">Applications</a></li>
+                      <li><a href="/subscribe">Subscribe</a></li>
+                      <li><a href="/misc/ada">ADA Policy</a></li>
+                      <li><a href="/misc/privacy">Online Privacy Policy</a></li>
+                      <li><a href="/law/disclaimer">Disclaimer</a></li>
+                    </ul>
+                  </nav>
+
+                  <!-- Bottom: Comments/Contact -->
+                  <div class="footer-contact">
+                    <div class="footer-comments-line">                      
+                      <span class="phone">&#9742; Senate Switchboard: 515.281.3116 or 515.281.3371</span>
+                      <span class="divider">|</span>
+                      <span class="phone">&#9742; House of Representatives Switchboard: 515.281.3221</span>
+                    </div>
+                    <div class="footer-comments-line">
+                      <strong>Comments?</strong>
+                      <span class="arrow">&#8658;</span>
+                      <a href="mailto:webmaster@legis.iowa.gov">&#9993; webmaster@legis.iowa.gov</a>
+                      <span class="divider">|</span>
+                      <span class="phone">&#9742; IT Help Desk: 515.281.6506</span>
+                      <span class="divider">|</span>
+                      <span class="reportada">&#x26A0; <a href="/misc/ada#ada">Report ADA Accessibility Issue</a></span>
+                      
+                    </div>
+
+                    <p class="footer-note">
+                      (Please remember that the webmaster does not vote on bills.
+                      Direct all comments concerning legislation to State Legislators.)
+                    </p>
+                  </div>                 
+                </div>
+              </div>
+              <div class="footer-bottom">
+                <button class="back-to-top" aria-label="Back to top">&uarr; Back to Top</button>
+              </div>
+              <input type="hidden" name="template" value="law/codeChapterList"/>
+              <input type="hidden" name="processTime" value="533863700 nanos"/>
+              <input type="hidden" name="renderTime" value="1135799 nanos"/>
+              <input type="hidden" name="totalTime" value="535015400 nanos"/>
+              <input type="hidden" name="template" value="law/codeChapterList"/>
+            </footer>            
+                        <div id="permaLinkDialog" style="display: none" title="Permanent Link">
+                <div style="color:#254561">If you would like to get the permanent link to a url other than the page you are currently viewing you can paste
+                    a url inside of the destination box and hit regenerate</div>
+                <div class="divideVert">Destination: <input type="text" value="" placeholder="This page" aria-label="Destination"/></div>
+                <div>Perma Link: &nbsp;<a id="permaLink" target="_blank" aria-label="Perma Link"></a></div>
+            </div>
+        </div>
+
+       
+                        
+        <script type="text/javascript" src="/cached/11/scripts/postload.js"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+        <script type="text/javascript" src="/cached/202604281100/scripts/master.js"></script>
+        
+                <script>         (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),         m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)         })(window,document,'script','//www.google-analytics.com/analytics.js','ga');         ga('create', 'UA-38741357-1', 'auto');         ga('send', 'pageview');         </script>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-HC5JJR60WG"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+
+          gtag('config', 'G-HC5JJR60WG');
+          
+          const backToTopBtn = document.querySelector('.back-to-top');
+          window.addEventListener('scroll', () => {
+              if (window.scrollY > 200) {
+                backToTopBtn.style.display = 'inline-block';
+              } else {
+                backToTopBtn.style.display = 'none';
+              }
+          });
+
+          backToTopBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          });
+        </script>
+    </body>
+</html>
