@@ -11,6 +11,10 @@ Shape is deliberately tree-shaped so a thin UI can drill:
 
 from __future__ import annotations
 
+import hashlib
+import json
+
+from django.http import HttpResponse, HttpResponseNotModified, JsonResponse
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from ninja import Router
@@ -24,6 +28,34 @@ from apps.corpus.services.lookups import (
 from apps.corpus.services.search import hybrid_search
 
 browse_router = Router()
+
+# Browse only ever serves approved, currently-effective public law, and that
+# only changes when an admin approves an ingest. So let Cloudflare (and the
+# browser) absorb repeat reads: a short shared-cache TTL caps staleness to a
+# minute while killing the per-navigation origin/DB hit, and a payload ETag
+# lets a revalidation come back as a 32-byte 304.
+_BROWSE_CACHE_CONTROL = "public, s-maxage=60, stale-while-revalidate=600"
+
+
+def _cached_json(request, payload) -> HttpResponse:
+    """Serialize ``payload`` with an ETag + cache headers, and short-circuit
+    to ``304 Not Modified`` when the client's If-None-Match still matches.
+
+    Returned directly from a Ninja operation, which passes HttpResponse
+    instances through untouched (no double serialization)."""
+    body = json.dumps(payload, separators=(",", ":"), default=str)
+    etag = f'"{hashlib.sha1(body.encode()).hexdigest()[:16]}"'
+
+    if request.headers.get("If-None-Match") == etag:
+        resp: HttpResponse = HttpResponseNotModified()
+    else:
+        # safe=False: list_sources returns a top-level JSON array.
+        resp = JsonResponse(
+            payload, safe=False, json_dumps_params={"default": str}
+        )
+    resp["ETag"] = etag
+    resp["Cache-Control"] = _BROWSE_CACHE_CONTROL
+    return resp
 
 
 def _citation(node: Node) -> str:
@@ -73,7 +105,7 @@ def list_sources(request):
                 else "Entries",
             }
         )
-    return out
+    return _cached_json(request, out)
 
 
 @browse_router.get("/sources/{slug}/chapters", auth=None)
@@ -92,7 +124,7 @@ def list_chapters(request, slug: str):
     )
     # path is a string ("1".."70"); sort numerically for a sane TOC.
     rows = sorted(chapters, key=lambda n: _intkey(n.ordinal))
-    return {
+    return _cached_json(request, {
         "source": {"slug": source.slug, "name": source.name},
         "chapters": [
             {
@@ -104,7 +136,7 @@ def list_chapters(request, slug: str):
             }
             for c in rows
         ],
-    }
+    })
 
 
 @browse_router.get("/chapters/{int:chapter_id}", auth=None)
@@ -115,11 +147,13 @@ def chapter_detail(request, chapter_id: int):
     )
     children = (
         Node.objects.filter(parent=chapter, is_repealed=False)
-        .select_related("node_type")
+        # ``source`` is needed by _citation() for every child — without it the
+        # list comprehension below issues one SELECT per child (N+1).
+        .select_related("node_type", "source")
         .order_by("path")
     )
     rows = sorted(children, key=lambda n: _ordkey(n.ordinal))
-    return {
+    return _cached_json(request, {
         "id": chapter.id,
         "type": chapter.node_type.label_singular,
         "source_slug": chapter.source.slug,
@@ -140,17 +174,22 @@ def chapter_detail(request, chapter_id: int):
             }
             for n in rows
         ],
-    }
+    })
 
 
 @browse_router.get("/nodes/{int:node_id}", auth=None)
 def node_detail(request, node_id: int):
     """A single node with its currently effective approved content."""
     node = get_object_or_404(
-        Node.objects.select_related("source", "node_type", "parent"), pk=node_id
+        # ``parent__source`` so _citation(node.parent) below doesn't fire an
+        # extra SELECT for the parent's source.
+        Node.objects.select_related(
+            "source", "node_type", "parent", "parent__source"
+        ),
+        pk=node_id,
     )
     version = current_version(node)
-    return {
+    return _cached_json(request, {
         "id": node.id,
         "type": node.node_type.label_singular,
         "source": node.source.name,
@@ -168,7 +207,7 @@ def node_detail(request, node_id: int):
         "body_text": version.body_text if version else "",
         "effective_from": version.effective_from.isoformat() if version else None,
         "has_content": version is not None,
-    }
+    })
 
 
 # Public browse search is keyword-only (FTS + trigram, RRF-fused) — no vector

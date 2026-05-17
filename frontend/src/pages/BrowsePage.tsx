@@ -260,45 +260,74 @@ export function BrowsePage({ onBack }: Props) {
     };
   }, []);
 
+  // In-flight request caches. The `if (cache[id]) return` guards below read a
+  // stale closure value, so two callers in the same tick (e.g. a chapter row
+  // firing both onToggleChapter and onSelectChapter, or React StrictMode's
+  // dev double-invoke) would both miss the guard and fire duplicate fetches.
+  // Keying the live promise by id collapses concurrent callers onto one
+  // request; the entry is dropped once it settles so a later miss refetches.
+  const chaptersInFlight = useRef<Map<string, Promise<unknown>>>(new Map());
+  const chapterInFlight = useRef<Map<number, Promise<ChapterDetail>>>(new Map());
+  const nodeInFlight = useRef<Map<number, Promise<unknown>>>(new Map());
+
   const loadChapters = useCallback(
-    async (slug: string) => {
-      if (chapters[slug]) return;
+    (slug: string) => {
+      if (chapters[slug]) return Promise.resolve();
+      const existing = chaptersInFlight.current.get(slug);
+      if (existing) return existing;
       mark(`src:${slug}`, true);
-      try {
-        const r = await browseChapters(slug);
-        setChapters((p) => ({ ...p, [slug]: r.chapters }));
-      } finally {
-        mark(`src:${slug}`, false);
-      }
+      const p = browseChapters(slug)
+        .then((r) => {
+          setChapters((prev) => ({ ...prev, [slug]: r.chapters }));
+        })
+        .finally(() => {
+          chaptersInFlight.current.delete(slug);
+          mark(`src:${slug}`, false);
+        });
+      chaptersInFlight.current.set(slug, p);
+      return p;
     },
     [chapters, mark],
   );
 
   const loadChapter = useCallback(
-    async (id: number) => {
-      if (chapterDetails[id]) return chapterDetails[id];
+    (id: number): Promise<ChapterDetail | undefined> => {
+      const cached = chapterDetails[id];
+      if (cached) return Promise.resolve(cached);
+      const existing = chapterInFlight.current.get(id);
+      if (existing) return existing;
       mark(`chap:${id}`, true);
-      try {
-        const d = await browseChapter(id);
-        setChapterDetails((p) => ({ ...p, [id]: d }));
-        return d;
-      } finally {
-        mark(`chap:${id}`, false);
-      }
+      const p = browseChapter(id)
+        .then((d) => {
+          setChapterDetails((prev) => ({ ...prev, [id]: d }));
+          return d;
+        })
+        .finally(() => {
+          chapterInFlight.current.delete(id);
+          mark(`chap:${id}`, false);
+        });
+      chapterInFlight.current.set(id, p);
+      return p;
     },
     [chapterDetails, mark],
   );
 
   const loadNode = useCallback(
-    async (id: number) => {
-      if (nodes[id]) return;
+    (id: number) => {
+      if (nodes[id]) return Promise.resolve();
+      const existing = nodeInFlight.current.get(id);
+      if (existing) return existing;
       mark(`node:${id}`, true);
-      try {
-        const d = await browseNode(id);
-        setNodes((p) => ({ ...p, [id]: d }));
-      } finally {
-        mark(`node:${id}`, false);
-      }
+      const p = browseNode(id)
+        .then((d) => {
+          setNodes((prev) => ({ ...prev, [id]: d }));
+        })
+        .finally(() => {
+          nodeInFlight.current.delete(id);
+          mark(`node:${id}`, false);
+        });
+      nodeInFlight.current.set(id, p);
+      return p;
     },
     [nodes, mark],
   );

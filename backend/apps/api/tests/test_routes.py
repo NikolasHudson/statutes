@@ -13,7 +13,9 @@ import datetime as dt
 import json
 
 from django.core.cache import cache
+from django.db import connection
 from django.test import Client, TestCase, tag
+from django.test.utils import CaptureQueriesContext
 
 from apps.accounts.models import Tier
 from apps.corpus.models import (
@@ -289,3 +291,99 @@ class BrowseSearchRouteTests(TestCase):
         body = resp.json()
         self.assertEqual(body["scope"], "iowa-code")
         self.assertGreaterEqual(body["count"], 1)
+
+
+class BrowseDetailQueryCountTests(TestCase):
+    """Regression guard for the N+1 fixed in chapter_detail / node_detail:
+    the query count must not grow with the number of children."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.source, cls.section, cls.version = make_iowa_corpus_minimal()
+        cls.chapter = cls.section.parent
+        cls.section_t = NodeType.objects.get(source=cls.source, key="section")
+
+    def setUp(self):
+        cache.clear()
+        reset_default_source_cache()
+        self.client = Client()
+
+    def _add_sections(self, n: int, start: int = 100) -> None:
+        for i in range(start, start + n):
+            Node.objects.create(
+                source=self.source,
+                node_type=self.section_t,
+                parent=self.chapter,
+                ordinal=str(i),
+                path=f"714.{i}",
+                heading=f"Section {i}",
+            )
+
+    def _count_chapter_detail_queries(self) -> int:
+        with CaptureQueriesContext(connection) as ctx:
+            resp = self.client.get(f"/api/browse/chapters/{self.chapter.id}")
+            self.assertEqual(resp.status_code, 200)
+        return len(ctx.captured_queries)
+
+    def test_chapter_detail_query_count_is_constant_in_child_count(self):
+        self._add_sections(2, start=200)
+        few = self._count_chapter_detail_queries()
+        self._add_sections(8, start=300)
+        many = self._count_chapter_detail_queries()
+        # 8 extra children must not add 8 extra queries (the N+1 symptom).
+        self.assertEqual(
+            few,
+            many,
+            f"chapter_detail issued {many} queries for 10 children vs "
+            f"{few} for 2 — query count scales with children (N+1).",
+        )
+
+    def test_node_detail_query_count_is_bounded(self):
+        with CaptureQueriesContext(connection) as ctx:
+            resp = self.client.get(f"/api/browse/nodes/{self.section.id}")
+            self.assertEqual(resp.status_code, 200)
+        # node + version + (parent/source via select_related). Generous
+        # ceiling; the point is it must not regress into per-relation fetches.
+        self.assertLessEqual(
+            len(ctx.captured_queries),
+            5,
+            f"node_detail issued {len(ctx.captured_queries)} queries: "
+            f"{[q['sql'][:80] for q in ctx.captured_queries]}",
+        )
+
+
+class BrowseCacheHeaderTests(TestCase):
+    """Browse read endpoints must be Cloudflare/browser cacheable: a shared
+    Cache-Control TTL plus an ETag that drives 304 revalidation."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.source, cls.section, cls.version = make_iowa_corpus_minimal()
+        cls.chapter = cls.section.parent
+
+    def setUp(self):
+        cache.clear()
+        reset_default_source_cache()
+        self.client = Client()
+
+    def test_detail_endpoints_are_publicly_cacheable_with_etag(self):
+        for url in (
+            "/api/browse/sources",
+            "/api/browse/sources/iowa-code/chapters",
+            f"/api/browse/chapters/{self.chapter.id}",
+            f"/api/browse/nodes/{self.section.id}",
+        ):
+            resp = self.client.get(url)
+            self.assertEqual(resp.status_code, 200, url)
+            self.assertIn("s-maxage=60", resp["Cache-Control"], url)
+            self.assertIn("public", resp["Cache-Control"], url)
+            self.assertTrue(resp["ETag"], url)
+
+    def test_matching_if_none_match_returns_304(self):
+        url = f"/api/browse/chapters/{self.chapter.id}"
+        first = self.client.get(url)
+        etag = first["ETag"]
+        again = self.client.get(url, HTTP_IF_NONE_MATCH=etag)
+        self.assertEqual(again.status_code, 304)
+        self.assertEqual(again["ETag"], etag)
+        self.assertFalse(again.content)

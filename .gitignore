@@ -30,3 +30,7 @@ media/
 *.swp
 *.swo
 .DS_Store
+
+# Postgres corpus dumps — large binaries, not source. Keep out of git
+# (use object storage / a release asset to share these).
+*.dump
