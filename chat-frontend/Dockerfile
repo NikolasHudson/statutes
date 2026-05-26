@@ -18,6 +18,11 @@ FROM node:20-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
+# CRITICAL: Next.js's standalone server defaults HOSTNAME to localhost,
+# which means App Platform's health probe (sourced from outside the
+# container) can never reach it and the component never goes live —
+# resulting in a platform-level 404 at /chat. Bind to all interfaces.
+ENV HOSTNAME=0.0.0.0
 
 # Standalone output bundles only the files needed for `next start`.
 COPY --from=builder /app/public ./public
