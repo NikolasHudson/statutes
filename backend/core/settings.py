@@ -118,15 +118,11 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
     },
 }
-# The built React SPA is served same-origin straight from frontend/dist by
-# WhiteNoise (NOT via collectstatic): Vite already emits content-hashed
-# /assets/* names, and WHITENOISE_INDEX_FILE makes "/" return index.html so
-# the Django session cookie is first-party for login/chat — no CORS, no
-# SameSite gymnastics. Deep links use hash routing (#/...), so "/" is the
-# only real server path. The dir won't exist until `npm run build`.
-FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
-WHITENOISE_ROOT = FRONTEND_DIST if FRONTEND_DIST.is_dir() else None
-WHITENOISE_INDEX_FILE = True
+# The frontend used to be a Vite SPA served by WhiteNoise from
+# frontend/dist; we've moved to a separate Next.js component (see
+# chat-frontend/) routed to "/" by App Platform. Django no longer serves
+# any SPA — just /api/* and /admin/*. WhiteNoise continues to serve the
+# Django admin's own static (collected to STATIC_ROOT via collectstatic).
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

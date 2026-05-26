@@ -387,81 +387,69 @@ hard ceiling on OpenAI spend — tune them before launch.
 
 ---
 
-## 17. Adding the Next.js chat-frontend (Option C: side-by-side)
+## 17. Frontend = Next.js (assistant-ui), Django = API only
 
-The repo now contains a second frontend at `chat-frontend/` — the
-assistant-ui Next.js app. It runs in its own App Platform component
-alongside the Django service and mounts at `/chat/*` so it shares the
-production domain (and therefore session cookies) with the original
-Vite SPA.
+The repo now ships a single frontend — the assistant-ui Next.js app at
+`chat-frontend/` — served at the root of the production domain. Django
+is API + admin only.
 
 ### Architecture
 
 ```
                           App Platform ingress
    ──────────────────────────────────────────────────────────
-   /chat/*  ────────►  chat-frontend (Node 20, Next.js)
-                           basePath: /chat
-                           output: "standalone"
-
-   /api/*   ────────►  statutes (gunicorn + Django + WhiteNoise)
-   /admin/*  ───────►  statutes
-   /        ────────►  statutes (serves the legacy Vite SPA)
+   /api/*   ────────►  statutes (gunicorn + Django)
+   /admin/*  ───────►  statutes (Django admin)
+   /        ────────►  chat-frontend (Node 20, Next.js, catch-all)
 ```
 
-Both services hit the SAME `iowa-db` Postgres and share the same primary
-domain, so a session cookie set by `/api/auth/login` is visible to both
-the Vite SPA at `/` and the Next.js app at `/chat/*` automatically.
+Both components share the same App Platform domain
+(`corpus.nick.law`), so the Django session cookie set by
+`/api/auth/login` is automatically scoped to all routes — no CORS, no
+cross-domain cookie gymnastics.
 
-### What's already in the repo
+### What's in the repo
 
 - `chat-frontend/Dockerfile` — Node-20 two-stage build, emits
-  `.next/standalone/` then runs `node server.js`.
-- `chat-frontend/next.config.ts` — sets `basePath: '/chat'` when
-  `NODE_ENV=production`, plus `output: 'standalone'` for the slim image.
-- `.do/app.yaml` — added the `chat-frontend` component and reordered
-  `ingress.rules` so `/chat/*` reaches it (preserve_path_prefix: true)
-  while `/api/*`, `/admin/*`, and `/` keep going to Django.
+  `.next/standalone/` then runs `node server.js` bound to `0.0.0.0`.
+- `chat-frontend/next.config.ts` — `output: 'standalone'`. No
+  `basePath` (it owns the root). Dev-only `/api/*` rewrite to
+  `localhost:8000` for local Django.
+- `Dockerfile` (root) — single-stage Python image, just Django + gunicorn.
+- `.do/app.yaml` — two `services` (statutes + chat-frontend),
+  `domains: corpus.nick.law (PRIMARY)`, three ingress rules
+  (`/api`, `/admin`, `/`) all with `preserve_path_prefix: true`.
 
-### Pushing it
+### Critical settings to know about
 
-1. Push to `main`. App Platform sees the new component and provisions
-   a second instance.
-2. After the deploy finishes, the new URLs are:
-   - Legacy Vite app: `https://<app>.ondigitalocean.app/`
-   - New chat: `https://<app>.ondigitalocean.app/chat/`
-   - API: `https://<app>.ondigitalocean.app/api/...` (unchanged)
-3. Cost: about $5–10/mo extra for the `apps-s-1vcpu-0.5gb` instance.
-   Adjust `instance_size_slug` in `app.yaml` to taste.
+- **`preserve_path_prefix: true` on every ingress rule.** Without it App
+  Platform strips the matched prefix before forwarding — `/api/auth/login`
+  would reach Django as `/auth/login` → 500.
+- **`HOSTNAME=0.0.0.0` in `chat-frontend/Dockerfile`.** Next.js's
+  standalone server defaults to `localhost`, which makes App Platform's
+  health probes fail and the component never goes live.
+- **`SECRET_KEY` must have a value in App Platform.** The DO panel's
+  "preserve secrets on spec re-paste" behavior is unreliable; if a
+  secret with `type: SECRET` and no `value:` is re-applied, the existing
+  value can be wiped. Confirm via panel → Settings → Environment
+  Variables after any spec change.
 
-### Open follow-ups before retiring the Vite app
-
-- **Citation deep-links from the Vite app.** The legacy chat in
-  `frontend/` still emits `legis.iowa.gov` links in its sources footer.
-  Once `/chat` is the canonical entry point, retire `frontend/` entirely
-  (drop the `frontend` stage from the root `Dockerfile`, repoint
-  `ingress.rules`'s `/` catch-all to `chat-frontend`, switch
-  `next.config.ts` to `basePath: undefined` so it serves at `/`).
-- **CSRF / cookies.** Django's session cookie defaults to `SameSite=Lax`
-  in DEBUG mode; production already sets `SESSION_COOKIE_SAMESITE=Lax`
-  via `settings.py`. Since both services share the same domain in this
-  setup, no extra cookie-domain wiring is needed.
-- **Browse Phase 3 polish** (effective-date selector, working
-  Print/Download buttons) still to be ported.
-
-### Local sanity check before pushing
+### Local development
 
 ```bash
 # In one terminal — Django:
-cd backend && python manage.py runserver 0.0.0.0:8000
+cd backend && source .venv/bin/activate && python manage.py runserver 0.0.0.0:8000
 
-# In another — Next.js dev (no basePath, talks to Django via the
+# In another — Next.js dev (root path, talks to Django via the
 # /api proxy configured in next.config.ts):
 cd chat-frontend && npm run dev
-
-# To preview the production build with basePath locally:
-cd chat-frontend && NODE_ENV=production npm run build && \
-    NEXT_PUBLIC_BASE_PATH=/chat node .next/standalone/server.js
-# Then visit http://localhost:8080/chat/  (the API rewrite is off in
-# prod mode — point a Caddy/nginx or test against the real deploy).
+# Visit http://localhost:3100/
 ```
+
+### Open follow-ups
+
+- **Browse Phase 3 polish** — working Print/Download actions,
+  effective-date selector for historical section text.
+- **Old `/chat/*` URLs.** If anyone bookmarked the transitional `/chat`
+  URLs from the side-by-side era, they now 404. Add a `redirects:` block
+  to the spec mapping `/chat/(.*)` → `/$1` if that becomes an issue.

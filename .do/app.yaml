@@ -49,21 +49,13 @@ envs:
 - key: CHAT_MONTHLY_GLOBAL_LIMIT
   scope: RUN_TIME
   value: "20000"
-# Ingress rules are evaluated top-down; first prefix match wins. Keep
-# /api and /admin pointed at Django, /chat at the Next.js app, and the
-# catch-all '/' at Django so the existing Vite SPA keeps serving the root.
+# Ingress rules are evaluated top-down; first prefix match wins. The Next.js
+# chat-frontend serves the entire SPA at "/"; Django keeps /api/* and
+# /admin/*. preserve_path_prefix is REQUIRED everywhere — without it App
+# Platform strips the matched prefix before forwarding (so /api/auth/login
+# would reach Django as /auth/login).
 ingress:
   rules:
-  - match:
-      path:
-        prefix: /chat
-    component:
-      name: chat-frontend
-      preserve_path_prefix: true
-  # preserve_path_prefix MUST be true here too. Without it App Platform
-  # strips the matched prefix before forwarding, so Django sees /auth/login
-  # instead of /api/auth/login and returns 500. The old single-rule spec
-  # (prefix: /) didn't hit this because nothing was stripped.
   - match:
       path:
         prefix: /api
@@ -80,9 +72,10 @@ ingress:
       path:
         prefix: /
     component:
-      name: statutes
+      name: chat-frontend
       preserve_path_prefix: true
 services:
+# Django: API + admin only. WhiteNoise serves Django admin's own static.
 - name: statutes
   dockerfile_path: /Dockerfile
   source_dir: /
@@ -93,9 +86,9 @@ services:
   http_port: 8080
   instance_count: 1
   instance_size_slug: apps-s-1vcpu-1gb
-# The assistant-ui Next.js app. Same repo, lives in /chat-frontend, ships
-# its own Dockerfile (Node 20). Mounted at /chat/* by the ingress rule
-# above; basePath in next.config.ts matches so its router knows about it.
+# Next.js assistant-ui app: the canonical frontend. Lives in /chat-frontend
+# in the repo and ships its own Node 20 Dockerfile. Mounted at / by the
+# ingress rule above; no basePath since it owns the root.
 - name: chat-frontend
   dockerfile_path: /chat-frontend/Dockerfile
   source_dir: /chat-frontend
@@ -106,7 +99,3 @@ services:
   http_port: 8080
   instance_count: 1
   instance_size_slug: apps-s-1vcpu-0.5gb
-  envs:
-  - key: NEXT_PUBLIC_BASE_PATH
-    scope: RUN_AND_BUILD_TIME
-    value: /chat

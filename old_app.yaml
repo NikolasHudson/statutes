@@ -1,0 +1,63 @@
+databases:
+- cluster_name: iowa-db
+  db_name: defaultdb
+  db_user: doadmin
+  engine: PG
+  name: iowa-db
+  production: true
+domains:
+- domain: corpus.nick.law
+  type: PRIMARY
+envs:
+- key: SECRET_KEY
+  scope: RUN_AND_BUILD_TIME
+  type: SECRET
+  value: EV[1:YNLdnGriMQeoAUxgvduGvQDTiJdrd2yq:YOruBsaxYTi80wBM10u+sh3nyBJ+rnqnYK9agIaxXIf7fv3hj6cKRkGVwchm2lMZ0MoOMLBucb+FkRr78b8jJfou2LhuGDCFptLBT1gditBxwO7AlWDD7MzjYYYp5D7BWjSlURxl]
+- key: OPENAI_API_KEY
+  scope: RUN_AND_BUILD_TIME
+  type: SECRET
+  value: EV[1:5M/wj4gfPIW6jWcxLMxK05jeNnnbv1TA:0phBR+vvuq9ZpefLzFsEYcyr4F2zzvpOw+ZRmJqr8q14M/TTFLBqSs331sbQEAICRBAFM3nr6EQ4JjIKk+Exk3ZI8cwSMHd3OPo29TDOCJtsrjjIuiX9BCitZJGONkECC3+e30rxayUbfSNV/vJi4fFghAud1n9nJvRz27C7Ov5z2omCAX/28YSCN3YiKdY97xC90JJu5S94BPYR8dbeOyw+jMJ9LBXPkw27VryNsoBArgU3]
+- key: VOYAGE_API_KEY
+  scope: RUN_AND_BUILD_TIME
+  type: SECRET
+  value: EV[1:xxIGaH3tTwUPa75wuWbpr/lQg38sL8nY:F0TGJYEbsMn6s49ktZz5MtL36fosc2XreALPs9sQ+xtx78MoBA5z99MSbvoEpq+uKcQREFoLlRw2+xnzTKo=]
+- key: DATABASE_URL
+  scope: RUN_AND_BUILD_TIME
+  value: ${iowa-db.DATABASE_URL}
+- key: DEBUG
+  scope: RUN_AND_BUILD_TIME
+  value: "False"
+- key: ALLOWED_HOSTS
+  scope: RUN_TIME
+  value: '*'
+- key: CSRF_TRUSTED_ORIGINS
+  scope: RUN_TIME
+  value: https://${APP_DOMAIN}
+- key: CHAT_DAILY_USER_LIMIT
+  scope: RUN_TIME
+  value: "50"
+- key: CHAT_MONTHLY_GLOBAL_LIMIT
+  scope: RUN_TIME
+  value: "20000"
+features:
+- buildpack-stack=ubuntu-22
+ingress:
+  rules:
+  - component:
+      name: statutes
+    match:
+      path:
+        prefix: /
+name: statutes
+region: nyc
+services:
+- dockerfile_path: /Dockerfile
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: NikolasHudson/statutes
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-1gb
+  name: statutes
+  source_dir: /

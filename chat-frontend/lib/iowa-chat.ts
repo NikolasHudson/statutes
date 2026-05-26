@@ -88,19 +88,13 @@ export function citationsMarkdown(
   const cited = all.filter((n) => key(n) && answer.includes(key(n)!));
   const chosen = (cited.length ? cited : all).slice(0, 8);
 
-  // Next.js basePath isn't automatically applied to raw <a href> strings
-  // (only to <Link>). The markdown renderer turns these into raw <a>, so
-  // we have to prepend the basePath ourselves. NEXT_PUBLIC_BASE_PATH is
-  // set by us at build time when basePath is configured in next.config.ts.
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-
   const lines = chosen.map((n) => {
     const label = SOURCE_LABELS[n.source_slug] ?? n.source_slug;
     const bareCite =
       (n.path && n.path.trim()) ||
       n.citation.trim().split(/\s+/).pop() ||
       "";
-    const browseUrl = `${basePath}/browse#/${n.source_slug}/${bareCite}`;
+    const browseUrl = `/browse#/${n.source_slug}/${bareCite}`;
     return `- [**${n.citation}** — ${n.heading}](${browseUrl}) · ${label} · [official ↗](${n.official_url})`;
   });
   return `\n\n---\n\n**Sources**\n\n${lines.join("\n")}`;

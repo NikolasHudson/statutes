@@ -1097,8 +1097,7 @@ function ActionToolbar({ node }: { node: NodeDetail | null }) {
       (node.path && node.path.trim()) ||
       node.citation.trim().split(/\s+/).pop() ||
       "";
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-    const url = `${window.location.origin}${basePath}/browse#/${node.source_slug}/${bare}`;
+    const url = `${window.location.origin}/browse#/${node.source_slug}/${bare}`;
     try {
       await navigator.clipboard.writeText(url);
       ping("share");
