@@ -53,21 +53,28 @@ ingress:
     component:
       name: chat-frontend
       preserve_path_prefix: true
+  # preserve_path_prefix MUST be true here too. Without it App Platform
+  # strips the matched prefix before forwarding, so Django sees /auth/login
+  # instead of /api/auth/login and returns 500. The old single-rule spec
+  # (prefix: /) didn't hit this because nothing was stripped.
   - match:
       path:
         prefix: /api
     component:
       name: statutes
+      preserve_path_prefix: true
   - match:
       path:
         prefix: /admin
     component:
       name: statutes
+      preserve_path_prefix: true
   - match:
       path:
         prefix: /
     component:
       name: statutes
+      preserve_path_prefix: true
 services:
 - name: statutes
   dockerfile_path: /Dockerfile
