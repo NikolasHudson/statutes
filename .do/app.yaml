@@ -2,6 +2,13 @@ name: statutes
 region: nyc
 features:
 - buildpack-stack=ubuntu-22
+# Custom domain. Without this, re-applying the spec wipes whatever domain
+# was attached via the DO panel — that's how we lost corpus.nick.law on
+# the first spec re-paste. Keep this in source so the domain is tied to
+# the spec, not just the panel state.
+domains:
+- domain: corpus.nick.law
+  type: PRIMARY
 databases:
 - name: iowa-db
   engine: PG
