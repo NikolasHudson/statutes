@@ -292,6 +292,155 @@ def get_cross_references(
 
 
 # ---------------------------------------------------------------------------
+# Inline citation links
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CitationLink:
+    """One in-text citation that resolves to a node in the same source.
+
+    ``raw`` is the citation substring exactly as it appears in the body
+    (e.g. ``"714.16"``, ``"§ 714.16"``, ``"chapter 232"``). The frontend
+    matches on this string rather than a byte offset because it reparses
+    the body into a numbered tree before rendering — offsets wouldn't
+    survive that transform, but the literal phrase does."""
+
+    raw: str
+    target_node_id: int
+    target_path: str  # Node.path of the target ("714.16" or chapter "232")
+
+
+# Series citations: one sigil governing a comma/"and"/"or" list, where
+# only the first member carries the sigil — "chapter 497, 498, or 499",
+# "chapters 9H and 9I", "sections 4.1, 4.2 and 4.3". The bare trailing
+# members ("498", "9I") have neither a sigil nor a separator of their
+# own, so Pass 1's confidence filter drops them; this rescues them by
+# inheriting the leading sigil's kind. Ranges ("497 through 499") are
+# deliberately excluded — linking only the endpoints would mislead.
+_SERIES_ITEM = r"\d+[A-Z]?(?:[.:][\w.]+)?"
+_SERIES_RE = re.compile(
+    r"""
+    \b(?P<sigil>chapters?|sections?|§§?)\s+
+    (?P<list>
+        """ + _SERIES_ITEM + r"""
+        # A separator is a run of connectors so ", or" / "; and" (comma
+        # *and* conjunction) is one gap, not two.
+        (?:(?:\s*(?:,|;|&|\band\b|\bor\b))+\s+""" + _SERIES_ITEM + r""")+
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+_SERIES_ITEM_RE = re.compile(_SERIES_ITEM, re.IGNORECASE)
+
+
+def citation_links(
+    text: str,
+    *,
+    source: Source,
+    exclude_node_id: int | None = None,
+    include_pending: bool = False,
+) -> list[CitationLink]:
+    """Every citation in ``text`` that resolves to a live node in ``source``.
+
+    Confidence filter — we only link a citation we're sure is one, so we
+    don't turn every bare number in statutory prose ("not more than 30")
+    into a link: keep it when it's section-shaped (``714.16`` — has the
+    chapter/section separator) *or* carries an explicit sigil (``§``,
+    "section", "chapter", "I.C.", "Iowa Code").
+
+    Resolution is batched (two queries total, independent of how many
+    citations the body contains) so this stays cheap on the cached
+    ``/browse/nodes`` hot path. Targets that are repealed, or sections
+    with no current approved version, are dropped — a link should never
+    land on an empty reader page.
+    """
+
+    if not text or not text.strip():
+        return []
+
+    # Pass 1: walk once, parse, keep the confident ones with their target
+    # path. Order preserved so de-dup keeps the first occurrence.
+    pending: list[tuple[str, str]] = []  # (raw substring, target Node.path)
+    wanted: set[str] = set()
+    for match in _ITER_RE.finditer(text):
+        raw = match.group(0).strip()
+        if len(raw) < 2:
+            continue
+        try:
+            citation = parse_citation(raw)
+        except CitationParseError:
+            continue
+        confident = bool(citation.section) or bool(
+            _SIGIL_TOKEN_RE.match(match.group(0))
+        )
+        if not confident:
+            continue
+        target_path = citation.section_path or citation.chapter_path
+        if not target_path:
+            continue
+        pending.append((raw, target_path))
+        wanted.add(target_path)
+
+    # Pass 1b: rescue series members that lack their own sigil. The
+    # leading sigil's kind governs the whole list.
+    for series in _SERIES_RE.finditer(text):
+        section_kind = series.group("sigil")[0].lower() in {"s", "§"}
+        for item in _SERIES_ITEM_RE.finditer(series.group("list")):
+            token = item.group(0)
+            has_sep = ("." in token) or (":" in token)
+            if has_sep:
+                target_path = token  # full path: "4.2", "32:1.7"
+            elif section_kind:
+                continue  # bare number after "section" is too ambiguous
+            else:
+                target_path = token  # chapter number: "498", "9I", "501A"
+            pending.append((token, target_path))
+            wanted.add(target_path)
+
+    if not wanted:
+        return []
+
+    # Pass 2: one query resolves every distinct path.
+    nodes = {
+        n.path: n
+        for n in Node.objects.filter(source=source, path__in=wanted)
+    }
+
+    # Pass 3: one query tells us which section targets have a current
+    # approved version. Chapter nodes legitimately have none, so they're
+    # exempt from this check (the chapter Node existing is enough).
+    section_ids = [
+        n.id for n in nodes.values() if n.parent_id is not None
+    ]
+    live_section_ids: set[int] = set()
+    if section_ids:
+        vqs = NodeVersion.objects.filter(
+            node_id__in=section_ids, effective_to__isnull=True
+        ).filter(_approved_filter(include_pending))
+        live_section_ids = set(vqs.values_list("node_id", flat=True))
+
+    links: list[CitationLink] = []
+    emitted: set[tuple[str, int]] = set()
+    for raw, target_path in pending:
+        node = nodes.get(target_path)
+        if node is None or node.id == exclude_node_id or node.is_repealed:
+            continue
+        if node.parent_id is not None and node.id not in live_section_ids:
+            continue
+        key = (raw, node.id)
+        if key in emitted:
+            continue
+        emitted.add(key)
+        links.append(
+            CitationLink(
+                raw=raw, target_node_id=node.id, target_path=node.path
+            )
+        )
+    return links
+
+
+# ---------------------------------------------------------------------------
 # Definitions
 # ---------------------------------------------------------------------------
 
@@ -582,9 +731,9 @@ def validate_citations(
     return ValidationReport(items=items)
 
 
-# Reuse the parser's iterator regex. We import it directly because
-# duplicating it here would let the two patterns drift out of sync.
-from apps.citations.parser import _ITER_RE  # noqa: E402
+# Reuse the parser's regexes directly — duplicating them here would let
+# the patterns drift out of sync with the parser they mirror.
+from apps.citations.parser import _ITER_RE, _SIGIL_TOKEN_RE  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

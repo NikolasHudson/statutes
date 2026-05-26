@@ -13,6 +13,7 @@ from django.test import SimpleTestCase
 
 from apps.ingestion_iowa_code.parser import (
     ParseError,
+    _normalize_body,
     parse_probe_json,
 )
 
@@ -149,3 +150,38 @@ class ParseErrorTests(SimpleTestCase):
         }
         with self.assertRaises(ParseError):
             parse_probe_json(payload)
+
+
+class NormalizeBodyTests(SimpleTestCase):
+    """The 'eferred to in' artifact (dropped leading R + stray '; ') shows up
+    in two shapes; both must be stripped without eating real trailing text."""
+
+    def test_strips_trailing_line_variant(self):
+        body = (
+            "The boundaries of the state are as defined in the preamble.\n\n"
+            "eferred to in §1.2"
+        )
+        self.assertEqual(
+            _normalize_body(body),
+            "The boundaries of the state are as defined in the preamble.",
+        )
+
+    def test_strips_inline_variant_but_keeps_following_note(self):
+        # As seen on §2.10: artifact spliced onto the Acts-history line, with a
+        # real "See …" constitutional note on the next line that must survive.
+        body = (
+            "…final adjournment.\n\n"
+            "83 Acts, ch 205, §20; 97 Acts, ch 204, §16; ; ; ; "
+            "eferred to in §2.14, 2.32A, 2.40\n"
+            "See Iowa Constitution, Art. III, §25"
+        )
+        self.assertEqual(
+            _normalize_body(body),
+            "…final adjournment.\n\n"
+            "83 Acts, ch 205, §20; 97 Acts, ch 204, §16\n"
+            "See Iowa Constitution, Art. III, §25",
+        )
+
+    def test_leaves_clean_body_untouched(self):
+        body = "1.\xa0\xa0First.\n\xa0\xa02.\xa0\xa0Second."
+        self.assertEqual(_normalize_body(body), body)

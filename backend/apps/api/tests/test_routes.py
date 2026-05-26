@@ -387,3 +387,93 @@ class BrowseCacheHeaderTests(TestCase):
         self.assertEqual(again.status_code, 304)
         self.assertEqual(again["ETag"], etag)
         self.assertFalse(again.content)
+
+
+@tag("postgres")
+class BrowseResolveAndCrossRefTests(TestCase):
+    """The public citation-native permalink resolver, and the inline
+    cross_refs the reader renders as clickable links."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.source, cls.section, cls.version = make_iowa_corpus_minimal()
+        cls.chapter = cls.section.parent  # 714
+        cls.section_t = NodeType.objects.get(source=cls.source, key="section")
+        # A second section so 714.16 can cite it.
+        cls.s8 = Node.objects.create(
+            source=cls.source,
+            node_type=cls.section_t,
+            parent=cls.chapter,
+            ordinal="8",
+            path="714.8",
+            heading="Theft defined",
+        )
+        body = "Conduct that also violates section 714.8 is punishable."
+        cls.s8v = NodeVersion.objects.create(
+            node=cls.s8,
+            body_text="Theft is the taking of property.",
+            effective_from=dt.date(2025, 1, 1),
+            content_hash="a" * 64,
+            review_status=ReviewStatus.APPROVED,
+        )
+        # Repoint 714.16's current version body at one with a cross-ref.
+        cls.version.body_text = body
+        cls.version.save(update_fields=["body_text"])
+
+    def setUp(self):
+        cache.clear()
+        reset_default_source_cache()
+        self.client = Client()
+
+    def test_resolve_is_public_and_returns_node_id(self):
+        resp = self.client.get(
+            "/api/browse/resolve", {"source": "iowa-code", "cite": "714.16"}
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["found"])
+        self.assertEqual(data["node_id"], self.section.id)
+        self.assertEqual(data["path"], "714.16")
+        self.assertFalse(data["is_chapter"])
+
+    def test_resolve_chapter_only_citation(self):
+        resp = self.client.get(
+            "/api/browse/resolve", {"source": "iowa-code", "cite": "chapter 714"}
+        )
+        data = resp.json()
+        self.assertTrue(data["found"])
+        self.assertEqual(data["node_id"], self.chapter.id)
+        self.assertTrue(data["is_chapter"])
+
+    def test_resolve_unknown_section_returns_candidates_not_a_guess(self):
+        resp = self.client.get(
+            "/api/browse/resolve", {"source": "iowa-code", "cite": "714.404"}
+        )
+        data = resp.json()
+        self.assertFalse(data["found"])
+        # Same-chapter near-misses are offered, never substituted.
+        self.assertTrue(
+            any(c["path"] in {"714.8", "714.16"} for c in data["candidates"])
+        )
+
+    def test_resolve_unknown_source_is_not_found(self):
+        resp = self.client.get(
+            "/api/browse/resolve", {"source": "nope", "cite": "714.16"}
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["found"])
+
+    def test_node_detail_exposes_path_and_cross_refs(self):
+        resp = self.client.get(f"/api/browse/nodes/{self.section.id}")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["path"], "714.16")
+        refs = data["cross_refs"]
+        self.assertEqual(len(refs), 1)
+        self.assertEqual(refs[0]["text"], "section 714.8")
+        self.assertEqual(refs[0]["path"], "714.8")
+        self.assertEqual(refs[0]["node_id"], self.s8.id)
+
+    def test_chapter_detail_exposes_path(self):
+        resp = self.client.get(f"/api/browse/chapters/{self.chapter.id}")
+        self.assertEqual(resp.json()["path"], "714")

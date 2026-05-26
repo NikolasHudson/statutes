@@ -249,15 +249,24 @@ def _tuple_of_str(value: Any) -> tuple[str, ...]:
     return tuple(str(v).strip() for v in value if str(v).strip())
 
 
-_TRAILING_REFERRED_RE = re.compile(r"\n\s*eferred to in [^\n]*$")
+# The upstream RTF scrape drops the leading "R" from "Referred to in" and
+# leaves stray "; " separators where the link markup used to be. It shows up
+# two ways: as its own trailing line ("\n\neferred to in §1.2"), or spliced
+# onto the end of the Acts-history line ("…§16; ; ; ; eferred to in §2.14, …"
+# followed by a real "\nSee …" note). Match both: an optional run of stray
+# semicolons OR a leading newline, then the truncated phrase to end of line.
+_REFERRED_ARTIFACT_RE = re.compile(
+    r"(?:\n\s*|\s*(?:;\s*)+)eferred to in [^\n]*"
+)
 
 
 def _normalize_body(body: str) -> str:
     """Collapse trailing whitespace and strip the truncated 'eferred to in ...'
-    artifact some probe rows carry. Whitespace inside the body is preserved
-    because Iowa Code subsection indentation is meaningful."""
+    artifact some probe rows carry (see _REFERRED_ARTIFACT_RE). Whitespace
+    inside the body is preserved because Iowa Code subsection indentation is
+    meaningful."""
     text = body.replace("\r\n", "\n").rstrip()
-    text = _TRAILING_REFERRED_RE.sub("", text)
+    text = _REFERRED_ARTIFACT_RE.sub("", text)
     return text.rstrip()
 
 

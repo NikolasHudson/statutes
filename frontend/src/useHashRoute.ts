@@ -26,9 +26,37 @@ const KNOWN: Route[] = [
   'console',
 ];
 
+function segments(): string[] {
+  return window.location.hash
+    .replace(/^#\/?/, '')
+    .split('?')[0]
+    .split('/')
+    .filter(Boolean);
+}
+
 function read(): Route {
-  const raw = window.location.hash.replace(/^#\/?/, '').split('?')[0];
-  return (KNOWN as readonly string[]).includes(raw) ? (raw as Route) : '';
+  const segs = segments();
+  const head = segs[0] ?? '';
+  if ((KNOWN as readonly string[]).includes(head)) return head as Route;
+  // Citation-native permalink: "#/iowa-code/714.16" → the corpus browser.
+  // (A lone unknown segment stays the chat home, unchanged.)
+  if (segs.length >= 2) return 'browse';
+  return '';
+}
+
+// Parse a citation permalink: "#/iowa-code/714.16" → { slug, path }.
+// The path can carry dots/colons/parens; we keep everything after the
+// source slug verbatim (decoded) and let the backend resolver parse it.
+// Returns null for the fixed routes ("#/account") and the bare home.
+export function hashCitationTarget(): { slug: string; path: string } | null {
+  const segs = segments();
+  if (segs.length < 2) return null;
+  const head = segs[0];
+  if ((KNOWN as readonly string[]).includes(head)) return null;
+  return {
+    slug: head,
+    path: decodeURIComponent(segs.slice(1).join('/')),
+  };
 }
 
 // Read a query param off the hash, e.g. "#/browse?node=123" → "123".

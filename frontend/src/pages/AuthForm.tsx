@@ -60,7 +60,9 @@ export function AuthForm({ mode, onAuthed }: Props) {
           ? await register({ email, password, full_name: fullName })
           : await login({ email, password });
       onAuthed(user);
-      navigate('account');
+      // Land on chat (the default route) after sign-in / register — that's
+      // the product, the account page is a side trip from there.
+      navigate('');
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : 'Network error');
     } finally {

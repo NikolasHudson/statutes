@@ -45,10 +45,16 @@ export default function Shell() {
     };
   }, []);
 
-  // /account requires login — bounce to /login if we're not authed.
+  // App is fully gated: logged-out users only see /login and /register.
+  // Bounce any other route to /login so the URL is honest about state and
+  // a refresh keeps them on the auth page. And bounce authed users away
+  // from the auth pages — those don't apply once you're signed in.
   useEffect(() => {
-    if (authChecked && route === 'account' && !user) {
+    if (!authChecked) return;
+    if (!user && route !== 'login' && route !== 'register') {
       navigate('login');
+    } else if (user && (route === 'login' || route === 'register')) {
+      navigate('');
     }
   }, [authChecked, route, user, navigate]);
 
@@ -68,11 +74,17 @@ export default function Shell() {
         <CircularProgress />
       </Container>
     );
-  } else if (route === 'register') {
-    body = <AuthForm mode="register" onAuthed={setUser} />;
-  } else if (route === 'login') {
-    body = <AuthForm mode="login" onAuthed={setUser} />;
-  } else if (route === 'account' && user) {
+  } else if (!user) {
+    // Whole app is gated — only the auth form renders for logged-out users.
+    // The bounce effect above keeps `route` at 'login' or 'register'; this
+    // branch is what they actually see between bounces and on first paint.
+    body = (
+      <AuthForm
+        mode={route === 'register' ? 'register' : 'login'}
+        onAuthed={setUser}
+      />
+    );
+  } else if (route === 'account') {
     body = (
       <AccountPage
         user={user}
@@ -88,9 +100,10 @@ export default function Shell() {
     body = <ChatPage user={user} onNavigate={navigate} />;
   }
 
-  // The auth routes own the whole viewport (full-bleed split layout), so the
-  // app chrome would only get in the way — hide it there.
-  const chromeless = route === 'login' || route === 'register';
+  // Auth pages own the whole viewport (full-bleed split layout), and the
+  // loading spinner has no app to chrome around either — hide chrome any
+  // time we're not rendering the authed app.
+  const chromeless = !user;
 
   return (
     <ThemeProvider theme={lightTheme}>
@@ -116,7 +129,7 @@ export default function Shell() {
               sx={{ fontWeight: 600, cursor: 'pointer', flexGrow: 1 }}
               onClick={() => navigate('')}
             >
-              Iowa Legal Corpus
+              Hudson Legal Tech
             </Typography>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <Button size="small" onClick={() => navigate('')}>

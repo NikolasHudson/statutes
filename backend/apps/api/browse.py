@@ -21,6 +21,7 @@ from ninja import Router
 
 from apps.corpus.models import Node, Source
 from apps.corpus.services.lookups import (
+    citation_links,
     current_version,
     lookup_citation,
     official_url_for_node,
@@ -157,6 +158,9 @@ def chapter_detail(request, chapter_id: int):
         "id": chapter.id,
         "type": chapter.node_type.label_singular,
         "source_slug": chapter.source.slug,
+        # ``path`` is the citation-native permalink key (#/<slug>/<path>);
+        # for a chapter that's just the bare chapter number ("714").
+        "path": chapter.path,
         "citation": _citation(chapter),
         "ordinal": chapter.ordinal,
         "heading": chapter.heading,
@@ -189,11 +193,33 @@ def node_detail(request, node_id: int):
         pk=node_id,
     )
     version = current_version(node)
+
+    # Inline cross-reference links. Scoped to Iowa Code for now (Court Rules
+    # use colon paths + a 2-level hierarchy the citation parser isn't tuned
+    # for yet). Two extra queries, constant in the citation count — cheap
+    # enough for an endpoint that's already edge-cached for a minute.
+    cross_refs: list[dict] = []
+    if version is not None and node.source.slug == "iowa-code":
+        cross_refs = [
+            {
+                "text": link.raw,
+                "path": link.target_path,
+                "node_id": link.target_node_id,
+            }
+            for link in citation_links(
+                version.body_text,
+                source=node.source,
+                exclude_node_id=node.id,
+            )
+        ]
+
     return _cached_json(request, {
         "id": node.id,
         "type": node.node_type.label_singular,
         "source": node.source.name,
         "source_slug": node.source.slug,
+        # Citation-native permalink key — see chapter_detail.
+        "path": node.path,
         "citation": _citation(node),
         "heading": node.heading,
         "chapter": (
@@ -207,6 +233,37 @@ def node_detail(request, node_id: int):
         "body_text": version.body_text if version else "",
         "effective_from": version.effective_from.isoformat() if version else None,
         "has_content": version is not None,
+        "cross_refs": cross_refs,
+    })
+
+
+@browse_router.get("/resolve", auth=None)
+def resolve_node(request, source: str, cite: str):
+    """Resolve a citation to a node id, for citation-native permalinks.
+
+    The router turns ``#/iowa-code/714.16`` into a call here, then opens
+    the returned node through the normal node/chapter path. Mirrors the
+    authenticated ``/api/lookup`` contract (never guesses — an unresolved
+    cite comes back ``found:false`` with same-chapter candidates) but is
+    public and shaped for the browser rather than for citation rendering.
+    """
+    src = Source.objects.filter(slug=source).first()
+    if src is None:
+        return _cached_json(request, {"found": False, "candidates": []})
+    lr = lookup_citation(cite, source=src)
+    if lr.found and lr.node is not None:
+        return _cached_json(request, {
+            "found": True,
+            "node_id": lr.node.id,
+            "path": lr.node.path,
+            "is_chapter": lr.citation.is_chapter_only,
+        })
+    return _cached_json(request, {
+        "found": False,
+        "candidates": [
+            {"node_id": n.id, "path": n.path, "heading": n.heading}
+            for n in lr.candidates
+        ],
     })
 
 

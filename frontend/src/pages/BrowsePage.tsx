@@ -27,6 +27,7 @@ import {
   browseChapter,
   browseChapters,
   browseNode,
+  browseResolve,
   browseSearch,
   browseSources,
   type BrowseChapter,
@@ -34,10 +35,15 @@ import {
   type BrowseSearchResult,
   type BrowseSource,
   type ChapterDetail,
+  type CrossRef,
   type NodeDetail,
 } from '../api';
 import { usePalette, type Pal } from './legalPalette';
-import { clearHashQuery, hashQueryParam } from '../useHashRoute';
+import {
+  clearHashQuery,
+  hashCitationTarget,
+  hashQueryParam,
+} from '../useHashRoute';
 
 type Props = { onBack: () => void };
 
@@ -61,19 +67,29 @@ const DISCLAIMER =
   'Legal Corpus and is not a substitute for the official publication. ' +
   'Always verify against the official source before relying on any provision.';
 
-// parseRuleBody (declared lower in the file, hoisted) recovers the numbered
-// structure from the unbroken body string; re-emit it with real line breaks
-// and indentation so the .txt / print output is readable.
+// parseStatute (declared lower, hoisted) recovers the numbered hierarchy;
+// re-emit it depth-indented so the .txt / print output is readable.
+function renderStatuteLines(
+  items: StatuteItem[],
+  depth: number,
+  out: string[],
+): void {
+  for (const it of items) {
+    const indent = '    '.repeat(depth);
+    const head = [it.marker, it.title].filter(Boolean).join(' ');
+    const line = [head, it.text].filter(Boolean).join(' ').trim();
+    if (line) out.push(indent + line);
+    if (it.children.length) renderStatuteLines(it.children, depth + 1, out);
+  }
+}
+
 function renderBodyText(raw: string): string {
-  const { blocks } = parseRuleBody(raw);
-  if (blocks.length <= 1) return raw.trim();
-  return blocks
-    .map((b) => {
-      const indent = '    '.repeat(b.level);
-      const head = [b.marker, b.title].filter(Boolean).join(' ');
-      return indent + [head, b.text].filter(Boolean).join(' ');
-    })
-    .join('\n\n');
+  const { lead, tree } = parseStatute(raw);
+  if (tree.length === 0) return (lead || raw).trim();
+  const out: string[] = [];
+  if (lead) out.push(lead);
+  renderStatuteLines(tree, 0, out);
+  return out.join('\n');
 }
 
 function buildPlainText(
@@ -97,13 +113,9 @@ function buildPlainText(
         ? renderBodyText(node.body_text)
         : '[No extractable text for this provision.]',
     );
-    const parsed = parseRuleBody(node.body_text || '');
-    const history = node.history.length
-      ? node.history
-      : parsed.history
-        ? [parsed.history]
-        : [];
-    if (history.length) lines.push('', ...history);
+    const bodyHistory = parseStatute(node.body_text || '').history;
+    const history = [...bodyHistory, ...node.history];
+    if (history.length) lines.push('', 'History', ...history);
     if (node.official_url) lines.push('', `Official source: ${node.official_url}`);
   } else if (chapter) {
     lines.push(
@@ -150,8 +162,24 @@ function downloadText(filename: string, text: string): void {
   URL.revokeObjectURL(url);
 }
 
-function shareUrl(sel: Selection): string {
+// Citation-native permalink: "…#/iowa-code/714.16". Stable, human-typeable,
+// and matches how the section is actually cited. Falls back to the legacy
+// "?node=<id>" form only if the detail (and thus its path) hasn't loaded
+// yet — that form is still resolved on the way in, so old shared links and
+// chat source-card deep-links keep working.
+function shareUrl(
+  sel: Selection,
+  node: NodeDetail | null,
+  chapter: ChapterDetail | null,
+): string {
   const { origin, pathname } = window.location;
+  const permalink =
+    node && node.path
+      ? `${node.source_slug}/${encodeURIComponent(node.path)}`
+      : chapter && chapter.path
+        ? `${chapter.source_slug}/${encodeURIComponent(chapter.path)}`
+        : '';
+  if (permalink) return `${origin}${pathname}#/${permalink}`;
   const q = sel.nodeId
     ? `node=${sel.nodeId}`
     : sel.chapterId
@@ -372,9 +400,51 @@ export function BrowsePage({ onBack }: Props) {
     [loadChapter, loadNode],
   );
 
-  // Deep link from a chat source card: "#/browse?node=<id>". Resolve the node
-  // to its source + chapter, prime the caches, select it, and open the tree to
-  // it. Consume the param once so it doesn't re-fire on later hashchanges.
+  // Inline cross-reference click: resolve the cited path to a node and
+  // open it in place (no reload), then reflect the canonical permalink in
+  // the address bar. replaceState (not location.hash) so it doesn't fire
+  // the router — selection is already driven by state here. Targets come
+  // from the backend-resolved cross_refs list, so resolve essentially
+  // always succeeds; a miss just leaves the current view untouched.
+  const goToCitation = useCallback(
+    async (sourceSlug: string, path: string) => {
+      try {
+        const r = await browseResolve(sourceSlug, path);
+        if (!r.found) return;
+        const d = await browseNode(r.node_id);
+        const slug = d.source_slug;
+        const chapterId = d.chapter?.id ?? d.id;
+        setNodes((p) => ({ ...p, [d.id]: d }));
+        await loadChapters(slug);
+        await loadChapter(chapterId);
+        setSel({
+          slug,
+          chapterId,
+          nodeId: d.chapter ? d.id : undefined,
+        });
+        setExpanded((p) =>
+          new Set(p).add(`src:${slug}`).add(`chap:${chapterId}`),
+        );
+        window.history.replaceState(
+          null,
+          '',
+          `#/${slug}/${encodeURIComponent(path)}`,
+        );
+      } catch {
+        /* unresolved / transient — leave the current view as-is */
+      }
+    },
+    [loadChapters, loadChapter],
+  );
+
+  // Deep links into the reader. Two shapes:
+  //   • Citation-native permalink — "#/iowa-code/714.16" (the canonical
+  //     shareable URL; also what an inline cross-ref click navigates to).
+  //   • Legacy query form — "#/browse?node=<id>" / "?chapter=<id>" (old
+  //     shared links + chat source cards). Still resolved on the way in.
+  // Both resolve to a node, prime the caches, select it, and open the
+  // tree. Consume the legacy query once so it doesn't re-fire; keep a
+  // permalink in the address bar since it *is* the shareable URL.
   //
   // Self-contained on purpose: it does its own fetches rather than calling
   // loadChapters/loadChapter, because those useCallbacks are keyed on the very
@@ -383,19 +453,31 @@ export function BrowsePage({ onBack }: Props) {
   const deepLinked = useRef(false);
   useEffect(() => {
     if (deepLinked.current || !sources) return;
+    const permalink = hashCitationTarget();
     const nodeRaw = hashQueryParam('node');
     const chapterRaw = hashQueryParam('chapter');
     const nodeId = nodeRaw ? Number(nodeRaw) : NaN;
     const chapterParam = chapterRaw ? Number(chapterRaw) : NaN;
     const wantsNode = !!nodeRaw && !Number.isNaN(nodeId);
     const wantsChapter = !wantsNode && !!chapterRaw && !Number.isNaN(chapterParam);
-    if (!wantsNode && !wantsChapter) return;
+    if (!permalink && !wantsNode && !wantsChapter) return;
     deepLinked.current = true;
 
     (async () => {
       try {
-        if (wantsNode) {
-          const d = await browseNode(nodeId);
+        // A citation permalink resolves to a node id first; a chapter-
+        // level permalink ("#/iowa-code/714") resolves to the chapter
+        // node, which browseNode reports with chapter:null — the node
+        // branch below already handles that shape.
+        let resolvedNodeId = wantsNode ? nodeId : NaN;
+        if (permalink) {
+          const r = await browseResolve(permalink.slug, permalink.path);
+          if (!r.found) return; // unknown cite — leave the landing view
+          resolvedNodeId = r.node_id;
+        }
+
+        if (permalink || wantsNode) {
+          const d = await browseNode(resolvedNodeId);
           const slug = d.source_slug;
           // A node with no parent is itself a chapter; otherwise read the
           // chapter under which it lives.
@@ -429,10 +511,23 @@ export function BrowsePage({ onBack }: Props) {
       } catch {
         /* bad / stale id — just leave the browser on its landing view */
       } finally {
-        clearHashQuery();
+        // The permalink is the canonical URL — leave it in the bar.
+        // Only the legacy ?query= form gets consumed.
+        if (!permalink) clearHashQuery();
       }
     })();
   }, [sources]);
+
+  // Fill the empty sidebar on first load: expand the first source so the
+  // reader lands on a populated tree instead of two collapsed rows over a
+  // blank column. Runs once; yields to a deep link or any prior expansion.
+  const autoExpanded = useRef(false);
+  useEffect(() => {
+    if (autoExpanded.current || !sources || sources.length === 0) return;
+    autoExpanded.current = true;
+    if (deepLinked.current || expanded.size > 0) return;
+    openSource(sources[0].slug);
+  }, [sources, expanded.size, openSource]);
 
   const selSource = sources?.find((s) => s.slug === sel.slug) ?? null;
   const selChapterDetail = sel.chapterId
@@ -527,7 +622,7 @@ export function BrowsePage({ onBack }: Props) {
   );
 
   const handleShare = useCallback(async () => {
-    const url = shareUrl(sel);
+    const url = shareUrl(sel, selNode, selChapterDetail);
     const title = actionTitle();
     if (navigator.share) {
       try {
@@ -544,7 +639,7 @@ export function BrowsePage({ onBack }: Props) {
     } catch {
       setSnack('Could not copy the link');
     }
-  }, [sel, actionTitle]);
+  }, [sel, selNode, selChapterDetail, actionTitle]);
 
   const handleDownload = useCallback(() => {
     if (!hasContent) return;
@@ -584,7 +679,6 @@ export function BrowsePage({ onBack }: Props) {
         pal={pal}
         tocOpen={tocOpen}
         onToggleToc={() => setTocOpen((v) => !v)}
-        actions={actions}
         crumbs={buildCrumbs(selSource, selChapterDetail, selNode)}
         onCrumb={(c) => {
           if (c === 'source' && sel.slug)
@@ -693,6 +787,7 @@ export function BrowsePage({ onBack }: Props) {
               onPickChild={(cid, nid) =>
                 sel.slug && selectNode(sel.slug, cid, nid)
               }
+              onCitation={goToCitation}
               onBackToResults={
                 searchResults ? () => setSearchActive(true) : undefined
               }
@@ -764,7 +859,6 @@ function ActionBar({
   pal,
   tocOpen,
   onToggleToc,
-  actions,
   crumbs,
   onCrumb,
   search,
@@ -772,7 +866,6 @@ function ActionBar({
   pal: Pal;
   tocOpen: boolean;
   onToggleToc: () => void;
-  actions: ActionHandlers;
   crumbs: Crumb[];
   onCrumb: (key: Crumb['key']) => void;
   search: SearchBoxProps;
@@ -921,51 +1014,6 @@ function ActionBar({
         )}
       </Box>
 
-      <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 0.75, pr: 0.5 }}>
-        {QUICK_ACTIONS.map((a) => {
-          const isBookmark = a.key === 'bookmark';
-          const onClick =
-            a.key === 'share'
-              ? actions.onShare
-              : a.key === 'download'
-                ? actions.onDownload
-                : a.key === 'print'
-                  ? actions.onPrint
-                  : undefined;
-          const disabled = isBookmark || !actions.enabled;
-          const title = isBookmark
-            ? 'Bookmark — not available in preview'
-            : actions.enabled
-              ? a.label
-              : `${a.label} — open a chapter or section first`;
-          return (
-            <Tooltip key={a.key} title={title}>
-              <Box component="span">
-                <IconButton
-                  size="small"
-                  disabled={disabled}
-                  onClick={onClick}
-                  aria-label={a.label}
-                  sx={{
-                    width: 30,
-                    height: 30,
-                    bgcolor: pal.chromeText,
-                    border: `1px solid ${pal.circleBorder}`,
-                    '&.Mui-disabled': {
-                      bgcolor: pal.chromeText,
-                      opacity: 0.85,
-                    },
-                    '&:hover': { bgcolor: pal.chromeText },
-                    '& svg': { fontSize: 16, color: pal.circleIcon },
-                  }}
-                >
-                  {a.icon}
-                </IconButton>
-              </Box>
-            </Tooltip>
-          );
-        })}
-      </Box>
     </Box>
   );
 }
@@ -978,14 +1026,24 @@ function VersionSelector({ pal }: { pal: Pal }) {
   return (
     <Box
       sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1,
         px: 1.5,
         py: 1.25,
         borderBottom: `1px solid ${pal.border}`,
       }}
     >
+      <Typography
+        sx={{
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: 0.4,
+          textTransform: 'uppercase',
+          color: pal.muted,
+          mb: 0.75,
+        }}
+      >
+        Viewing as of
+      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       <Tooltip title="Historical versions — not available in preview">
         <Box
           component="span"
@@ -1019,6 +1077,7 @@ function VersionSelector({ pal }: { pal: Pal }) {
           </IconButton>
         </Box>
       </Tooltip>
+      </Box>
     </Box>
   );
 }
@@ -1273,6 +1332,7 @@ function ReadingPane({
   nodeLoading,
   hasNode,
   onPickChild,
+  onCitation,
   onBackToResults,
 }: {
   pal: Pal;
@@ -1284,6 +1344,10 @@ function ReadingPane({
   nodeLoading: boolean;
   hasNode: boolean;
   onPickChild: (chapterId: number, nodeId: number) => void;
+  // Inline cross-reference click — resolve a cited path to a node and
+  // open it in place. (sourceSlug, path) so the reader can pass the
+  // viewed section's own source.
+  onCitation: (sourceSlug: string, path: string) => void;
   // Set only when a hidden-but-preserved search result set exists (user
   // drilled into a hit). Renders a return link above the banner.
   onBackToResults?: () => void;
@@ -1346,7 +1410,11 @@ function ReadingPane({
         </Centered>
       ) : chapter ? (
         <>
-          <ChapterTitleBlock pal={pal} chapter={chapter} />
+          <ChapterTitleBlock
+            pal={pal}
+            chapter={chapter}
+            showOfficialLink={!hasNode}
+          />
 
           {hasNode ? (
             nodeLoading && !node ? (
@@ -1354,7 +1422,12 @@ function ReadingPane({
                 <CircularProgress size={28} />
               </Centered>
             ) : node ? (
-              <SectionBlock pal={pal} actions={actions} node={node} />
+              <SectionBlock
+                pal={pal}
+                actions={actions}
+                node={node}
+                onCitation={onCitation}
+              />
             ) : null
           ) : (
             <SectionIndexGrid
@@ -1383,22 +1456,38 @@ function DocumentBanner({ pal, text }: { pal: Pal; text: string }) {
       sx={{
         bgcolor: pal.banner,
         color: pal.bannerText,
-        textAlign: 'center',
-        py: 2.5,
         my: 4,
-        mx: { xs: -3, md: -8 },
+        // Break out of the 880px max-width container so the black bar spans
+        // the full width of the reading pane, while the text stays constrained.
+        position: 'relative',
+        left: '50%',
+        right: '50%',
+        ml: '-50vw',
+        mr: '-50vw',
+        width: '100vw',
+        maxWidth: '100vw',
       }}
     >
-      <Typography
+      <Box
         sx={{
-          fontSize: { xs: 22, md: 30 },
-          fontWeight: 700,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
+          maxWidth: 880,
+          mx: 'auto',
+          px: { xs: 3, md: 8 },
+          py: { xs: 2.5, md: 3.5 },
+          textAlign: 'center',
         }}
       >
-        {text}
-      </Typography>
+        <Typography
+          sx={{
+            fontSize: { xs: 22, md: 30 },
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {text}
+        </Typography>
+      </Box>
     </Box>
   );
 }
@@ -1406,9 +1495,13 @@ function DocumentBanner({ pal, text }: { pal: Pal; text: string }) {
 function ChapterTitleBlock({
   pal,
   chapter,
+  // When a section is open it carries its own "Official source" link, so the
+  // chapter-level one here is redundant — suppress it then.
+  showOfficialLink,
 }: {
   pal: Pal;
   chapter: ChapterDetail;
+  showOfficialLink: boolean;
 }) {
   return (
     <Box
@@ -1440,7 +1533,7 @@ function ChapterTitleBlock({
       >
         {chapter.heading}
       </Typography>
-      {chapter.official_url && (
+      {showOfficialLink && chapter.official_url && (
         <Box
           component="a"
           href={chapter.official_url}
@@ -1482,45 +1575,60 @@ function SectionIndexGrid({
     );
   }
   return (
-    <Box
-      sx={{
-        columnGap: 5,
-        columnCount: { xs: 1, sm: 2 },
-        mb: 5,
-      }}
-    >
-      {chapter.children.map((c) => (
-        <Box
-          key={c.id}
-          component="button"
-          onClick={() => onPick(c.id)}
-          sx={{
-            all: 'unset',
-            display: 'block',
-            breakInside: 'avoid',
-            cursor: 'pointer',
-            py: 0.6,
-            fontSize: 14,
-            lineHeight: 1.5,
-            color: pal.body,
-            '&:hover .cite': { opacity: 0.7 },
-          }}
-        >
+    // Single column with a left number gutter — mirrors how the section pages
+    // read, and sidesteps the mid-entry wrap the old two-column flow caused.
+    <Box sx={{ mb: 5 }}>
+      {chapter.children.map((c) => {
+        // Reserved / repealed placeholders aren't navigable text — mute them
+        // and drop the link affordance so a scanning eye skips past.
+        const inactive = /^(reserved\b|repealed\b)/i.test(c.heading.trim());
+        return (
           <Box
-            component="span"
-            className="cite"
+            key={c.id}
+            component={inactive ? 'div' : 'button'}
+            onClick={inactive ? undefined : () => onPick(c.id)}
             sx={{
-              color: pal.link,
-              textDecoration: 'underline',
-              fontWeight: 600,
-              fontVariantNumeric: 'tabular-nums',
+              all: 'unset',
+              boxSizing: 'border-box',
+              width: '100%',
+              display: 'grid',
+              gridTemplateColumns: { xs: '5.5rem 1fr', sm: '7rem 1fr' },
+              columnGap: 2,
+              alignItems: 'baseline',
+              py: 0.7,
+              fontSize: 14.5,
+              lineHeight: 1.5,
+              borderBottom: `1px solid ${pal.borderSoft}`,
+              cursor: inactive ? 'default' : 'pointer',
+              '&:hover .cite': inactive
+                ? {}
+                : { textDecoration: 'underline' },
             }}
           >
-            {c.citation}
-          </Box>{' '}
-          {c.heading}
-        </Box>
-      ))}
+            <Box
+              component="span"
+              className="cite"
+              sx={{
+                color: inactive ? pal.muted : pal.link,
+                fontWeight: 600,
+                fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {c.citation}
+            </Box>
+            <Box
+              component="span"
+              sx={{
+                color: inactive ? pal.muted : pal.body,
+                fontStyle: inactive ? 'italic' : 'normal',
+              }}
+            >
+              {c.heading}
+            </Box>
+          </Box>
+        );
+      })}
     </Box>
   );
 }
@@ -1640,11 +1748,415 @@ function parseRuleBody(raw: string): ParsedBody {
   return { blocks, history };
 }
 
-function FormattedBody({ pal, text }: { pal: Pal; text: string }) {
-  const { blocks } = useMemo(() => parseRuleBody(text), [text]);
+// ---------------------------------------------------------------------------
+// Statute structure parser + nested-list renderer
+//
+// Two upstream shapes feed this:
+//
+//  • Iowa Code — body_text is newline-delimited with NBSP-padded markers
+//    ("1.  …", "a.  …", "(1)  …"). Indentation
+//    is NOT meaningful (every line carries the same 2-NBSP lead); the hierarchy
+//    lives in the marker shape alone: 1. → a. → (1) → (a). A line may open a
+//    child inline ("4.  a.  The director …").
+//
+//  • Iowa Court Rules — one unbroken string, no newlines/NBSP. parseRuleBody
+//    (above) recovers its 2.20(1)/a./(1) structure heuristically; we fold its
+//    flat levelled blocks into the same tree so one renderer serves both.
+//
+// parseStatute() returns { lead, tree, history }. StatuteBody renders a real
+// nested <ol> so the document is semantic and screen-readable.
+// ---------------------------------------------------------------------------
 
-  // No recoverable structure (e.g. Iowa Code prose): keep newlines, wrap.
-  if (blocks.length <= 1) {
+type StatuteItem = {
+  marker: string;
+  // Bold run-in catchline (Court Rules only — Iowa Code markers are explicit).
+  title: string;
+  text: string;
+  children: StatuteItem[];
+};
+
+type ParsedStatute = { lead: string; tree: StatuteItem[]; history: string[] };
+
+const NBSP_RE = /\u00A0/g;
+
+// Marker → depth. Numeric "1." is the top tier, lowercase "a." next, then
+// parenthesised "(1)", then "(a)"/"(A)".
+function markerLevel(marker: string): number {
+  if (/^\d+\.$/.test(marker)) return 0;
+  if (/^[a-z]+\.$/.test(marker)) return 1;
+  if (/^\(\d+\)$/.test(marker)) return 2;
+  if (/^\([A-Za-z]+\)$/.test(marker)) return 3;
+  return 0;
+}
+
+// One leading marker at the start of an (NBSP-normalised) line segment.
+const LEAD_MARKER_RE = /^(\d+\.|[a-z]+\.|\([0-9A-Za-z]+\))[ \t]+/;
+
+// A trailing line is history/notes when it is the Acts-enactment trail, a
+// "See …" cross-reference note, the bracketed codification, the older C/S/R
+// codification, or the truncated "eferred to in …" scrape artifact. These
+// always sit after the substantive text, contiguous, at the very end.
+const HISTORY_LINE_RE =
+  /(\bActs?,\s+ch\b|^See\s|eferred to in|^\[.*\]$|^[CSR]\d{2}\b|^C\d{2,4},)/;
+
+// Strip the scrape artifact ("…§16; ; ; ; eferred to in §2.14, …" → "…§16")
+// and any now-dangling separators. Mirrors the backend _normalize_body fix so
+// already-ingested rows display clean without a re-ingest.
+function cleanHistoryLine(line: string): string {
+  return line
+    .replace(/[\s;]*\b[Rr]?eferred to in\b[^\n]*/g, '')
+    .replace(/[;\s]+$/g, '')
+    .trim();
+}
+
+function blocksToTree(blocks: Block[]): StatuteItem[] {
+  const tree: StatuteItem[] = [];
+  const stack: { item: StatuteItem; level: number }[] = [];
+  for (const b of blocks) {
+    const item: StatuteItem = {
+      marker: b.marker,
+      title: b.title,
+      text: b.text,
+      children: [],
+    };
+    while (stack.length && stack[stack.length - 1].level >= b.level)
+      stack.pop();
+    const parent = stack.length
+      ? stack[stack.length - 1].item.children
+      : tree;
+    parent.push(item);
+    stack.push({ item, level: b.level });
+  }
+  return tree;
+}
+
+function parseStatute(raw: string): ParsedStatute {
+  const src = (raw ?? '').replace(/\r\n/g, '\n');
+  if (!src.trim()) return { lead: '', tree: [], history: [] };
+
+  // Court Rules: no newlines/NBSP — defer to the legacy heuristic, then nest.
+  if (!src.includes('\n') && !src.includes("\u00A0")) {
+    const { blocks, history } = parseRuleBody(src);
+    return {
+      lead: '',
+      tree: blocksToTree(blocks),
+      history: history ? [history] : [],
+    };
+  }
+
+  // Iowa Code. Normalise NBSP → space, split into lines.
+  const lines = src.split('\n').map((l) => l.replace(NBSP_RE, ' ').trim());
+
+  // Peel the trailing history/notes run off the end (blank + history-shaped
+  // lines, contiguous, until the first real body line).
+  const history: string[] = [];
+  let cut = lines.length;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const ln = lines[i];
+    if (ln === '') {
+      cut = i;
+      continue;
+    }
+    if (HISTORY_LINE_RE.test(ln)) {
+      const cleaned = cleanHistoryLine(ln);
+      if (cleaned) history.unshift(cleaned);
+      cut = i;
+      continue;
+    }
+    break;
+  }
+  const bodyLines = lines.slice(0, cut).filter((l) => l !== '');
+
+  const tree: StatuteItem[] = [];
+  const stack: { item: StatuteItem; level: number }[] = [];
+  const leadParts: string[] = [];
+  let started = false;
+
+  for (const line of bodyLines) {
+    // Pull the chain of leading markers off this line ("4. a. The director").
+    let rest = line;
+    const markers: string[] = [];
+    let mm: RegExpMatchArray | null;
+    while ((mm = rest.match(LEAD_MARKER_RE))) {
+      markers.push(mm[1]);
+      rest = rest.slice(mm[0].length);
+    }
+    if (markers.length === 0) {
+      if (!started) leadParts.push(line);
+      else if (stack.length) {
+        const top = stack[stack.length - 1].item;
+        top.text = `${top.text} ${line}`.trim();
+      } else leadParts.push(line);
+      continue;
+    }
+    started = true;
+    let leaf: StatuteItem | null = null;
+    for (const marker of markers) {
+      const level = markerLevel(marker);
+      while (stack.length && stack[stack.length - 1].level >= level)
+        stack.pop();
+      const parent = stack.length
+        ? stack[stack.length - 1].item.children
+        : tree;
+      const item: StatuteItem = {
+        marker,
+        title: '',
+        text: '',
+        children: [],
+      };
+      parent.push(item);
+      stack.push({ item, level });
+      leaf = item;
+    }
+    if (leaf) leaf.text = rest.trim();
+  }
+
+  return { lead: leadParts.join(' ').trim(), tree, history };
+}
+
+// ---------------------------------------------------------------------------
+// Inline cross-reference links.
+//
+// The backend resolves every citation in the body to a live node and hands
+// back the literal phrases (node.cross_refs). We match on the phrase, not a
+// byte offset, because parseStatute reparses the body (NBSP→space, trim,
+// line-join) before render — offsets wouldn't survive that, the phrase does.
+// ---------------------------------------------------------------------------
+
+type Linkify = (s: string) => React.ReactNode;
+
+const IDENTITY_LINKIFY: Linkify = (s) => s;
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normWs(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+function buildCitationMatcher(
+  refs: CrossRef[] | undefined,
+): { re: RegExp; byText: Map<string, CrossRef> } | null {
+  if (!refs || refs.length === 0) return null;
+  const byText = new Map<string, CrossRef>();
+  for (const r of refs) {
+    const key = normWs(r.text);
+    if (key && !byText.has(key)) byText.set(key, r);
+  }
+  if (byText.size === 0) return null;
+  // Longest phrase first so "§ 714.16" wins over the bare "714.16"
+  // alternative at the same position.
+  const phrases = [...byText.keys()].sort((a, b) => b.length - a.length);
+  const alt = phrases
+    .map((p) => p.split(' ').map(escapeRegExp).join('\\s+'))
+    .join('|');
+  // group1 = one boundary char (or start) re-emitted as plain text;
+  // group2 = the phrase. Trailing guard blocks continuation into a
+  // longer token — a word char ("714.16" inside "714.160", "501" inside
+  // "501A") or a dotted-path digit ("714.16" inside "714.16.5") — but
+  // still allows a sentence-ending period ("…section 22.7."). No
+  // lookbehind — keeps older Safari happy.
+  const re = new RegExp(`(^|[^\\w.])(${alt})(?!\\w|\\.\\d)`, 'g');
+  return { re, byText };
+}
+
+function CitationLink({
+  pal,
+  onClick,
+  children,
+}: {
+  pal: Pal;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box
+      component="a"
+      role="link"
+      tabIndex={0}
+      onClick={(e: React.MouseEvent) => {
+        e.preventDefault();
+        onClick();
+      }}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      sx={{
+        color: pal.link,
+        textDecoration: 'underline',
+        textDecorationThickness: '1px',
+        textUnderlineOffset: '2px',
+        cursor: 'pointer',
+        '&:hover': { textDecorationThickness: '2px' },
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function makeLinkify(
+  matcher: { re: RegExp; byText: Map<string, CrossRef> } | null,
+  pal: Pal,
+  onCitation: (path: string) => void,
+): Linkify {
+  if (!matcher) return IDENTITY_LINKIFY;
+  const { re, byText } = matcher;
+  return (s: string) => {
+    if (!s) return s;
+    re.lastIndex = 0;
+    const out: React.ReactNode[] = [];
+    let last = 0;
+    let hit = false;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(s)) !== null) {
+      hit = true;
+      const lead = m[1] ?? '';
+      const phrase = m[2];
+      const ref = byText.get(normWs(phrase));
+      out.push(s.slice(last, m.index) + lead);
+      if (ref) {
+        out.push(
+          <CitationLink
+            key={m.index}
+            pal={pal}
+            onClick={() => onCitation(ref.path)}
+          >
+            {phrase}
+          </CitationLink>,
+        );
+      } else {
+        out.push(phrase);
+      }
+      last = m.index + m[0].length;
+      if (re.lastIndex === m.index) re.lastIndex += 1;
+    }
+    if (!hit) return s;
+    out.push(s.slice(last));
+    return out;
+  };
+}
+
+function StatuteItemList({
+  pal,
+  items,
+  depth,
+  linkify = IDENTITY_LINKIFY,
+}: {
+  pal: Pal;
+  items: StatuteItem[];
+  depth: number;
+  linkify?: Linkify;
+}) {
+  return (
+    <Box
+      component="ol"
+      sx={{
+        listStyle: 'none',
+        m: 0,
+        p: 0,
+        // Stair-step each nested level deeper than its parent.
+        pl: depth === 0 ? 0 : { xs: 1.5, sm: 2.25 },
+      }}
+    >
+      {items.map((it, i) => (
+        <Box
+          component="li"
+          key={i}
+          sx={{
+            display: 'grid',
+            // Marker sits in a fixed left gutter; body wraps cleanly aligned
+            // underneath itself (hanging indent).
+            gridTemplateColumns: it.marker
+              ? 'minmax(1.9rem, auto) 1fr'
+              : '1fr',
+            columnGap: it.marker ? 1 : 0,
+            // Looser between top-level items, tighter within a hierarchy.
+            mt: i === 0 ? 0 : depth === 0 ? 1.6 : 0.65,
+          }}
+        >
+          {it.marker && (
+            <Box
+              component="span"
+              sx={{
+                fontVariantNumeric: 'tabular-nums',
+                fontWeight: 600,
+                color: pal.text,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {it.marker}
+            </Box>
+          )}
+          <Box sx={{ minWidth: 0 }}>
+            {(it.title || it.text) && (
+              <Typography
+                component="p"
+                sx={{
+                  m: 0,
+                  fontSize: 15.5,
+                  lineHeight: 1.75,
+                  color: pal.body,
+                  textAlign: 'left',
+                }}
+              >
+                {it.title && (
+                  <Box
+                    component="span"
+                    sx={{ fontWeight: 700, color: pal.text }}
+                  >
+                    {linkify(it.title)}
+                    {it.text ? ' ' : ''}
+                  </Box>
+                )}
+                {linkify(it.text)}
+              </Typography>
+            )}
+            {it.children.length > 0 && (
+              <Box sx={{ mt: 0.65 }}>
+                <StatuteItemList
+                  pal={pal}
+                  items={it.children}
+                  depth={depth + 1}
+                  linkify={linkify}
+                />
+              </Box>
+            )}
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+function StatuteBody({
+  pal,
+  text,
+  crossRefs,
+  onCitation,
+}: {
+  pal: Pal;
+  text: string;
+  crossRefs?: CrossRef[];
+  onCitation?: (path: string) => void;
+}) {
+  const { lead, tree } = useMemo(() => parseStatute(text), [text]);
+  // Rebuild the matcher only when the cross-ref set changes; the click
+  // handler is recreated each render (cheap) and closes over the memo.
+  const matcher = useMemo(
+    () => buildCitationMatcher(crossRefs),
+    [crossRefs],
+  );
+  const linkify = onCitation
+    ? makeLinkify(matcher, pal, onCitation)
+    : IDENTITY_LINKIFY;
+
+  // No recoverable structure: keep newlines, wrap as a single prose block.
+  if (tree.length === 0) {
     return (
       <Typography
         component="div"
@@ -1654,51 +2166,37 @@ function FormattedBody({ pal, text }: { pal: Pal; text: string }) {
           fontSize: 15.5,
           lineHeight: 1.75,
           color: pal.body,
-          textAlign: 'justify',
+          textAlign: 'left',
         }}
       >
-        {text}
+        {linkify(lead || text)}
       </Typography>
     );
   }
 
   return (
     <Box>
-      {blocks.map((b, i) => (
+      {lead && (
         <Typography
-          key={i}
           component="p"
           sx={{
             m: 0,
-            mt: i === 0 ? 0 : b.level === 0 ? 2.5 : 1.25,
-            ml: { xs: b.level * 1.75, sm: b.level * 3 },
+            mb: 2,
             fontSize: 15.5,
             lineHeight: 1.75,
             color: pal.body,
-            textAlign: 'justify',
+            textAlign: 'left',
           }}
         >
-          {b.marker && (
-            <Box
-              component="span"
-              sx={{
-                fontWeight: 700,
-                color: pal.text,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {b.marker}{' '}
-            </Box>
-          )}
-          {b.title && (
-            <Box component="span" sx={{ fontWeight: 700, color: pal.text }}>
-              {b.title}
-              {b.text ? ' ' : ''}
-            </Box>
-          )}
-          {b.text}
+          {linkify(lead)}
         </Typography>
-      ))}
+      )}
+      <StatuteItemList
+        pal={pal}
+        items={tree}
+        depth={0}
+        linkify={linkify}
+      />
     </Box>
   );
 }
@@ -1707,23 +2205,25 @@ function SectionBlock({
   pal,
   actions,
   node,
+  onCitation,
 }: {
   pal: Pal;
   actions: ActionHandlers;
   node: NodeDetail;
+  onCitation: (sourceSlug: string, path: string) => void;
 }) {
-  // The inline trailing [..] bracket is the same history the API also exposes
-  // via node.history — fall back to the parsed one only if that's empty.
-  const inlineHistory = useMemo(
-    () => parseRuleBody(node.body_text).history,
+  // Two history trails: the Acts-enactment + "See …" notes that trail the
+  // body text (parsed + de-artifacted here), and the older bracketed
+  // codification the API exposes via node.history (source_metadata). Show
+  // enactment first; the terser codification is grouped under it, italicised.
+  const bodyHistory = useMemo(
+    () => parseStatute(node.body_text).history,
     [node.body_text],
   );
-  const history =
-    node.history.length > 0
-      ? node.history
-      : inlineHistory
-        ? [inlineHistory]
-        : [];
+  const history = [...bodyHistory, ...node.history];
+  // A long heading reads heavy in all-caps — keep the source's natural mixed
+  // case for those, reserve uppercase for short ones.
+  const upperHeading = node.heading.length <= 46;
   return (
     <Box sx={{ mb: 5 }}>
       <Box
@@ -1734,17 +2234,31 @@ function SectionBlock({
           mb: 2,
         }}
       >
-        <Typography
-          sx={{
-            flex: 1,
-            fontSize: { xs: 16, md: 18 },
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            lineHeight: 1.35,
-          }}
-        >
-          {node.citation} {node.heading}
-        </Typography>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            sx={{
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              color: pal.muted,
+            }}
+          >
+            {node.citation}
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: { xs: 18, md: 21 },
+              fontWeight: 700,
+              lineHeight: 1.3,
+              mt: 0.25,
+              color: pal.text,
+              textTransform: upperHeading ? 'uppercase' : 'none',
+            }}
+          >
+            {node.heading}
+          </Typography>
+        </Box>
         <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 0.5, pt: 0.25 }}>
           {QUICK_ACTIONS.map((a) => {
             const isBookmark = a.key === 'bookmark';
@@ -1791,7 +2305,12 @@ function SectionBlock({
       )}
 
       {node.body_text ? (
-        <FormattedBody pal={pal} text={node.body_text} />
+        <StatuteBody
+          pal={pal}
+          text={node.body_text}
+          crossRefs={node.cross_refs}
+          onCitation={(path) => onCitation(node.source_slug, path)}
+        />
       ) : (
         <Alert severity="info" sx={{ my: 1 }}>
           No extractable text for this provision.{' '}
@@ -1810,15 +2329,38 @@ function SectionBlock({
       )}
 
       {history.length > 0 && (
-        <Box sx={{ mt: 3, textAlign: 'center' }}>
+        <Box
+          sx={{
+            mt: 4,
+            pt: 2,
+            borderTop: `1px solid ${pal.border}`,
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.09em',
+              textTransform: 'uppercase',
+              color: pal.muted,
+              mb: 0.75,
+            }}
+          >
+            History
+          </Typography>
           {history.map((h, i) => (
             <Typography
               key={i}
               sx={{
-                fontStyle: 'italic',
-                fontSize: 13.5,
+                fontSize: 13,
+                lineHeight: 1.6,
                 color: pal.muted,
-                mt: 0.5,
+                // The bracketed codification trail (after the body-derived
+                // entries) is the older, terser line — italicise it and group
+                // it tight under the enactment history.
+                fontStyle: i >= bodyHistory.length ? 'italic' : 'normal',
+                mt: i === 0 ? 0 : i === bodyHistory.length ? 0.75 : 0.4,
+                textAlign: 'left',
               }}
             >
               {h}
@@ -1828,7 +2370,7 @@ function SectionBlock({
       )}
 
       {node.official_url && node.body_text && (
-        <Box sx={{ mt: 3, textAlign: 'center' }}>
+        <Box sx={{ mt: 2.5 }}>
           <Box
             component="a"
             href={node.official_url}

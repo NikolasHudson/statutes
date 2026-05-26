@@ -39,7 +39,7 @@ import type { Citation, Message } from '../types';
 // source picker scopes every search the assistant runs to one corpus.
 
 // Mirror of apps/api/chat.py ALLOWED_CHAT_MODELS — keep in sync.
-const CHAT_MODELS = ['gpt-4o-mini', 'gpt-4o'] as const;
+const CHAT_MODELS = ['gpt-5-mini', 'gpt-4o', 'gpt-4o-mini'] as const;
 
 const MODEL_STORAGE = 'iowa-test-openai-model';
 const SCOPE_STORAGE = 'iowa-chat-source-slug';
@@ -519,7 +519,7 @@ export function ChatPage({ user, onNavigate }: ChatPageProps) {
           {hasMessages ? (
             <Box sx={{ pb: 3 }}>
               {messages.map((m) => (
-                <Turn key={m.id} pal={pal} message={m} />
+                <Turn key={m.id} pal={pal} message={m} scopeName={scopeName} />
               ))}
               <Box ref={endRef} />
             </Box>
@@ -723,7 +723,56 @@ function EmptyState({
 // One conversation turn
 // ---------------------------------------------------------------------------
 
-function Turn({ pal, message }: { pal: Pal; message: Message }) {
+function PendingStages({ pal, scopeName }: { pal: Pal; scopeName?: string }) {
+  // Honest staging: each phase corresponds to real backend work (corpus
+  // search, then section reads, then the model composing). The timings are
+  // approximate — they exist so testers don't think a multi-second request
+  // is hung. If the response lands before "Drafting", the placeholder is
+  // swapped out anyway.
+  const stages = useMemo(
+    () => [
+      `Searching ${scopeName ?? 'the Iowa corpus'}…`,
+      'Reading sections…',
+      'Drafting answer…',
+    ],
+    [scopeName],
+  );
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    const t1 = window.setTimeout(() => setStage(1), 3000);
+    const t2 = window.setTimeout(() => setStage(2), 8000);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, []);
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+        color: pal.muted,
+        py: 1,
+      }}
+    >
+      <CircularProgress size={16} sx={{ color: pal.muted }} />
+      <Typography sx={{ fontSize: 14, fontStyle: 'italic' }}>
+        {stages[stage]}
+      </Typography>
+    </Box>
+  );
+}
+
+function Turn({
+  pal,
+  message,
+  scopeName,
+}: {
+  pal: Pal;
+  message: Message;
+  scopeName?: string;
+}) {
   const isUser = message.role === 'user';
 
   if (isUser) {
@@ -766,20 +815,7 @@ function Turn({ pal, message }: { pal: Pal; message: Message }) {
       </Typography>
 
       {message.pending ? (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5,
-            color: pal.muted,
-            py: 1,
-          }}
-        >
-          <CircularProgress size={16} sx={{ color: pal.muted }} />
-          <Typography sx={{ fontSize: 14, fontStyle: 'italic' }}>
-            Researching the corpus…
-          </Typography>
-        </Box>
+        <PendingStages pal={pal} scopeName={scopeName} />
       ) : (
         <Answer pal={pal} text={message.content} />
       )}

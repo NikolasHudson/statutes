@@ -33,7 +33,7 @@ type Message = {
 
 const MODEL_STORAGE = 'iowa-test-openai-model';
 // Mirror of apps/api/chat.py ALLOWED_CHAT_MODELS — keep in sync.
-const CHAT_MODELS = ['gpt-4o-mini', 'gpt-4o'];
+const CHAT_MODELS = ['gpt-5-mini', 'gpt-4o', 'gpt-4o-mini'];
 
 // Same-origin: Vite proxies /api → backend in dev (see vite.config.ts).
 // Override with VITE_API_BASE for non-dev hosting.

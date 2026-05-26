@@ -25,6 +25,7 @@ from ninja import Router, Schema
 from ninja.errors import HttpError
 
 from apps.api.accounts import _require_login
+from apps.api.trace_capture import record_chat_trace
 from apps.corpus.models import NodeVersion, Source
 from apps.corpus.services.rerank import default_reranker
 from apps.mcp_server.tools import (
@@ -96,12 +97,18 @@ def _enriched_search(args: dict) -> dict:
         return result
 
     node_ids = [h["node"]["id"] for h in hits]
-    # Get the current body for each node (effective_to IS NULL).
+    # Get the current body + effective_from for each node (effective_to IS NULL).
+    # effective_from goes onto the hit so the model can quote the section's
+    # real effective date instead of fabricating one (today's date written as
+    # "Effective from …" was a common hallucination tell).
     bodies: dict[int, str] = {}
+    effective_from: dict[int, str] = {}
     for nv in NodeVersion.objects.filter(
         node_id__in=node_ids, effective_to__isnull=True
-    ).only("node_id", "body_text"):
+    ).only("node_id", "body_text", "effective_from"):
         bodies.setdefault(nv.node_id, nv.body_text)
+        if nv.effective_from and nv.node_id not in effective_from:
+            effective_from[nv.node_id] = nv.effective_from.isoformat()
 
     # Rerank on heading + body so the cross-encoder sees what the section is
     # actually about, not just its first sentence.
@@ -127,6 +134,7 @@ def _enriched_search(args: dict) -> dict:
             else SEARCH_BODY_MAX_CHARS
         )
         h["body_excerpt"] = _excerpt(bodies.get(nid, ""), budget)
+        h["effective_from"] = effective_from.get(nid)
         ordered.append(h)
 
     result["hits"] = ordered
@@ -149,8 +157,8 @@ class ChatMessage(Schema):
 # Models a logged-in user is allowed to spend our key on. Keeping this tight
 # is a cost control: an unrestricted `model` field would let any session pick
 # the most expensive model. Add to this set deliberately, not by request.
-ALLOWED_CHAT_MODELS = {"gpt-4o-mini", "gpt-4o"}
-DEFAULT_CHAT_MODEL = "gpt-4o-mini"
+ALLOWED_CHAT_MODELS = {"gpt-4o-mini", "gpt-4o", "gpt-5-mini"}
+DEFAULT_CHAT_MODEL = "gpt-5-mini"
 
 
 class ChatRequest(Schema):
@@ -391,10 +399,60 @@ SYSTEM_PROMPT = (
     "from memory or with an unrelated rule.\n"
     "• If a lookup_citation fails or returns found:false, tell the user you "
     "could not retrieve that provision and try search_statutes; never "
-    "substitute a remembered rule number.\n\n"
-    "Always include the official URL and the effective_from date from the "
-    "tool output. If a citation is ambiguous, present the candidates and "
+    "substitute a remembered rule number.\n"
+    "• Never invent an ``official_url`` or an ``effective_from`` date. Use "
+    "the values that appear in the tool result for that section, verbatim. "
+    "If a section is mentioned in the answer but no tool result resolved it, "
+    "OMIT the link and the effective date rather than synthesise plausible-"
+    "looking ones. Telltale hallucinations: today's date written as an "
+    "'effective from' date, or a tidy URL like "
+    "``legis.iowa.gov/docs/iac/rule/32.1.18.pdf`` that you wrote rather than "
+    "copied — both are wrong.\n"
+    "• Cite each section using its canonical path form — the ``path`` field "
+    "of the node (e.g. ``1.981``, ``32:1.10``, ``714.16``) — prefixed by the "
+    "source's abbreviation (``Iowa Ct. R. 1.981``, ``Iowa Code § 714.16``). "
+    "Do NOT split the path across words (``Chapter 1, Rule 981`` is wrong; "
+    "``Iowa Ct. R. 1.981`` is right). The first time you cite a section, use "
+    "the full form so the reader can verify it.\n\n"
+    "When the tool result for a section includes a non-empty "
+    "``official_url`` and / or ``effective_from``, copy them into your "
+    "answer verbatim alongside that section's citation. When either field "
+    "is missing or empty in the tool output, OMIT it — do not write "
+    "anything in its place. Today's date is not a substitute for an "
+    "effective_from date; a guessed URL is not a substitute for the "
+    "official one. If a citation is ambiguous, present the candidates and "
     "ask the user to pick — never silently substitute.\n\n"
+    "PROFESSIONAL CONDUCT / ETHICS RULES — additional checks (chapter 32, "
+    "44, 45, 51):\n"
+    "• MANDATORY vs PERMISSIVE: ethics rules routinely have both a 'shall' "
+    "branch and a 'may' branch in the same section. Before quoting the "
+    "permissive language, check the mandatory branch first against the "
+    "specific facts. Withdrawal is the classic trap: 32:1.16(a) MANDATES "
+    "withdrawal when continuing the representation would result in a "
+    "violation of the rules or other law (e.g. assisting client crime or "
+    "fraud under 32:1.2(d)); 32:1.16(b) PERMITS withdrawal when 'withdrawal "
+    "can be accomplished without material adverse effect on the interests "
+    "of the client'. If the facts trigger 32:1.16(a)(1), do NOT pull the "
+    "32:1.16(b) 'no material adverse effect' boilerplate — withdrawal is "
+    "required regardless of effect on the client. Same pattern for "
+    "disclosure under 32:1.6(b) (all permissive), 32:1.13(c) (permissive "
+    "report-out), and 32:3.3 (mandatory candor to the tribunal).\n"
+    "• Keep distinct doctrines separate. 'Noisy withdrawal' (the lawyer "
+    "withdraws AND disaffirms documents or opinions previously delivered to "
+    "prevent a third party from being defrauded — rooted in the Comment to "
+    "32:1.6 and cross-referenced in 32:1.2 Comment) is NOT the same as "
+    "'reporting out' under 32:1.13(c) (revealing organizational confidences "
+    "when the entity's highest authority fails to act and a violation is "
+    "reasonably certain to result in substantial injury TO THE "
+    "ORGANIZATION). When the fraud harms an outside party (a bank, a "
+    "buyer, a counterparty), the lawyer's authority to disclose comes from "
+    "32:1.6(b)(2) or (b)(3), NOT from 32:1.13(c). Do not cite 32:1.13(c) "
+    "to justify disclosure to an outsider.\n"
+    "• Comments are not the black-letter rule. When you rely on a Comment, "
+    "label it as 'Comment [N] to Rule X' — do not present its language as "
+    "if it were the rule's operative text. The black letter and the "
+    "Comments can say materially different things; mixing them creates "
+    "false authority.\n\n"
     "MULTI-ISSUE QUESTIONS — completeness is mandatory:\n"
     "• Before searching, restate every distinct sub-question the user asked "
     "as an explicit checklist. Count each numbered item, AND each separately "
@@ -443,6 +501,36 @@ SYNTHESIS_NUDGE = (
 # so the forced final answer is never cut off mid-section.
 ANSWER_MAX_TOKENS = 4000
 
+# Reasoning-tier models spend *hidden* reasoning tokens that count against
+# the same output budget as the visible answer. With ANSWER_MAX_TOKENS=4000
+# and the default `reasoning_effort='medium'`, gpt-5-mini routinely exhausts
+# its budget on reasoning before producing any visible content — the
+# response returns with empty `content` and a successful 200. Two things
+# fix this together: (1) a much larger token budget, since reasoning eats
+# most of it; (2) `reasoning_effort='low'` so the model doesn't chain-of-
+# thought at length on top of the structured work the tool loop is already
+# doing. Names listed here are the OpenAI base IDs; the API also serves
+# dated variants like `gpt-5-mini-2025-08-07` whose first 11 chars match,
+# so we substring-test below.
+REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+REASONING_ANSWER_MAX_TOKENS = 16000
+
+
+def _is_reasoning_model(model: str) -> bool:
+    return any(model.startswith(p) for p in REASONING_MODEL_PREFIXES)
+
+
+def _model_extras(model: str) -> dict[str, Any]:
+    """Per-model kwargs layered onto the chat-completions call. Empty for
+    classic chat models; reasoning models get `reasoning_effort='low'`."""
+    if _is_reasoning_model(model):
+        return {"reasoning_effort": "low"}
+    return {}
+
+
+def _token_budget(model: str) -> int:
+    return REASONING_ANSWER_MAX_TOKENS if _is_reasoning_model(model) else ANSWER_MAX_TOKENS
+
 
 def _create_completion(client, base_kwargs: dict, max_tokens: int, state: dict):
     """Create a chat completion, tolerant of the OpenAI output-token param
@@ -466,6 +554,17 @@ def _create_completion(client, base_kwargs: dict, max_tokens: int, state: dict):
             is_token_param = (
                 "unsupported_parameter" in msg or "unsupported parameter" in msg
             ) and ("max_tokens" in msg or "max_completion_tokens" in msg)
+            # Classic models reject reasoning_effort; non-prefixed reasoning
+            # variants may reject some efforts. Strip the field and retry
+            # rather than 502 — losing the effort hint is a degradation, not
+            # a failure.
+            is_reasoning_param = (
+                "unsupported_parameter" in msg or "unsupported parameter" in msg
+            ) and "reasoning_effort" in msg
+            if is_reasoning_param and "reasoning_effort" in base_kwargs:
+                base_kwargs = {k: v for k, v in base_kwargs.items() if k != "reasoning_effort"}
+                last_exc = exc
+                continue
             if is_token_param:
                 last_exc = exc
                 continue
@@ -542,50 +641,66 @@ def _enforce_chat_quota(user) -> None:
         )
 
 
-@chat_router.post("/chat", response={200: ChatResponse}, auth=None)
-def chat(request, payload: ChatRequest):
-    # Login required: this endpoint spends our OpenAI key.
-    user = _require_login(request)
+class ChatTurnError(Exception):
+    """OpenAI / loop failure raised by ``run_chat_turn``.
 
-    if not payload.messages:
-        raise HttpError(400, "messages must not be empty")
-    if payload.model not in ALLOWED_CHAT_MODELS:
-        raise HttpError(400, f"unsupported model: {payload.model}")
+    Carries the partial trace gathered before the failure so the caller can
+    still log it (the view records it as an error row; the probe CLI prints
+    what it had). The view re-raises this as a 502; other callers (e.g. the
+    ``probe_chat`` management command) get the raw exception.
+    """
 
-    api_key = settings.OPENAI_API_KEY
-    if not api_key:
-        raise HttpError(
-            503,
-            "The assistant is not configured (no server OpenAI key). "
-            "Set OPENAI_API_KEY and restart.",
-        )
+    def __init__(self, message: str, *, trace: list[ToolCallTrace]):
+        super().__init__(message)
+        self.trace = trace
 
-    # Gate spend BEFORE doing any OpenAI work.
-    _enforce_chat_quota(user)
+
+def run_chat_turn(
+    *,
+    messages: list[dict[str, Any]],
+    source_slug: str | None,
+    model: str,
+    api_key: str,
+    trace: list[ToolCallTrace] | None = None,
+) -> tuple[str, str]:
+    """Drive the OpenAI tool loop against the corpus tools.
+
+    Returns ``(answer_content, actual_model_name)``. Mutates ``trace`` in
+    place as each tool call resolves, so a caller passing its own list can
+    inspect partial state even if we raise.
+
+    Authentication, quota enforcement, ChatTrace persistence, and HTTP
+    error translation are all the *caller's* job — the chat view layers
+    them on top of this; the ``probe_chat`` CLI deliberately does not.
+    Validation of ``model`` / ``messages`` is the caller's too, since the
+    view returns 400 while the CLI prints to stderr.
+    """
+    if trace is None:
+        trace = []
 
     try:
         from openai import OpenAI
     except ImportError as exc:
-        raise HttpError(
-            500,
+        raise ChatTurnError(
             "openai package is not installed on the server. "
             "Run `pip install -r requirements.txt` and restart.",
+            trace=trace,
         ) from exc
 
     client = OpenAI(api_key=api_key)
 
-    # Translate request messages into the OpenAI chat-completions format,
+    # Translate inbound messages into the OpenAI chat-completions format,
     # prepending our system prompt so each test request gets the same
     # grounding instructions.
     convo: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT + _scope_preamble(payload.source_slug)}
+        {"role": "system", "content": SYSTEM_PROMPT + _scope_preamble(source_slug)}
     ]
-    for m in payload.messages:
-        if m.role not in {"user", "assistant", "system"}:
-            raise HttpError(400, f"unsupported role: {m.role}")
-        convo.append({"role": m.role, "content": m.content})
+    for m in messages:
+        role = m.get("role")
+        if role not in {"user", "assistant", "system"}:
+            raise ChatTurnError(f"unsupported role: {role}", trace=trace)
+        convo.append({"role": role, "content": m.get("content", "")})
 
-    trace: list[ToolCallTrace] = []
     token_state: dict = {}
 
     for i in range(MAX_TOOL_LOOPS):
@@ -598,18 +713,19 @@ def chat(request, payload: ChatRequest):
             completion = _create_completion(
                 client,
                 {
-                    "model": payload.model,
+                    "model": model,
                     "messages": convo,
                     "tools": OPENAI_TOOLS,
                     "tool_choice": "none" if final_round else "auto",
+                    **_model_extras(model),
                 },
-                ANSWER_MAX_TOKENS,
+                _token_budget(model),
                 token_state,
             )
         except Exception as exc:
-            # OpenAI auth/quota/etc. — surface a 502 with the message so the
-            # test page can show what went wrong.
-            raise HttpError(502, f"OpenAI call failed: {exc}") from exc
+            raise ChatTurnError(
+                f"OpenAI call failed: {exc}", trace=trace
+            ) from exc
 
         choice = completion.choices[0]
         msg = choice.message
@@ -617,13 +733,9 @@ def chat(request, payload: ChatRequest):
 
         # No tools requested (normal exit), or the forced final round —
         # either way the model has produced its answer; return it with the
-        # full trace so the UI can still render verifiable source cards.
+        # full trace so the caller can still render verifiable source cards.
         if not tool_calls or final_round:
-            return ChatResponse(
-                content=msg.content or "",
-                tool_calls=trace,
-                model=completion.model,
-            )
+            return msg.content or "", completion.model
 
         # Append the assistant turn (with its tool_calls) verbatim, then run
         # each tool and append the corresponding tool messages. The model
@@ -652,14 +764,14 @@ def chat(request, payload: ChatRequest):
                 args = json.loads(tc.function.arguments or "{}")
             except json.JSONDecodeError:
                 args = {}
-            # Scope is a user decision, not the model's: force the request's
+            # Scope is a user decision, not the model's: force the caller's
             # source_slug onto search and lookup so a Court Rule citation
             # resolves against the right corpus instead of silently missing.
             if (
                 tc.function.name in ("search_statutes", "lookup_citation")
-                and payload.source_slug
+                and source_slug
             ):
-                args["source_slug"] = payload.source_slug
+                args["source_slug"] = source_slug
             if handler is None:
                 result: dict[str, Any] = {
                     "error": f"unknown tool: {tc.function.name}"
@@ -688,12 +800,70 @@ def chat(request, payload: ChatRequest):
     # Unreachable: the final round always returns above. Kept as a defensive
     # best-effort so a logic change here can never regress to a hard 500 that
     # throws away an already-gathered trace.
-    return ChatResponse(
-        content=(
-            "I gathered sources but ran out of room to finish the analysis. "
-            "Here is what I retrieved — please narrow the question and ask "
-            "again for a complete answer."
-        ),
-        tool_calls=trace,
-        model=payload.model,
+    return (
+        "I gathered sources but ran out of room to finish the analysis. "
+        "Here is what I retrieved — please narrow the question and ask "
+        "again for a complete answer.",
+        model,
     )
+
+
+@chat_router.post("/chat", response={200: ChatResponse}, auth=None)
+def chat(request, payload: ChatRequest):
+    # Login required: this endpoint spends our OpenAI key.
+    user = _require_login(request)
+
+    if not payload.messages:
+        raise HttpError(400, "messages must not be empty")
+    if payload.model not in ALLOWED_CHAT_MODELS:
+        raise HttpError(400, f"unsupported model: {payload.model}")
+
+    api_key = settings.OPENAI_API_KEY
+    if not api_key:
+        raise HttpError(
+            503,
+            "The assistant is not configured (no server OpenAI key). "
+            "Set OPENAI_API_KEY and restart.",
+        )
+
+    # Gate spend BEFORE doing any OpenAI work.
+    _enforce_chat_quota(user)
+
+    trace: list[ToolCallTrace] = []
+    started = time.monotonic()
+
+    def _elapsed_ms() -> int:
+        return int((time.monotonic() - started) * 1000)
+
+    try:
+        content, actual_model = run_chat_turn(
+            messages=[{"role": m.role, "content": m.content} for m in payload.messages],
+            source_slug=payload.source_slug,
+            model=payload.model,
+            api_key=api_key,
+            trace=trace,
+        )
+    except ChatTurnError as exc:
+        # A failed turn (and what it had retrieved before dying) is often
+        # the most informative one to inspect, so capture the partial trace
+        # before surfacing the error.
+        record_chat_trace(
+            user=user,
+            payload=payload,
+            content="",
+            trace=exc.trace,
+            model=payload.model,
+            latency_ms=_elapsed_ms(),
+            error=str(exc),
+        )
+        raise HttpError(502, str(exc)) from exc
+
+    record_chat_trace(
+        user=user,
+        payload=payload,
+        content=content,
+        trace=trace,
+        model=actual_model,
+        latency_ms=_elapsed_ms(),
+    )
+    return ChatResponse(content=content, tool_calls=trace, model=actual_model)

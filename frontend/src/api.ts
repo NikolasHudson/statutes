@@ -147,6 +147,8 @@ export type ChapterDetail = {
   id: number;
   type: string;
   source_slug: string;
+  // Citation-native permalink key — for a chapter, the bare number ("714").
+  path: string;
   citation: string;
   ordinal: string;
   heading: string;
@@ -156,11 +158,23 @@ export type ChapterDetail = {
   children: BrowseChild[];
 };
 
+// One in-text citation that resolved to a live node in the same source.
+// `text` is the exact substring as it appears in body_text; the reader
+// matches on it (the body is reparsed before render, so byte offsets
+// wouldn't survive — the literal phrase does).
+export type CrossRef = {
+  text: string;
+  path: string;
+  node_id: number;
+};
+
 export type NodeDetail = {
   id: number;
   type: string;
   source: string;
   source_slug: string;
+  // Citation-native permalink key, e.g. "714.16".
+  path: string;
   citation: string;
   heading: string;
   chapter: { id: number; citation: string } | null;
@@ -170,6 +184,7 @@ export type NodeDetail = {
   body_text: string;
   effective_from: string | null;
   has_content: boolean;
+  cross_refs: CrossRef[];
 };
 
 export const browseSources = () =>
@@ -185,6 +200,22 @@ export const browseChapter = (id: number) =>
 
 export const browseNode = (id: number) =>
   request<NodeDetail>(`/api/browse/nodes/${id}`);
+
+export type ResolveResult =
+  | { found: true; node_id: number; path: string; is_chapter: boolean }
+  | {
+      found: false;
+      candidates: { node_id: number; path: string; heading: string }[];
+    };
+
+// Resolve a citation-native permalink ("#/iowa-code/714.16") to a node.
+// Never guesses: an unresolved cite comes back { found: false } with
+// same-chapter candidates.
+export const browseResolve = (source: string, cite: string) =>
+  request<ResolveResult>(
+    `/api/browse/resolve?source=${encodeURIComponent(source)}` +
+      `&cite=${encodeURIComponent(cite)}`,
+  );
 
 export type BrowseSearchResult = {
   node_id: number;

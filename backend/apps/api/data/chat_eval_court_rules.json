@@ -1,0 +1,200 @@
+{
+  "_": [
+    "Eval set for the chat assistant against the Iowa Court Rules corpus.",
+    "",
+    "Each entry:",
+    "  question:        the user's ask",
+    "  expected_paths:  Node.path values an attorney would expect to see cited.",
+    "                   Multiple paths mean ANY of them counts as a hit (the",
+    "                   model only needs to surface one to ground the answer).",
+    "                   An empty list signals the question SHOULD NOT resolve",
+    "                   to a Court Rule — see kind=out_of_scope.",
+    "  kind:            how the user asked (drives per-kind scoring so we can",
+    "                   tell whether scenarios are weak vs lookups, etc.).",
+    "                     citation_lookup   — user named a specific rule",
+    "                     search_substantive — natural-language topic Q",
+    "                     scenario          — facts → which rule controls",
+    "                     comparison        — how two rules differ",
+    "                     multi_issue       — several sub-questions in one ask",
+    "                     definition        — what is X?",
+    "                     quote_verification — does the rule literally say X?",
+    "                     out_of_scope      — not in Court Rules; should abstain",
+    "  tags:            free-form area-of-law tags for human filtering.",
+    "",
+    "Used by `python manage.py probe_chat --queries <this file>` which prints",
+    "per-question traces and a hit@K / cited@K summary plus per-kind breakdown.",
+    "",
+    "Grow this set as we encounter new failure modes. Don't delete entries —",
+    "regression tracking depends on the set being stable across runs."
+  ],
+  "queries": [
+    {
+      "question": "What are the rules for asserting a counterclaim or cross-claim in Iowa civil litigation?",
+      "expected_paths": ["1.241", "1.242", "1.245"],
+      "kind": "search_substantive",
+      "tags": ["civil-procedure", "pleadings"]
+    },
+    {
+      "question": "How long do I have to serve original notice after filing a petition?",
+      "expected_paths": ["1.302"],
+      "kind": "search_substantive",
+      "tags": ["civil-procedure", "service"]
+    },
+    {
+      "question": "What are the requirements for a motion for summary judgment in Iowa state court?",
+      "expected_paths": ["1.981"],
+      "kind": "search_substantive",
+      "tags": ["civil-procedure", "motions"]
+    },
+    {
+      "question": "What is the deadline to file a motion to enlarge or amend findings under Rule 1.904?",
+      "expected_paths": ["1.904"],
+      "kind": "citation_lookup",
+      "tags": ["civil-procedure", "post-trial"]
+    },
+    {
+      "question": "When must a notice of appeal be filed in a civil case?",
+      "expected_paths": ["6.101"],
+      "kind": "search_substantive",
+      "tags": ["appellate", "deadlines"]
+    },
+    {
+      "question": "What must an appellant's proof brief contain under the Iowa Rules of Appellate Procedure?",
+      "expected_paths": ["6.903"],
+      "kind": "search_substantive",
+      "tags": ["appellate", "briefing"]
+    },
+    {
+      "question": "If a lawyer at my firm previously met with a prospective client, can the firm still represent a party adverse to that prospective client by screening the disqualified lawyer?",
+      "expected_paths": ["32:1.18"],
+      "kind": "scenario",
+      "tags": ["professional-conduct", "conflicts", "prospective-client"]
+    },
+    {
+      "question": "A lawyer just joined our firm from another firm where she personally represented a party adverse to one of our current clients. Can we keep the matter by screening the new lawyer?",
+      "expected_paths": ["32:1.10"],
+      "kind": "scenario",
+      "tags": ["professional-conduct", "conflicts", "imputation"]
+    },
+    {
+      "question": "What are the rules for an Iowa lawyer holding client funds in a trust account?",
+      "expected_paths": ["32:1.15", "45.1", "45.2"],
+      "kind": "search_substantive",
+      "tags": ["professional-conduct", "trust-account"]
+    },
+    {
+      "question": "When can a lawyer reveal information relating to the representation of a client?",
+      "expected_paths": ["32:1.6"],
+      "kind": "search_substantive",
+      "tags": ["professional-conduct", "confidentiality"]
+    },
+    {
+      "question": "What constitutes misconduct under the Iowa Rules of Professional Conduct?",
+      "expected_paths": ["32:8.4"],
+      "kind": "search_substantive",
+      "tags": ["professional-conduct", "misconduct"]
+    },
+    {
+      "question": "Look up Iowa Ct. R. 1.904.",
+      "expected_paths": ["1.904"],
+      "kind": "citation_lookup",
+      "tags": ["civil-procedure", "post-trial"]
+    },
+    {
+      "question": "What is the difference between a compulsory counterclaim and a permissive counterclaim under the Iowa Rules of Civil Procedure?",
+      "expected_paths": ["1.241", "1.242"],
+      "kind": "comparison",
+      "tags": ["civil-procedure", "pleadings"]
+    },
+    {
+      "question": "An Iowa district court judge previously practiced at the law firm that now represents the plaintiff in a case assigned to her. Must she disqualify herself?",
+      "expected_paths": ["51:2.11"],
+      "kind": "scenario",
+      "tags": ["judicial-conduct", "disqualification"]
+    },
+    {
+      "question": "What is the deadline for filing a notice of appeal in an Iowa civil case, and which post-trial motions toll that deadline?",
+      "expected_paths": ["6.101", "1.904", "1.1007"],
+      "kind": "multi_issue",
+      "tags": ["appellate", "deadlines", "post-trial"]
+    },
+    {
+      "question": "Does Iowa Rule of Civil Procedure 1.302(5) require the court to dismiss an action when service is not made within 90 days, with no exceptions?",
+      "expected_paths": ["1.302"],
+      "kind": "quote_verification",
+      "tags": ["civil-procedure", "service"]
+    },
+    {
+      "question": "What is the speed limit on Iowa interstate highways?",
+      "expected_paths": [],
+      "kind": "out_of_scope",
+      "tags": ["abstention", "non-legal"]
+    },
+    {
+      "question": "What is the penalty for first-degree theft under Iowa law?",
+      "expected_paths": [],
+      "kind": "out_of_scope",
+      "tags": ["abstention", "iowa-code-not-rules"]
+    },
+    {
+      "question": "What is a CINA proceeding in Iowa juvenile court, and what kind of hearing initiates it?",
+      "expected_paths": ["8.11"],
+      "kind": "definition",
+      "tags": ["juvenile", "CINA"]
+    },
+    {
+      "question": "What is the deadline for the State to bring a criminal defendant to trial under the Iowa Rules of Criminal Procedure?",
+      "expected_paths": ["2.33"],
+      "kind": "search_substantive",
+      "tags": ["criminal-procedure", "speedy-trial"]
+    },
+    {
+      "question": "When and how can a defendant in an Iowa criminal case move to suppress evidence obtained from an unlawful search and seizure?",
+      "expected_paths": ["2.12"],
+      "kind": "search_substantive",
+      "tags": ["criminal-procedure", "suppression"]
+    },
+    {
+      "question": "What is required to admit business records into evidence under the Iowa Rules of Evidence?",
+      "expected_paths": ["5.803"],
+      "kind": "search_substantive",
+      "tags": ["evidence", "hearsay-exceptions"]
+    },
+    {
+      "question": "Under the Iowa Rules of Evidence, when is the attorney-client privilege waived, and what protections exist for inadvertent disclosure?",
+      "expected_paths": ["5.502"],
+      "kind": "multi_issue",
+      "tags": ["evidence", "privilege"]
+    },
+    {
+      "question": "What is the scope of permissible discovery in an Iowa civil case?",
+      "expected_paths": ["1.503"],
+      "kind": "search_substantive",
+      "tags": ["civil-procedure", "discovery"]
+    },
+    {
+      "question": "What are the requirements for an out-of-state attorney to appear pro hac vice before an Iowa court?",
+      "expected_paths": ["31.14"],
+      "kind": "search_substantive",
+      "tags": ["bar-admission", "pro-hac-vice"]
+    },
+    {
+      "question": "I was personally served with a civil petition 28 days ago and never filed an answer. What is my situation now under the Iowa Rules of Civil Procedure?",
+      "expected_paths": ["1.303", "1.971"],
+      "kind": "scenario",
+      "tags": ["civil-procedure", "default", "deadlines"]
+    },
+    {
+      "question": "Sarah is in-house counsel for TechCorp. She discovered that the CEO is about to use loan documents she drafted to obtain a $50M bank loan based on materially false financial statements. She reported the issue up the chain to the board, who refuses to act. The closing is in 48 hours. Under the Iowa Rules of Professional Conduct, what are Sarah's obligations and options — must she withdraw, may she disclose to the bank, and on what authority?",
+      "expected_paths": ["32:1.13", "32:1.6", "32:1.16", "32:1.2"],
+      "kind": "scenario",
+      "tags": [
+        "professional-conduct",
+        "organization-as-client",
+        "mandatory-withdrawal",
+        "noisy-withdrawal",
+        "fraud-on-third-party"
+      ]
+    }
+  ]
+}
