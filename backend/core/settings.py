@@ -172,3 +172,29 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "same-origin"
     X_FRAME_OPTIONS = "DENY"
+
+# Django's default LOGGING config routes 500-error tracebacks to the
+# 'mail_admins' handler, which silently drops them when email isn't
+# configured — so production 500s are invisible. Pipe django.request
+# straight to stderr/stdout so gunicorn's runtime logs capture the
+# traceback and we can debug without flipping DEBUG=True.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+}
