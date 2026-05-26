@@ -42,13 +42,32 @@ envs:
 - key: CHAT_MONTHLY_GLOBAL_LIMIT
   scope: RUN_TIME
   value: "20000"
+# Ingress rules are evaluated top-down; first prefix match wins. Keep
+# /api and /admin pointed at Django, /chat at the Next.js app, and the
+# catch-all '/' at Django so the existing Vite SPA keeps serving the root.
 ingress:
   rules:
-  - component:
+  - match:
+      path:
+        prefix: /chat
+    component:
+      name: chat-frontend
+      preserve_path_prefix: true
+  - match:
+      path:
+        prefix: /api
+    component:
       name: statutes
-    match:
+  - match:
+      path:
+        prefix: /admin
+    component:
+      name: statutes
+  - match:
       path:
         prefix: /
+    component:
+      name: statutes
 services:
 - name: statutes
   dockerfile_path: /Dockerfile
@@ -60,3 +79,20 @@ services:
   http_port: 8080
   instance_count: 1
   instance_size_slug: apps-s-1vcpu-1gb
+# The assistant-ui Next.js app. Same repo, lives in /chat-frontend, ships
+# its own Dockerfile (Node 20). Mounted at /chat/* by the ingress rule
+# above; basePath in next.config.ts matches so its router knows about it.
+- name: chat-frontend
+  dockerfile_path: /chat-frontend/Dockerfile
+  source_dir: /chat-frontend
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    deploy_on_push: true
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  envs:
+  - key: NEXT_PUBLIC_BASE_PATH
+    scope: RUN_AND_BUILD_TIME
+    value: /chat

@@ -20,6 +20,7 @@ from typing import Any
 
 from django.conf import settings
 from django.core.cache import cache
+from django.http import StreamingHttpResponse
 from django.utils import timezone
 from ninja import Router, Schema
 from ninja.errors import HttpError
@@ -806,6 +807,316 @@ def run_chat_turn(
         "again for a complete answer.",
         model,
     )
+
+
+def run_chat_turn_stream(
+    *,
+    messages: list[dict[str, Any]],
+    source_slug: str | None,
+    model: str,
+    api_key: str,
+    trace: list[ToolCallTrace] | None = None,
+):
+    """Generator variant of :func:`run_chat_turn`.
+
+    Yields tuple events as the tool loop progresses:
+
+    * ``("tool_start", name, args_dict)`` — emitted just before a tool runs
+    * ``("delta", text)`` — a chunk of the model's visible answer
+    * ``("done", full_content, actual_model)`` — terminal event with the
+      assembled answer and the model id OpenAI actually billed
+
+    Every round uses ``stream=True`` so visible text streams the moment the
+    model starts emitting it — including from early rounds where the model
+    decides not to call any more tools. Tool-call deltas (``id`` / ``name``
+    / arguments JSON) arrive in pieces across chunks and are reassembled by
+    index before the corresponding tool runs.
+
+    Mutates ``trace`` in place exactly like :func:`run_chat_turn`. Raises
+    :class:`ChatTurnError` carrying the partial trace on failure.
+    """
+    if trace is None:
+        trace = []
+
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise ChatTurnError(
+            "openai package is not installed on the server. "
+            "Run `pip install -r requirements.txt` and restart.",
+            trace=trace,
+        ) from exc
+
+    client = OpenAI(api_key=api_key)
+
+    convo: list[dict[str, Any]] = [
+        {"role": "system", "content": SYSTEM_PROMPT + _scope_preamble(source_slug)}
+    ]
+    for m in messages:
+        role = m.get("role")
+        if role not in {"user", "assistant", "system"}:
+            raise ChatTurnError(f"unsupported role: {role}", trace=trace)
+        convo.append({"role": role, "content": m.get("content", "")})
+
+    token_state: dict = {}
+
+    for i in range(MAX_TOOL_LOOPS):
+        final_round = i == MAX_TOOL_LOOPS - 1
+        if final_round:
+            convo.append({"role": "system", "content": SYNTHESIS_NUDGE})
+
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": convo,
+            "tools": OPENAI_TOOLS,
+            "tool_choice": "none" if final_round else "auto",
+            "stream": True,
+            **_model_extras(model),
+        }
+
+        try:
+            stream = _create_completion(
+                client, kwargs, _token_budget(model), token_state
+            )
+        except Exception as exc:
+            raise ChatTurnError(
+                f"OpenAI call failed: {exc}", trace=trace
+            ) from exc
+
+        content_parts: list[str] = []
+        # Tool calls arrive as deltas across chunks: each delta carries an
+        # `index` plus partial id / name / arguments text. Reassemble per
+        # index, then act once the stream finishes.
+        tc_accum: dict[int, dict[str, Any]] = {}
+        actual_model = model
+
+        try:
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                choice = chunk.choices[0]
+                delta = choice.delta
+
+                text = getattr(delta, "content", None)
+                if text:
+                    content_parts.append(text)
+                    yield ("delta", text)
+
+                for tcd in getattr(delta, "tool_calls", None) or []:
+                    idx = tcd.index
+                    slot = tc_accum.setdefault(
+                        idx, {"id": None, "name": None, "args_text": ""}
+                    )
+                    if tcd.id:
+                        slot["id"] = tcd.id
+                    fn = getattr(tcd, "function", None)
+                    if fn is not None:
+                        if getattr(fn, "name", None):
+                            slot["name"] = fn.name
+                        if getattr(fn, "arguments", None):
+                            slot["args_text"] += fn.arguments
+
+                if getattr(chunk, "model", None):
+                    actual_model = chunk.model
+        except Exception as exc:
+            raise ChatTurnError(
+                f"OpenAI stream interrupted: {exc}", trace=trace
+            ) from exc
+
+        content = "".join(content_parts)
+        tool_calls = [
+            tc_accum[idx]
+            for idx in sorted(tc_accum)
+            if tc_accum[idx]["id"] and tc_accum[idx]["name"]
+        ]
+
+        # No tool calls — the model produced its final answer this round.
+        # The visible text already streamed as deltas; close out.
+        if not tool_calls:
+            yield ("done", content, actual_model)
+            return
+
+        # Tool calls requested: record the assistant turn, run each tool,
+        # append the tool messages, and loop. Any preface content that
+        # arrived alongside the tool_calls is captured on the assistant
+        # turn so the model can reference it next round if it likes.
+        convo.append(
+            {
+                "role": "assistant",
+                "content": content,
+                "tool_calls": [
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tc["name"],
+                            "arguments": tc["args_text"] or "{}",
+                        },
+                    }
+                    for tc in tool_calls
+                ],
+            }
+        )
+
+        for tc in tool_calls:
+            handler = TOOL_HANDLERS.get(tc["name"])
+            try:
+                args = json.loads(tc["args_text"] or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            if (
+                tc["name"] in ("search_statutes", "lookup_citation")
+                and source_slug
+            ):
+                args["source_slug"] = source_slug
+
+            yield ("tool_start", tc["name"], args)
+
+            if handler is None:
+                result: dict[str, Any] = {
+                    "error": f"unknown tool: {tc['name']}"
+                }
+            else:
+                try:
+                    result = handler(args)
+                except Exception as exc:  # don't kill the loop on a bad arg
+                    result = {"error": f"{type(exc).__name__}: {exc}"}
+
+            trace.append(
+                ToolCallTrace(
+                    name=tc["name"],
+                    arguments=args,
+                    result=result,
+                )
+            )
+            convo.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": json.dumps(result, default=str),
+                }
+            )
+
+    # Unreachable: the no-tool-calls branch always returns above, and the
+    # forced final round (tool_choice="none") cannot emit tool_calls.
+    # Defensive yield so a logic regression here can't drop the trace.
+    yield (
+        "done",
+        "I gathered sources but ran out of room to finish the analysis. "
+        "Here is what I retrieved — please narrow the question and ask "
+        "again for a complete answer.",
+        model,
+    )
+
+
+def _stream_ndjson_events(
+    *, user, payload: "ChatRequest", api_key: str
+):
+    """Drive ``run_chat_turn_stream`` and serialize each event to an NDJSON
+    line. After the generator completes (or fails), records the chat trace
+    so the streamed turn shows up in the admin audit log just like the
+    non-streaming endpoint."""
+    trace: list[ToolCallTrace] = []
+    content = ""
+    actual_model = payload.model
+    error: str | None = None
+    started = time.monotonic()
+
+    try:
+        gen = run_chat_turn_stream(
+            messages=[
+                {"role": m.role, "content": m.content} for m in payload.messages
+            ],
+            source_slug=payload.source_slug,
+            model=payload.model,
+            api_key=api_key,
+            trace=trace,
+        )
+        for event in gen:
+            kind = event[0]
+            if kind == "tool_start":
+                line = {
+                    "type": "tool_start",
+                    "name": event[1],
+                    "arguments": event[2],
+                }
+            elif kind == "delta":
+                line = {"type": "delta", "text": event[1]}
+            elif kind == "done":
+                content = event[1]
+                actual_model = event[2]
+                line = {
+                    "type": "done",
+                    "tool_calls": [
+                        {
+                            "name": t.name,
+                            "arguments": t.arguments,
+                            "result": t.result,
+                        }
+                        for t in trace
+                    ],
+                    "model": actual_model,
+                }
+            else:
+                continue
+            yield json.dumps(line, default=str) + "\n"
+    except ChatTurnError as exc:
+        error = str(exc)
+        # The generator owns the same `trace` list, so partial state is
+        # already in `trace` by the time it raises — no need to copy.
+        yield json.dumps({"type": "error", "message": error}) + "\n"
+    except GeneratorExit:
+        # Client disconnected mid-stream. Re-raise so Django can finalize
+        # the response cleanly; the finally block still records the partial
+        # trace below.
+        error = "client disconnected"
+        raise
+    except Exception as exc:
+        error = f"unexpected: {type(exc).__name__}: {exc}"
+        yield json.dumps({"type": "error", "message": error}) + "\n"
+    finally:
+        record_chat_trace(
+            user=user,
+            payload=payload,
+            content=content,
+            trace=trace,
+            model=actual_model,
+            latency_ms=int((time.monotonic() - started) * 1000),
+            error=error,
+        )
+
+
+@chat_router.post("/chat/stream", auth=None)
+def chat_stream(request, payload: ChatRequest):
+    """Streaming sibling of ``/api/chat``. Returns ``application/x-ndjson``;
+    each line is one event (``tool_start`` / ``delta`` / ``done`` / ``error``).
+    Same auth and quota gates as the non-streaming endpoint."""
+    user = _require_login(request)
+
+    if not payload.messages:
+        raise HttpError(400, "messages must not be empty")
+    if payload.model not in ALLOWED_CHAT_MODELS:
+        raise HttpError(400, f"unsupported model: {payload.model}")
+
+    api_key = settings.OPENAI_API_KEY
+    if not api_key:
+        raise HttpError(
+            503,
+            "The assistant is not configured (no server OpenAI key). "
+            "Set OPENAI_API_KEY and restart.",
+        )
+
+    _enforce_chat_quota(user)
+
+    response = StreamingHttpResponse(
+        _stream_ndjson_events(user=user, payload=payload, api_key=api_key),
+        content_type="application/x-ndjson",
+    )
+    response["Cache-Control"] = "no-cache"
+    # nginx / Cloudflare honor X-Accel-Buffering: no to disable response
+    # buffering. Belt-and-suspenders for any future proxy in front of us.
+    response["X-Accel-Buffering"] = "no"
+    return response
 
 
 @chat_router.post("/chat", response={200: ChatResponse}, auth=None)
