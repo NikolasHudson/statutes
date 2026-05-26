@@ -50,11 +50,15 @@ export function Thread() {
   return (
     <ThreadPrimitive.Root
       className="flex h-full flex-col bg-background text-base"
-      style={{
-        "--thread-max-width": "48rem",
-        "--accent-color": "#2563eb",
-        "--accent-foreground": "#ffffff",
-      }}
+      // CSS custom properties aren't in React.CSSProperties' typed union;
+      // cast so production `next build` (strict typecheck) accepts them.
+      style={
+        {
+          "--thread-max-width": "48rem",
+          "--accent-color": "#2563eb",
+          "--accent-foreground": "#ffffff",
+        } as React.CSSProperties
+      }
     >
       <ThreadPrimitive.Viewport
         turnAnchor="top"
