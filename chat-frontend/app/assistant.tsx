@@ -30,7 +30,17 @@ import {
   toolLabel,
   type BrowseSource,
 } from "@/lib/iowa-chat";
+import {
+  streamVerify,
+  type CitationFinding,
+  type VerifySummary,
+} from "@/lib/iowa-verify";
 import type { ProgressStep } from "@/components/tool-ui/progress-tracker";
+
+// Chat vs. Verify Document. In verify mode the document the user sends is run
+// through the citation verifier and the result renders inline as a checklist
+// card (same tool-UI mechanism as the chat progress tracker).
+type Mode = "chat" | "verify";
 
 // Must stay in sync with ALLOWED_CHAT_MODELS in apps/api/chat.py.
 const CHAT_MODELS = [
@@ -76,10 +86,29 @@ function flattenMessages(
     }));
 }
 
+// The last user message's text — the document to verify in verify mode.
+function lastUserText(
+  messages: readonly Parameters<ChatModelAdapter["run"]>[0]["messages"][number][],
+): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "user") continue;
+    const c = m.content;
+    return typeof c === "string"
+      ? c
+      : (c ?? [])
+          .filter((p) => p.type === "text")
+          .map((p) => (p as { type: "text"; text: string }).text)
+          .join("\n");
+  }
+  return "";
+}
+
 // Stable tool-call id for the progress tracker so re-emitting on each event
 // updates the SAME tool part (assistant-ui dedupes by toolCallId) rather than
 // stacking new cards in the message.
 const PROGRESS_TOOL_CALL_ID = "iowa-progress";
+const VERIFY_TOOL_CALL_ID = "iowa-verify";
 
 type ProgressOutcome =
   | { kind: "running" }
@@ -87,12 +116,108 @@ type ProgressOutcome =
   | { kind: "failed"; reason: string }
   | { kind: "cancelled" };
 
+// Verify-mode turn: run the document through the verifier and yield a single
+// `verifyDocument` tool part that updates as findings stream in. The Thread
+// renders it as a citation checklist card.
+async function* runVerifyTurn(
+  text: string,
+  model: string,
+  abortSignal: AbortSignal,
+) {
+  const startedAt = Date.now();
+  let findings: CitationFinding[] = [];
+  let total: number | null = null;
+  let summary: VerifySummary | null = null;
+  let state: "running" | "done" | "error" = "running";
+  let errorMessage = "";
+
+  const emit = () => ({
+    content: [
+      {
+        type: "tool-call" as const,
+        toolCallId: VERIFY_TOOL_CALL_ID,
+        toolName: "verifyDocument",
+        args: {},
+        argsText: "{}",
+        result: {
+          id: VERIFY_TOOL_CALL_ID,
+          findings: findings.map((f) => ({ ...f })),
+          total,
+          summary,
+          state,
+          ...(errorMessage ? { errorMessage } : {}),
+          elapsedTime: Date.now() - startedAt,
+        },
+      },
+    ],
+  });
+
+  if (!text.trim()) {
+    state = "error";
+    errorMessage = "Paste or attach a document to verify its citations.";
+    yield emit();
+    return;
+  }
+
+  yield emit();
+  try {
+    for await (const ev of streamVerify({ text }, abortSignal, model)) {
+      if (abortSignal.aborted) return;
+      switch (ev.type) {
+        case "start":
+          total = ev.citations_total;
+          break;
+        case "citation_done":
+          findings = [...findings, ev.finding];
+          break;
+        case "summary":
+          summary = {
+            total: ev.total,
+            green: ev.green,
+            yellow: ev.yellow,
+            red: ev.red,
+          };
+          break;
+        case "done":
+          state = "done";
+          break;
+        case "error":
+          state = "error";
+          errorMessage = ev.message;
+          break;
+      }
+      yield emit();
+    }
+    if (state === "running") {
+      state = "done";
+      yield emit();
+    }
+  } catch (e) {
+    if ((e as Error).name === "AbortError") return;
+    state = "error";
+    errorMessage = (e as Error).message ?? String(e);
+    yield emit();
+  }
+}
+
 function makeAdapter(
-  getScope: () => { model: string; sourceSlug: string | null },
+  getScope: () => {
+    model: string;
+    sourceSlug: string | null;
+    mode: Mode;
+    onVerifyDone: () => void;
+  },
 ): ChatModelAdapter {
   return {
     async *run({ messages, abortSignal }) {
       const scope = getScope();
+      if (scope.mode === "verify") {
+        yield* runVerifyTurn(lastUserText(messages), scope.model, abortSignal);
+        // One-shot: drop back to chat so the next message isn't silently
+        // treated as another document to verify.
+        scope.onVerifyDone();
+        return;
+      }
       const startedAt = Date.now();
       const steps: ProgressStep[] = [];
       let answer = "";
@@ -225,6 +350,7 @@ function makeAdapter(
 export const Assistant = () => {
   const [model, setModel] = useState<string>(CHAT_MODELS[0].id);
   const [scope, setScope] = useState<string>(DEFAULT_SCOPE);
+  const [mode, setMode] = useState<Mode>("chat");
   const [sources, setSources] = useState<BrowseSource[]>([]);
 
   useEffect(() => {
@@ -240,11 +366,12 @@ export const Assistant = () => {
   // Wrap state in a ref-style getter so the adapter (memoized once) always
   // sees the latest model/scope without re-instantiating the runtime.
   const sourceSlug = scope === SCOPE_ALL ? null : scope;
+  const onVerifyDone = () => setMode("chat");
   const scopeRef = useMemo(
-    () => ({ current: { model, sourceSlug } }),
+    () => ({ current: { model, sourceSlug, mode, onVerifyDone } }),
     [],
   );
-  scopeRef.current = { model, sourceSlug };
+  scopeRef.current = { model, sourceSlug, mode, onVerifyDone };
   const adapter = useMemo(() => makeAdapter(() => scopeRef.current), [scopeRef]);
   const runtime = useLocalRuntime(adapter);
 
@@ -299,7 +426,16 @@ export const Assistant = () => {
               </div>
             </header>
             <div className="flex-1 overflow-hidden">
-              <Thread />
+              <Thread
+                composerPlaceholder={
+                  mode === "verify"
+                    ? "Paste a document to verify its citations…"
+                    : "Message the assistant — or type / for tools"
+                }
+                onSelectTool={(id) =>
+                  setMode(id === "verify" ? "verify" : "chat")
+                }
+              />
             </div>
           </SidebarInset>
         </div>

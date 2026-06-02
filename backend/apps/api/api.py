@@ -33,6 +33,7 @@ from .accounts import account_router, auth_router
 from .auth import api_key_auth, enforce_rate_limit, require_feature
 from .browse import browse_router
 from .chat import chat_router
+from .verify import verify_router
 from .schemas import (
     AmendmentsResponse,
     CrossRefsResponse,
@@ -62,6 +63,7 @@ from .serializers import (
 
 api = NinjaAPI(title="Iowa Legal Corpus", version="0.2")
 api.add_router("", chat_router)
+api.add_router("", verify_router)
 api.add_router("/auth", auth_router)
 api.add_router("/account", account_router)
 api.add_router("/browse", browse_router)

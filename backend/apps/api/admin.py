@@ -20,7 +20,7 @@ from django.contrib import admin
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 
-from .models import ChatTrace
+from .models import ChatTrace, VerificationRun
 from .trace_capture import _answer_uses
 
 
@@ -28,7 +28,6 @@ from .trace_capture import _answer_uses
 class ChatTraceAdmin(admin.ModelAdmin):
     list_display = (
         "created_at",
-        "user",
         "short_question",
         "num_searches",
         "num_tool_calls",
@@ -48,7 +47,6 @@ class ChatTraceAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         "created_at",
-        "user",
         "model",
         "source_slug",
         "latency_ms",
@@ -63,6 +61,16 @@ class ChatTraceAdmin(admin.ModelAdmin):
     )
     fields = readonly_fields
 
+    # Confidentiality: a trace is the user's verbatim question + answer, so
+    # only superusers may view it — not every staff member with admin access.
+    # All four perms gate on superuser; the model otherwise vanishes from the
+    # admin index for ordinary staff.
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
     # A log is captured, not authored: keep the admin strictly view-only.
     def has_add_permission(self, request):
         return False
@@ -72,7 +80,7 @@ class ChatTraceAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         # Allow purging old rows (retention/privacy) but nothing else.
-        return True
+        return request.user.is_superuser
 
     @admin.display(description="Question")
     def short_question(self, obj: ChatTrace) -> str:
@@ -152,4 +160,112 @@ class ChatTraceAdmin(admin.ModelAdmin):
             '<pre style="max-height:500px;overflow:auto;font-size:11px;'
             'background:#f6f8fa;padding:10px">{}</pre>',
             json.dumps(obj.tool_calls, indent=2, default=str),
+        )
+
+
+_STATUS_COLOR = {"green": "#1a7f37", "yellow": "#9a6700", "red": "#c0392b"}
+
+
+@admin.register(VerificationRun)
+class VerificationRunAdmin(admin.ModelAdmin):
+    """Read-only audit surface for Verify-Document runs — the accuracy-review
+    counterpart to ChatTraceAdmin. Same confidentiality posture: superuser-only,
+    captured-not-authored, view + purge but never edit."""
+
+    list_display = (
+        "created_at",
+        "source_name",
+        "citations_total",
+        "green",
+        "yellow",
+        "red",
+        "has_error",
+    )
+    list_filter = ("created_at",)
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+
+    readonly_fields = (
+        "created_at",
+        "source_name",
+        "char_count",
+        "citations_total",
+        "green",
+        "yellow",
+        "red",
+        "latency_ms",
+        "error",
+        "findings_view",
+        "raw_findings",
+    )
+    fields = readonly_fields
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    @admin.display(boolean=True, description="Error")
+    def has_error(self, obj: VerificationRun) -> bool:
+        return bool(obj.error)
+
+    @admin.display(description="Findings (citation → status → language)")
+    def findings_view(self, obj: VerificationRun):
+        """One block per citation: the cite, its traffic-light status, and each
+        language check (claim vs. the source excerpt it was graded against)."""
+        findings = obj.findings or []
+        if not findings:
+            return mark_safe("<em>No citations graded.</em>")
+        blocks = []
+        for f in findings:
+            color = _STATUS_COLOR.get(f.get("status"), "#444")
+            checks = f.get("language_checks") or []
+            rows = format_html_join(
+                "",
+                '<div style="margin:2px 0 2px 16px;font-size:12px">'
+                "<code>[{}/{}]</code> {} <span style='color:#888'>↔ {}</span></div>",
+                (
+                    (
+                        c.get("kind", ""),
+                        c.get("verdict", ""),
+                        (c.get("claim_text", "") or "")[:160],
+                        (c.get("source_excerpt", "") or "")[:160],
+                    )
+                    for c in checks
+                ),
+            )
+            blocks.append(
+                format_html(
+                    '<div style="margin-bottom:10px"><strong style="color:{}">'
+                    "● {}</strong> <code>{}</code> — {}<br>{}</div>",
+                    color,
+                    (f.get("status") or "?").upper(),
+                    f.get("raw") or "?",
+                    f.get("detail") or "",
+                    rows,
+                )
+            )
+        return format_html(
+            '<div style="max-width:900px">{}</div>',
+            format_html_join("", "{}", ((b,) for b in blocks)),
+        )
+
+    @admin.display(description="Raw findings (source of truth)")
+    def raw_findings(self, obj: VerificationRun):
+        import json
+
+        return format_html(
+            '<pre style="max-height:500px;overflow:auto;font-size:11px;'
+            'background:#f6f8fa;padding:10px">{}</pre>',
+            json.dumps(obj.findings, indent=2, default=str),
         )

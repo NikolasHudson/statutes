@@ -19,6 +19,10 @@ env = environ.Env(
     # Persist each chat's search/grounding trace for offline quality
     # review (apps/api/models.ChatTrace). Off = no rows written.
     CHAT_TRACE_CAPTURE=(bool, True),
+    # Confidentiality: traces hold the user's verbatim question + answer, so
+    # they are not kept indefinitely. ``purge_chat_traces`` deletes rows older
+    # than this many days (0 disables the purge).
+    CHAT_TRACE_RETENTION_DAYS=(int, 7),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
@@ -31,6 +35,7 @@ OPENAI_API_KEY = env("OPENAI_API_KEY")
 CHAT_DAILY_USER_LIMIT = env("CHAT_DAILY_USER_LIMIT")
 CHAT_MONTHLY_GLOBAL_LIMIT = env("CHAT_MONTHLY_GLOBAL_LIMIT")
 CHAT_TRACE_CAPTURE = env("CHAT_TRACE_CAPTURE")
+CHAT_TRACE_RETENTION_DAYS = env("CHAT_TRACE_RETENTION_DAYS")
 
 INSTALLED_APPS = [
     "django.contrib.admin",

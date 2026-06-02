@@ -49,6 +49,12 @@ envs:
 - key: CHAT_MONTHLY_GLOBAL_LIMIT
   scope: RUN_TIME
   value: "20000"
+# Chat traces hold the user's verbatim question + answer; the trace-purge
+# worker deletes rows older than this many days. App-level env, so both the
+# Django service and the worker see it.
+- key: CHAT_TRACE_RETENTION_DAYS
+  scope: RUN_TIME
+  value: "7"
 # Ingress rules are evaluated top-down; first prefix match wins. The Next.js
 # chat-frontend serves the entire SPA at "/"; Django keeps /api/* and
 # /admin/*. preserve_path_prefix is REQUIRED everywhere — without it App
@@ -99,3 +105,20 @@ services:
   http_port: 8080
   instance_count: 1
   instance_size_slug: apps-s-1vcpu-0.5gb
+# Retention worker: DO App Platform has no native cron, so a long-lived worker
+# enforces the chat-trace retention window itself. It reuses the Django image
+# and inherits the app-level envs (DATABASE_URL, CHAT_TRACE_RETENTION_DAYS),
+# wakes once a day, purges expired traces, and sleeps. `while true` keeps it
+# alive even if a purge run exits non-zero, so a transient DB blip never kills
+# the loop — it just retries on the next tick.
+workers:
+- name: trace-purge
+  dockerfile_path: /Dockerfile
+  source_dir: /
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    deploy_on_push: true
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  run_command: while true; do python manage.py purge_chat_traces; sleep 86400; done

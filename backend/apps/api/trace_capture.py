@@ -149,7 +149,12 @@ def record_chat_trace(
                 break
 
         ChatTrace.objects.create(
-            user=user if getattr(user, "pk", None) else None,
+            # Confidentiality: a trace is kept for search-quality review only,
+            # never to see who asked. We deliberately do NOT attribute it to a
+            # user — the column stays null so no reviewer (admin or DB) can
+            # link a chat back to its sender. `user` is still accepted by this
+            # function for the quota/abuse path; it just isn't persisted here.
+            user=None,
             model=model or "",
             source_slug=payload.source_slug or "",
             question=question,
@@ -165,3 +170,39 @@ def record_chat_trace(
         )
     except Exception:  # noqa: BLE001 — capture must not break chat
         logger.exception("chat trace capture failed")
+
+
+def record_verification_run(
+    *,
+    user,
+    source_name: str,
+    char_count: int,
+    findings: list[dict],
+    summary: dict,
+    latency_ms: int | None = None,
+    error: str = "",
+) -> None:
+    """Persist one Verify-Document run. Never raises (same contract as
+    :func:`record_chat_trace`). Gated by ``settings.CHAT_TRACE_CAPTURE`` so the
+    whole audit-log feature toggles together."""
+    if not getattr(settings, "CHAT_TRACE_CAPTURE", True):
+        return
+    try:
+        from apps.api.models import VerificationRun
+
+        VerificationRun.objects.create(
+            # Unattributed, like ChatTrace — the run is kept for accuracy review
+            # only, never to see who submitted which document.
+            user=None,
+            source_name=source_name or "",
+            char_count=char_count or 0,
+            findings=findings or [],
+            citations_total=summary.get("total", 0),
+            green=summary.get("green", 0),
+            yellow=summary.get("yellow", 0),
+            red=summary.get("red", 0),
+            latency_ms=latency_ms,
+            error=error or "",
+        )
+    except Exception:  # noqa: BLE001 — capture must not break verification
+        logger.exception("verification run capture failed")

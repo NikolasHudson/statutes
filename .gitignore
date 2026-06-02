@@ -34,3 +34,9 @@ media/
 # Postgres corpus dumps — large binaries, not source. Keep out of git
 # (use object storage / a release asset to share these).
 *.dump
+
+# Local-only: prod DB connection string for cloning (never commit)
+.prod_db_url
+
+# Prod DB snapshot from clone_prod_db.sh — never commit
+prod.dump

@@ -126,7 +126,9 @@ class CaptureWiringTests(TestCase):
             })
         self.assertEqual(resp.status_code, 200)
         row = ChatTrace.objects.get()
-        self.assertEqual(row.user, self.user)
+        # Traces are intentionally unattributed — the sender is never stored,
+        # even though the request was authenticated as self.user.
+        self.assertIsNone(row.user)
         self.assertEqual(row.question, "what is consumer fraud?")
         self.assertEqual(row.answer, "Here is the answer.")
         self.assertEqual(row.source_slug, "iowa-code")

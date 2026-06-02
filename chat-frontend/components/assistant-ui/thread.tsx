@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   ArrowUpIcon,
   BotIcon,
@@ -24,6 +25,7 @@ import {
   ErrorPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  unstable_useSlashCommandAdapter,
 } from "@assistant-ui/react";
 import "@assistant-ui/react-markdown/styles/dot.css";
 
@@ -41,12 +43,22 @@ import { useAuth } from "@/components/auth-gate";
 import { ProgressTracker } from "@/components/tool-ui/progress-tracker";
 import { safeParseSerializableProgressTracker } from "@/components/tool-ui/progress-tracker/schema";
 import {
+  CitationChecklist,
+  checklistResultToProps,
+} from "@/components/tool-ui/citation-checklist/citation-checklist";
+import {
   ComposerAddAttachment,
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
 import { cn } from "@/lib/utils";
-export function Thread() {
+export function Thread({
+  composerPlaceholder,
+  onSelectTool,
+}: {
+  composerPlaceholder?: string;
+  onSelectTool?: (id: string) => void;
+} = {}) {
   return (
     <ThreadPrimitive.Root
       className="flex h-full flex-col bg-background text-base"
@@ -78,7 +90,10 @@ export function Thread() {
 
         <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto mt-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-4">
           
-          <Composer />
+          <Composer
+            placeholder={composerPlaceholder}
+            onSelectTool={onSelectTool}
+          />
         </ThreadPrimitive.ViewportFooter>
       </ThreadPrimitive.Viewport>
     </ThreadPrimitive.Root>
@@ -112,20 +127,84 @@ function ThreadWelcome() {
   );
 }
 
-function Composer() {
+function Composer({
+  placeholder,
+  onSelectTool,
+}: {
+  placeholder?: string;
+  onSelectTool?: (id: string) => void;
+} = {}) {
+  // Slash-command menu: typing "/" in the composer opens a menu of tools.
+  // Selecting one runs its `execute` (here: switch chat mode); `removeOnExecute`
+  // strips the "/verify" text so the composer is clean for the document.
+  const slash = unstable_useSlashCommandAdapter({
+    commands: useMemo(
+      () => [
+        {
+          id: "verify",
+          label: "Verify Document",
+          description:
+            "Check every citation's format and language against the source",
+          execute: () => onSelectTool?.("verify"),
+        },
+        {
+          id: "chat",
+          label: "Chat",
+          description: "Ask questions about the Iowa Code and Court Rules",
+          execute: () => onSelectTool?.("chat"),
+        },
+      ],
+      [onSelectTool],
+    ),
+    removeOnExecute: true,
+  });
+
   return (
     <ComposerPrimitive.Root className="relative flex w-full flex-col">
-      <ComposerPrimitive.AttachmentDropzone className="flex w-full flex-col rounded-3xl border border-input bg-background px-1 pt-2 outline-none transition-shadow has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-ring/20 data-[dragging=true]:border-ring data-[dragging=true]:border-dashed data-[dragging=true]:bg-accent/50">
-        <ComposerAttachments />
-        <ComposerPrimitive.Input
-          placeholder="Send a message..."
-          className="mb-1 max-h-32 min-h-14 w-full resize-none bg-transparent px-4 pt-2 pb-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-0"
-          rows={1}
-          autoFocus
-          aria-label="Message input"
-        />
-        <ComposerAction />
-      </ComposerPrimitive.AttachmentDropzone>
+      <ComposerPrimitive.Unstable_TriggerPopoverRoot>
+        <ComposerPrimitive.AttachmentDropzone className="flex w-full flex-col rounded-3xl border border-input bg-background px-1 pt-2 outline-none transition-shadow has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-ring/20 data-[dragging=true]:border-ring data-[dragging=true]:border-dashed data-[dragging=true]:bg-accent/50">
+          <ComposerAttachments />
+          <div className="relative">
+            <ComposerPrimitive.Unstable_TriggerPopover
+              char="/"
+              adapter={slash.adapter}
+              className="absolute bottom-full left-2 z-50 mb-2 w-80 overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-md"
+            >
+              <ComposerPrimitive.Unstable_TriggerPopover.Action
+                onExecute={slash.action.onExecute}
+                removeOnExecute={slash.action.removeOnExecute}
+              />
+              <ComposerPrimitive.Unstable_TriggerPopoverItems>
+                {(items) =>
+                  items.map((item, index) => (
+                    <ComposerPrimitive.Unstable_TriggerPopoverItem
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      className="flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left outline-none data-[highlighted]:bg-muted"
+                    >
+                      <span className="text-sm font-medium">{item.label}</span>
+                      {item.description && (
+                        <span className="text-xs text-muted-foreground">
+                          {item.description}
+                        </span>
+                      )}
+                    </ComposerPrimitive.Unstable_TriggerPopoverItem>
+                  ))
+                }
+              </ComposerPrimitive.Unstable_TriggerPopoverItems>
+            </ComposerPrimitive.Unstable_TriggerPopover>
+            <ComposerPrimitive.Input
+              placeholder={placeholder ?? "Send a message..."}
+              className="mb-1 max-h-32 min-h-14 w-full resize-none bg-transparent px-4 pt-2 pb-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-0"
+              rows={1}
+              autoFocus
+              aria-label="Message input"
+            />
+          </div>
+          <ComposerAction />
+        </ComposerPrimitive.AttachmentDropzone>
+      </ComposerPrimitive.Unstable_TriggerPopoverRoot>
     </ComposerPrimitive.Root>
   );
 }
@@ -276,6 +355,16 @@ function AssistantMessage() {
                     return (
                       <div className="my-2">
                         <ProgressTracker {...parsed} />
+                      </div>
+                    );
+                  }
+                }
+                if (part.toolName === "verifyDocument") {
+                  const props = checklistResultToProps(part.result);
+                  if (props) {
+                    return (
+                      <div className="my-2">
+                        <CitationChecklist {...props} />
                       </div>
                     );
                   }

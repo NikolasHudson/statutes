@@ -30,8 +30,11 @@ from django.db import models
 class ChatTrace(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
-    # SET_NULL, not CASCADE: deleting a user must not shred the search-
-    # quality history we use to tune retrieval.
+    # Confidentiality: traces are unattributed. As of migration 0002 the
+    # writer never sets this, so it stays null — a trace cannot be linked back
+    # to the user who sent it. The nullable column is retained (not dropped)
+    # so historical analysis code keeps working; it simply reads null. Still
+    # SET_NULL so a user delete never cascades into the trace history.
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -92,3 +95,58 @@ class ChatTrace(models.Model):
     def __str__(self) -> str:
         q = (self.question or "").strip().replace("\n", " ")
         return f"{self.created_at:%Y-%m-%d %H:%M} · {q[:60]}"
+
+
+class VerificationRun(models.Model):
+    """Audit log of one Verify-Document run.
+
+    Sibling of :class:`ChatTrace`: a write-mostly, browse-read-only record of
+    every document the verifier graded, so we can review accuracy of the
+    traffic-light judgements over real traffic. Same confidentiality posture —
+    unattributed (``user`` stays null) and the writer
+    (:func:`apps.api.trace_capture.record_verification_run`) never raises.
+    """
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    # Unattributed, exactly like ChatTrace — SET_NULL so a user delete never
+    # cascades into the verification history. The writer leaves it null.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verification_runs",
+    )
+
+    # How the document arrived ("paste" or an uploaded filename) and its size.
+    source_name = models.CharField(max_length=255, blank=True)
+    char_count = models.PositiveIntegerField(default=0)
+
+    # The full per-citation findings exactly as streamed to the client:
+    # [{"raw", "span", "status", "resolution", "language_checks": [...]}, ...].
+    findings = models.JSONField(default=list)
+
+    # Denormalized traffic-light tallies for at-a-glance admin triage. A run
+    # with reds is the one worth inspecting — a fabricated quote or fake cite.
+    citations_total = models.PositiveIntegerField(default=0)
+    green = models.PositiveIntegerField(default=0)
+    yellow = models.PositiveIntegerField(default=0)
+    red = models.PositiveIntegerField(default=0)
+
+    latency_ms = models.PositiveIntegerField(null=True, blank=True)
+    error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("-created_at",)),
+            models.Index(fields=("red",)),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.created_at:%Y-%m-%d %H:%M} · {self.source_name or 'paste'} "
+            f"· {self.citations_total} cites "
+            f"({self.green}/{self.yellow}/{self.red})"
+        )
