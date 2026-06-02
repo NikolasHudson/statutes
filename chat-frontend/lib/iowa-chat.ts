@@ -188,9 +188,26 @@ export async function fetchSources(): Promise<BrowseSource[]> {
   }
 }
 
+// Result of the backend's deterministic verification gate (apps/api/chat.py
+// `_verify_answer`). Surfaced in the progress tracker as a "Verifying
+// citations" step, and — when problems are found — appended to the answer as
+// an advisory by the backend itself.
+export type VerificationReport = {
+  ok: boolean;
+  source_label: string;
+  citations_total: number;
+  citations_verified: number;
+  quotes_total: number;
+  quotes_verified: number;
+  citation_problems: { raw: string; status: string }[];
+  quote_problems: { quote: string; status: string }[];
+};
+
 export type StreamEvent =
   | { type: "tool_start"; name: string; arguments: Record<string, unknown> }
   | { type: "delta"; text: string }
+  | { type: "verify_start" }
+  | { type: "verify_done"; report: VerificationReport }
   | { type: "done"; tool_calls: ToolCallTrace[]; model: string }
   | { type: "error"; message: string };
 

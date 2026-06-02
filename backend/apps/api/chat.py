@@ -15,7 +15,9 @@ processes and deploys.
 from __future__ import annotations
 
 import json
+import re
 import time
+from difflib import SequenceMatcher
 from typing import Any
 
 from django.conf import settings
@@ -28,6 +30,7 @@ from ninja.errors import HttpError
 from apps.api.accounts import _require_login
 from apps.api.trace_capture import record_chat_trace
 from apps.corpus.models import NodeVersion, Source
+from apps.corpus.services.lookups import validate_citations, verify_quotes
 from apps.corpus.services.rerank import default_reranker
 from apps.mcp_server.tools import (
     get_cross_references_tool,
@@ -642,6 +645,261 @@ def _enforce_chat_quota(user) -> None:
         )
 
 
+# ---------------------------------------------------------------------------
+# Deterministic answer verification (Track B #1)
+#
+# After the model produces its answer, we re-scan it with the same corpus the
+# answer was supposed to be grounded in and check two things deterministically,
+# without LLM judgment:
+#   • every section-shaped citation actually resolves to a live rule, and
+#   • every quoted passage actually appears in the rule it is attributed to.
+# Anything that fails is surfaced to the user as an explicit advisory rather
+# than silently presented as fact. This converts grounding from "the model
+# promised" to "the system checked."
+# ---------------------------------------------------------------------------
+
+
+_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+# Dollar amounts ("$7.25", "$1,000.50") parse as section-shaped citations
+# ("7.25") and would be flagged as fabricated — statutory text and answers are
+# full of them (minimum wage, fees, thresholds). Strip before scanning.
+_MONEY_RE = re.compile(r"\$\s?\d[\d,]*(?:\.\d+)?")
+
+
+def _is_real_section(citation) -> bool:
+    """True only when the part after the chapter is numeric — a genuine
+    section ("714.16", "32:1.10", "708.2A" → rest "16"/"1.10"/"2A"). Statutory
+    answers enumerate subsection markers like "1.d", "2.a", "2.d(1)" that parse
+    as section-shaped citations but are NOT standalone citations; their rest
+    starts with a letter, so this filters them out for both corpora (real Code
+    and Court Rule section numbers always start the rest with a digit)."""
+    section = citation.section or ""
+    chapter = citation.chapter or ""
+    rest = section[len(chapter) + 1:] if section.startswith(chapter) else section
+    return bool(rest) and rest[0].isdigit()
+_WS_RE = re.compile(r"\s+")
+
+
+def _normalize_for_match(text: str) -> str:
+    """Lowercase, unify quote glyphs, and collapse whitespace so a quoted
+    passage can be compared against rule text without tripping on smart quotes
+    or reflowed line breaks."""
+    text = text.replace("“", '"').replace("”", '"').replace("’", "'")
+    # Unify hyphen/dash glyphs so "attorney‑client" (U+2011 non-breaking
+    # hyphen, en/em dashes) matches the plain "-" used in the rule text.
+    for dash in ("‐", "‑", "‒", "–", "—"):
+        text = text.replace(dash, "-")
+    return _WS_RE.sub(" ", text).strip().lower()
+
+
+# Precedence when one citation is resolved against several sources: a
+# citation that resolves *valid* in ANY loaded source is good law, even if it
+# is not_found in the others. Higher rank wins the collapse.
+_STATUS_RANK = {"valid": 3, "repealed": 1, "not_found": 0, "parse_error": 0}
+
+
+def _verify_answer(content: str, source_slug: str | None) -> dict[str, Any] | None:
+    """Check the drafted answer's citations and quotes against the corpus.
+
+    Works for single-source answers AND mixed answers that legitimately span
+    corpora — a construction-defect question is grounded in both the Iowa Code
+    (§ 614.1 repose) and the Iowa Court Rules (1.402 relation-back, 32:3.3
+    candor). Every citation is resolved against ALL loaded sources and kept if
+    it resolves in any one of them; the quote-grounding corpus is the union of
+    every resolved rule's text. ``source_slug`` only labels the advisory now —
+    it no longer gates whether verification runs, so an unscoped / multi-corpus
+    answer (the highest-risk kind) is still checked.
+
+    Returns a structured report, or ``None`` when there is nothing to check
+    (empty answer or no sources loaded).
+    """
+    if not content.strip():
+        return None
+    sources = list(Source.objects.all())
+    if not sources:
+        return None
+    primary = next((s for s in sources if s.slug == source_slug), None)
+
+    # Strip URLs before scanning. Source links like ``.../chapter_32.pdf``
+    # contain ``number.word`` runs ("32.pdf") that parse as section-shaped
+    # citations and would be flagged as fabricated. The citation text in a
+    # markdown link *label* — ``[Iowa Ct. R. 32:1.10](http://…)`` — survives,
+    # so real citations are still checked; only the URL target is removed.
+    scan_text = _MONEY_RE.sub(" ", _URL_RE.sub(" ", content))
+
+    # Resolve every citation against each source. The reports share identical
+    # item order (same regex over the same text), so item ``i`` is the same
+    # in-text citation in all of them; we collapse to its best status. This
+    # replaces the old single-source scan + cross-reference guard: resolving
+    # across all sources directly is what the guard was approximating.
+    reports = [validate_citations(scan_text, source=s) for s in sources]
+    base_items = reports[0].items
+
+    citation_problems: list[dict[str, str]] = []
+    grounding_parts: list[str] = []
+    confident_total = 0
+    for idx, base in enumerate(base_items):
+        items_here = [rep.items[idx] for rep in reports]
+        # Grounding: heading + full body of every source where this citation
+        # resolves valid (usually exactly one). Building the quote haystack
+        # from ALL corpora is what lets a verbatim quote from a cross-source
+        # rule verify instead of being falsely flagged.
+        for it in items_here:
+            if it.status != "valid":
+                continue
+            if it.node is not None and it.node.heading:
+                grounding_parts.append(it.node.heading)
+            if it.version is not None and it.version.body_text:
+                grounding_parts.append(it.version.body_text)
+
+        # Only act on confident, section-shaped citations. A bare number like
+        # the "90" in "within 90 days" parses as a chapter-only reference and
+        # would otherwise be flagged not_found — legal prose is full of such
+        # numbers. ``_is_real_section`` additionally drops subsection list
+        # markers ("1.d", "2.a") that statutory answers enumerate.
+        cit = base.citation
+        if cit is None or cit.section is None or not _is_real_section(cit):
+            continue
+        confident_total += 1
+        best = max(items_here, key=lambda it: _STATUS_RANK.get(it.status, 0))
+        if best.status in ("not_found", "repealed"):
+            citation_problems.append({"raw": best.raw.strip(), "status": best.status})
+
+    # Quote check. The diagnostic ``verify_quotes`` pairs each quote with the
+    # *nearest* citation, which mispairs badly in multi-rule answers and only
+    # matches body_text (so a quoted rule heading fails). For the gate we use a
+    # higher-precision approach: flag a quote only when it shares almost no
+    # contiguous text with the union grounding corpus built above. We reuse
+    # ``verify_quotes`` purely to extract the quoted spans — its own
+    # source-scoped citation pairing is ignored — so the source we pass only
+    # affects work we discard; any loaded source yields the same spans.
+    grounding = _normalize_for_match(" ".join(grounding_parts))
+
+    quote_problems: list[dict[str, str]] = []
+    verifiable_quotes = 0
+    if grounding:
+        for q in verify_quotes(scan_text, source=primary or sources[0]).items:
+            qn = _normalize_for_match(q.quote)
+            # Skip fragments that aren't substantive verbatim claims:
+            #  • a multi-line capture is a markdown artifact, not one quote;
+            #  • ellipsis / [brackets] are the author signaling non-verbatim;
+            #  • a <4-word span is a term of art or heading ("work-product
+            #    protection"), not a quotation worth fact-checking.
+            if (
+                "\n" in q.quote
+                or "…" in q.quote
+                or "..." in q.quote
+                or "[" in q.quote
+                or len(qn.split()) < 4
+            ):
+                continue
+            verifiable_quotes += 1
+            if qn in grounding:
+                continue  # verbatim (normalized) — verified
+            # Near-verbatim: the quote must be reconstructable from a few
+            # CONTIGUOUS runs of the cited text covering most of its length.
+            # We sum matching blocks of >=4 chars (ignoring scattered
+            # single-word coincidences). A real quote broken only by internal
+            # numbering/punctuation ("...claim that (1)...") still covers ~all
+            # of itself; a fabrication shares only short common-word fragments
+            # and falls short. This is robust to section size — unlike
+            # bag-of-words, which over-verifies against long Iowa Code
+            # sections and lets fabrications through.
+            sm = SequenceMatcher(None, qn, grounding, autojunk=False)
+            covered = sum(b.size for b in sm.get_matching_blocks() if b.size >= 4)
+            if covered / max(len(qn), 1) < 0.6:
+                quote_problems.append({"quote": q.quote, "status": "not_found"})
+
+    return {
+        "ok": not citation_problems and not quote_problems,
+        "source_label": primary.name if primary else "any loaded source",
+        "citations_total": confident_total,
+        "citations_verified": confident_total - len(citation_problems),
+        "quotes_total": verifiable_quotes,
+        "quotes_verified": verifiable_quotes - len(quote_problems),
+        "citation_problems": citation_problems,
+        "quote_problems": quote_problems,
+    }
+
+
+def _verification_advisory(report: dict[str, Any]) -> str:
+    """Render a human-readable advisory block for an answer whose verification
+    turned up problems. Returns "" when everything checked out, so a clean
+    answer is never decorated."""
+    if report["ok"]:
+        return ""
+    label = report.get("source_label") or "the cited corpus"
+    lines: list[str] = []
+    for p in report["citation_problems"]:
+        reason = (
+            "could not be found in" if p["status"] == "not_found"
+            else "appears to be repealed in"
+        )
+        lines.append(f"- Citation **{p['raw']}** {reason} {label}.")
+    for p in report["quote_problems"]:
+        quote = p["quote"]
+        snippet = quote if len(quote) <= 100 else quote[:100].rstrip() + "…"
+        lines.append(
+            f"- The quotation “{snippet}” was not found verbatim in its "
+            f"cited rule."
+        )
+    return (
+        "\n\n---\n\n"
+        "**⚠️ Automated verification.** The following could not be confirmed "
+        "against the source text and should be checked before you rely on "
+        "them:\n\n" + "\n".join(lines)
+    )
+
+
+def _apply_verification(
+    content: str, source_slug: str | None, trace: list["ToolCallTrace"]
+) -> str:
+    """Non-streaming finalizer: verify ``content``, record the report on the
+    trace for audit, and append an advisory if anything failed."""
+    report = _verify_answer(content, source_slug)
+    if report is None:
+        return content
+    trace.append(
+        ToolCallTrace(
+            name="verify_answer",
+            arguments={"source_slug": source_slug or ""},
+            result=report,
+        )
+    )
+    return content + _verification_advisory(report)
+
+
+def _finalize_stream(
+    content: str,
+    actual_model: str,
+    source_slug: str | None,
+    trace: list["ToolCallTrace"],
+):
+    """Streaming finalizer: emit the verification step events, append any
+    advisory as a trailing delta, and close out with ``done`` carrying the
+    full (advisory-inclusive) content so the audit trace matches the UI."""
+    report = _verify_answer(content, source_slug)
+    if report is None:
+        yield ("done", content, actual_model)
+        return
+
+    yield ("verify_start",)
+    trace.append(
+        ToolCallTrace(
+            name="verify_answer",
+            arguments={"source_slug": source_slug or ""},
+            result=report,
+        )
+    )
+    advisory = _verification_advisory(report)
+    if advisory:
+        # Stream the advisory as visible answer text so the user sees the
+        # warning inline, not just in the progress step.
+        yield ("delta", advisory)
+    yield ("verify_done", report)
+    yield ("done", content + advisory, actual_model)
+
+
 class ChatTurnError(Exception):
     """OpenAI / loop failure raised by ``run_chat_turn``.
 
@@ -733,10 +991,12 @@ def run_chat_turn(
         tool_calls = msg.tool_calls or []
 
         # No tools requested (normal exit), or the forced final round —
-        # either way the model has produced its answer; return it with the
-        # full trace so the caller can still render verifiable source cards.
+        # either way the model has produced its answer. Run the deterministic
+        # verification gate over it before returning, so a fabricated citation
+        # or misquote is flagged, not silently surfaced.
         if not tool_calls or final_round:
-            return msg.content or "", completion.model
+            content = _apply_verification(msg.content or "", source_slug, trace)
+            return content, completion.model
 
         # Append the assistant turn (with its tool_calls) verbatim, then run
         # each tool and append the corresponding tool messages. The model
@@ -931,9 +1191,13 @@ def run_chat_turn_stream(
         ]
 
         # No tool calls — the model produced its final answer this round.
-        # The visible text already streamed as deltas; close out.
+        # The visible text already streamed as deltas; now run the
+        # deterministic verification gate (emitting its own progress events)
+        # before closing out.
         if not tool_calls:
-            yield ("done", content, actual_model)
+            yield from _finalize_stream(
+                content, actual_model, source_slug, trace
+            )
             return
 
         # Tool calls requested: record the assistant turn, run each tool,
@@ -1040,6 +1304,10 @@ def _stream_ndjson_events(
                     "name": event[1],
                     "arguments": event[2],
                 }
+            elif kind == "verify_start":
+                line = {"type": "verify_start"}
+            elif kind == "verify_done":
+                line = {"type": "verify_done", "report": event[1]}
             elif kind == "delta":
                 line = {"type": "delta", "text": event[1]}
             elif kind == "done":
