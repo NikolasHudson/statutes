@@ -171,7 +171,18 @@ def find_all(text: str) -> list[Citation]:
     return out
 
 
-# Used by find_all only. Order matters: try the most-specific forms first.
+# Used by find_all and (re-exported into lookups.py) by citation_links,
+# validate_citations, and verify_quotes. Order matters: try the most-specific
+# forms first.
+#
+# The body separator must stay in sync with ``_BODY_RE``: the Iowa Code and
+# most rules join chapter and section with a dot ("714.16", "1.303"), but the
+# Rules of Professional Conduct use a colon ("32:1.10", "51:2.11"). The colon
+# branch deliberately requires a *dotted* rest ("32:1.10", never "32:5") so it
+# captures the court-rule form as ONE token instead of splitting it into "32"
+# + "1.10" — while still not matching a bare time like "9:30" (rest "30" has
+# no dot). It is purely additive: text with no colon-citations scans exactly
+# as before.
 _ITER_RE = re.compile(
     r"""
     (?:
@@ -179,7 +190,12 @@ _ITER_RE = re.compile(
         (?:§§?|\bsec(?:tion|s\.?|\.)?\b|\bI\.?C\.?\b|\bch(?:apter|\.)?\b)
         \s*
     )?
-    \d+[A-Z]?(?:\.\w+)?(?:\s*\([^)]+\))*
+    \d+[A-Z]?
+    (?:
+        :\s*\d+(?:\.\w+)+    # court-rule colon form: 32:1.10, 51:2.11
+      | \.\w+               # dotted form: 714.16, 1.303
+    )?
+    (?:\s*\([^)]+\))*
     """,
     re.IGNORECASE | re.VERBOSE,
 )

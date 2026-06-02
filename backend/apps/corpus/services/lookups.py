@@ -741,10 +741,33 @@ from apps.citations.parser import _ITER_RE, _SIGIL_TOKEN_RE  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-# Match both straight ASCII quotes and typographic curly quotes. We require
-# at least 6 characters inside so we don't trip on apostrophe-S contractions
-# or single-letter scare quotes.
-_QUOTE_RE = re.compile(r'[“"]([^”"]{6,}?)[”"]')
+# Match a quoted passage. Straight quotes and curly quotes are handled as
+# SEPARATE delimiter pairs, not one interchangeable class. That matters for
+# the Iowa Code, where ~21% of sections quote a defined term internally
+# (e.g. the term “advertisement”): a straight-quoted passage that contains an
+# internal curly-quoted term must be captured as ONE quote. Lumping all quote
+# glyphs into a single class mis-pairs the delimiters — the leftover quote
+# binds to the NEXT quotation's opener and captures the prose between them as
+# a phantom quote. Curly branch: “ … ” (straight quotes allowed inside).
+# Straight branch: " … " (curly quotes allowed inside).
+#
+# CRITICAL: the inner content is ``+?`` (any non-empty run), NOT a minimum
+# length. A minimum baked into the pattern (e.g. ``{6,}``) is poison for a
+# toggling delimiter: when a genuinely short quoted term appears — legal prose
+# is full of one-word term-quotes like "costs" (5 chars) or "fees" — the
+# pattern FAILS to match at that term, the engine advances, and pairs the
+# term's CLOSING quote with the NEXT quote's OPENING one. That captures the
+# prose between them as a phantom quote AND flips delimiter parity for every
+# quote downstream, so a whole answer's worth of analytical prose gets
+# misread as unverified quotations. We instead pair every quote correctly and
+# enforce the 6-char floor in ``verify_quotes`` AFTER pairing (see there), so
+# a short term is consumed as its own match and discarded without desyncing.
+_QUOTE_RE = re.compile(r'“([^”]+?)”|"([^"]+?)"')
+
+# Minimum inner length for a captured span to count as a quotation, applied
+# after pairing. Filters apostrophe-S contractions and single-letter scare
+# quotes without letting their delimiters desync the pairing (see _QUOTE_RE).
+_QUOTE_MIN_LEN = 6
 
 # How far before/after a quote we'll scan for a citation. 400 chars is
 # roughly two paragraphs in legal writing, generous enough to catch the
@@ -842,10 +865,16 @@ def verify_quotes(
 
     items: list[QuoteCheck] = []
     for match in _QUOTE_RE.finditer(text):
-        quote = match.group(1).strip()
-        if not quote:
+        # The regex has two alternatives (curly | straight); exactly one of
+        # group 1 / group 2 carries the quoted text for any given match.
+        grp = 1 if match.group(1) is not None else 2
+        quote = match.group(grp).strip()
+        # Re-impose the minimum length here, post-pairing, rather than in the
+        # regex — see _QUOTE_RE for why a length floor inside the pattern
+        # desyncs delimiter pairing across the rest of the text.
+        if len(quote) < _QUOTE_MIN_LEN:
             continue
-        span = (match.start(1), match.end(1))
+        span = (match.start(grp), match.end(grp))
 
         if explicit_citation is not None:
             citation = explicit_citation

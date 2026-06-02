@@ -37,6 +37,12 @@ class Command(BaseCommand):
         parser.add_argument("--no-vector", action="store_true")
         parser.add_argument("--include-pending", action="store_true")
         parser.add_argument(
+            "--source",
+            type=str,
+            default=None,
+            help="Scope search to a single source slug (e.g. iowa-court-rules).",
+        )
+        parser.add_argument(
             "--queries",
             type=str,
             default=str(DEFAULT_QUERIES_PATH),
@@ -71,7 +77,8 @@ class Command(BaseCommand):
         skipped: list[dict] = []
 
         for entry in queries:
-            query = entry["query"]
+            # Accept the chat-eval key "question" as an alias for "query".
+            query = entry.get("query") or entry["question"]
             expected = set(entry.get("expected_paths", []))
             tags = entry.get("tags", [])
 
@@ -85,6 +92,7 @@ class Command(BaseCommand):
                 limit=k,
                 include_pending=opts["include_pending"],
                 use_vector=not opts["no_vector"],
+                source_slug=opts["source"],
             )
             top_paths = [h.path for h in hits]
             matched = available_expected & set(top_paths)
