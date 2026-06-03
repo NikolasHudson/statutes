@@ -1,0 +1,60 @@
+name: dependency-scan
+
+# Blocks PRs (and pushes to main) on known-vulnerable dependencies, and runs
+# weekly to catch newly-disclosed CVEs in already-merged code. Satisfies the
+# enforced/auditable half of SOC 2 CC7.1 — Dependabot proposes fixes, this
+# fails the build until they land.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Mondays 06:00 UTC — surfaces advisories disclosed over the weekend.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    name: pip-audit (${{ matrix.requirements }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        requirements:
+          # requirements-dev.txt is a compiled superset of requirements.txt,
+          # but we audit the runtime file explicitly so a failure names the
+          # prod surface. All three are pinned, hashed locks compiled from the
+          # adjacent .in files (pip-compile --generate-hashes).
+          - backend/requirements.txt
+          - backend/requirements-dev.txt
+          - docling-service/requirements.txt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Pinned so the CI scanner version is reproducible (also in
+      # backend/requirements-dev.txt for local `pip-audit -r ...`).
+      - run: pip install pip-audit==2.10.0
+      - name: Audit ${{ matrix.requirements }}
+        run: pip-audit --strict --requirement "${{ matrix.requirements }}"
+
+  npm-audit:
+    name: npm-audit (chat-frontend)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chat-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: chat-frontend/package-lock.json
+      - run: npm ci
+      # Fail only on high/critical advisories to keep the gate actionable;
+      - run: npm audit --audit-level=high

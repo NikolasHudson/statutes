@@ -1,0 +1,63 @@
+# Dependabot keeps dependencies patched and produces an auditable, automated
+# update trail for SOC 2 CC7.1 (vulnerability management). Three Python
+# surfaces + one npm surface + the GitHub Actions we run in CI.
+#
+# Enabling this file is only half the control: also turn on Dependabot
+# *alerts* + the dependency graph under the repo's Settings > Code security
+# (free, and what actually flags known CVEs). See .github/workflows/
+# dependency-scan.yml for the PR-blocking scan.
+version: 2
+updates:
+  # --- Django API backend (runtime deps) ---
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      backend-minor-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - python
+
+  # --- Docling extraction microservice (PyTorch + ML model deps) ---
+  - package-ecosystem: pip
+    directory: /docling-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      docling-minor-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - python
+
+  # --- Next.js chat frontend ---
+  - package-ecosystem: npm
+    directory: /chat-frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      frontend-minor-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - javascript
+
+  # --- The CI Actions themselves (pin-by-tag drift) ---
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ci
