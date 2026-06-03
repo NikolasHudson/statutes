@@ -17,10 +17,21 @@ databases:
   db_name: defaultdb
   db_user: doadmin
 # Secret values are NOT committed. SECRET_KEY / OPENAI_API_KEY /
-# VOYAGE_API_KEY / DOCLING_INTERNAL_TOKEN are already set (or must be set) as
-# encrypted env vars on the App Platform app; App Platform preserves an
-# existing SECRET value when the spec omits it. Set/rotate them in the App
-# Platform UI or via `doctl`. Never commit plaintext here.
+# VOYAGE_API_KEY / DOCLING_INTERNAL_TOKEN are set as encrypted env vars on the
+# App Platform app. Never commit plaintext here.
+#
+# WARNING — do NOT `doctl apps update --spec` straight from THIS file. A value-
+# less `type: SECRET` does NOT preserve the existing value on update; it
+# re-encrypts it to an EMPTY string and the next container boots with
+# SECRET_KEY="" (500s on every real request — this took prod login down on
+# 2026-06-03). To change the spec safely, start from the LIVE spec which still
+# carries the encrypted values:
+#   doctl apps spec get <app-id> > /tmp/spec.yaml   # has the EV[...] secrets
+#   # edit /tmp/spec.yaml, then:
+#   doctl apps update <app-id> --spec /tmp/spec.yaml
+# i.e. always apply a spec whose SECRET envs include their EV[...] ciphertext
+# (passing the ciphertext back is what actually preserves them). This file is
+# the human-readable source of intent only.
 envs:
 - key: SECRET_KEY
   scope: RUN_AND_BUILD_TIME
