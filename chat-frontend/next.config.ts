@@ -5,6 +5,45 @@ import type { NextConfig } from "next";
 // go to Django). No basePath: same URL in dev and prod.
 const isProd = process.env.NODE_ENV === "production";
 
+// Content-Security-Policy. Everything the app talks to is same-origin:
+//   - API/auth/chat/verify all hit relative /api/* paths (DJANGO_BASE = ""),
+//     routed to Django by App Platform ingress in prod and a dev rewrite
+//     locally — so connect-src 'self' covers them.
+//   - Fonts use next/font/google, which self-hosts the font files at build
+//     time under /_next, so no external font origin is required.
+// Next.js injects inline bootstrap/runtime <script> and inline styles
+// (styled-jsx + framework style tags); without a nonce middleware these
+// require 'unsafe-inline'. Dev additionally needs 'unsafe-eval' and a ws:
+// connection for React Refresh / HMR. frame-ancestors 'none' backstops the
+// X-Frame-Options header against clickjacking.
+const cspDirectives = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  `connect-src 'self'${isProd ? "" : " ws: http://localhost:8000"}`,
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  ...(isProd ? ["upgrade-insecure-requests"] : []),
+];
+
+const securityHeaders = [
+  {
+    key: "Content-Security-Policy",
+    value: cspDirectives.join("; "),
+  },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=63072000; includeSubDomains; preload",
+  },
+];
+
 const nextConfig: NextConfig = {
   // `output: "standalone"` makes `next build` emit .next/standalone/ which
   // bundles only the files the production server needs — half the image
@@ -22,6 +61,18 @@ const nextConfig: NextConfig = {
       {
         source: "/api/:path*",
         destination: "http://localhost:8000/api/:path*",
+      },
+    ];
+  },
+
+  // Defense-in-depth security response headers for every Next-served route.
+  // App Platform does not add these at the edge, so they ship from the app
+  // itself. Confirm with `curl -I` against / and /browse after deploy.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
       },
     ];
   },

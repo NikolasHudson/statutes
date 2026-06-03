@@ -12,6 +12,7 @@ Shape is deliberately tree-shaped so a thin UI can drill:
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 
 from django.http import HttpResponse, HttpResponseNotModified, JsonResponse
@@ -282,10 +283,14 @@ def _search_snippet(body: str, query: str) -> str:
     """A ~240-char excerpt centered on the first query-term hit, so a result
     row shows *why* it matched rather than always the section's opening words.
     Falls back to a head excerpt when no term is found (e.g. a pure trigram
-    fuzzy match)."""
+    fuzzy match).
+
+    The returned text is HTML-escaped so the snippet can never carry markup
+    regardless of how the client renders it — defense in depth alongside the
+    client rendering it as plain text (no markup is ever emitted here)."""
     body = " ".join(body.split())
     if len(body) <= SNIPPET_CHARS:
-        return body
+        return html.escape(body)
 
     lowered = body.lower()
     pos = -1
@@ -295,7 +300,7 @@ def _search_snippet(body: str, query: str) -> str:
             break
 
     if pos == -1:
-        return body[: SNIPPET_CHARS - 1].rsplit(" ", 1)[0].rstrip() + "…"
+        return html.escape(body[: SNIPPET_CHARS - 1].rsplit(" ", 1)[0].rstrip()) + "…"
 
     start = max(0, pos - SNIPPET_CHARS // 3)
     end = min(len(body), start + SNIPPET_CHARS)
@@ -304,7 +309,7 @@ def _search_snippet(body: str, query: str) -> str:
         snippet = "…" + snippet.split(" ", 1)[-1]
     if end < len(body):
         snippet = snippet.rsplit(" ", 1)[0] + "…"
-    return snippet.strip()
+    return html.escape(snippet.strip())
 
 
 def _search_row(

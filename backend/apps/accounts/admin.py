@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
-from .models import APIKey, User
+from .models import APIKey, AuditEvent, User
 
 
 @admin.register(User)
@@ -40,3 +40,35 @@ class APIKeyAdmin(admin.ModelAdmin):
     search_fields = ("name", "user__email", "prefix")
     readonly_fields = ("prefix", "hashed_key", "created_at", "last_used_at")
     autocomplete_fields = ("user",)
+
+
+@admin.register(AuditEvent)
+class AuditEventAdmin(admin.ModelAdmin):
+    """Read-only view of the append-only security audit trail. The model is
+    append-only by contract (AuditEvent.save), and the admin enforces the same:
+    no add / change / delete, so the forensic record can't be edited from here.
+    """
+
+    list_display = ("created_at", "event_type", "outcome", "actor_email", "source_ip")
+    list_filter = ("event_type", "outcome", "created_at")
+    search_fields = ("actor_email", "source_ip")
+    date_hierarchy = "created_at"
+    readonly_fields = (
+        "actor",
+        "actor_email",
+        "event_type",
+        "outcome",
+        "created_at",
+        "source_ip",
+        "user_agent",
+        "detail",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

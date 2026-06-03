@@ -19,6 +19,7 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { csrfHeaders } from "@/lib/csrf";
 
 export type AuthUser = {
   id: number;
@@ -74,6 +75,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", {
       method: "POST",
+      headers: await csrfHeaders(),
       credentials: "include",
     });
     setStatus("signed-out");
@@ -152,7 +154,7 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (u: AuthUser) => void }) {
           : { email: email.trim().toLowerCase(), password };
       const r = await fetch(path, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await csrfHeaders()) },
         credentials: "include",
         body: JSON.stringify(body),
       });

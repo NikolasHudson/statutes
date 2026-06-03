@@ -106,3 +106,42 @@ class VerifyEndpointTests(TestCase):
             data={"text": "Iowa Code § 714.16 controls.", "model": "evil-model"},
         )
         self.assertEqual(resp.status_code, 400)
+
+    def test_over_quota_is_rejected_before_extraction(self):
+        """An over-quota caller must not reach extract_text() (#17)."""
+        from unittest import mock
+
+        self.client.force_login(self.user)
+        with override_settings(CHAT_DAILY_USER_LIMIT=0), mock.patch(
+            "apps.api.verify.extract_text",
+            side_effect=AssertionError("extraction must not run when over quota"),
+        ):
+            resp = self._post_paste("Iowa Code § 714.16 controls.")
+        self.assertEqual(resp.status_code, 429)
+
+    def test_extract_burst_rate_limit(self):
+        """The per-user burst limit throttles even within the daily quota (#17)."""
+        from django.core.cache import cache
+
+        from apps.api import verify as verify_mod
+
+        cache.clear()  # start the window's counter from zero
+        self.client.force_login(self.user)
+        with override_settings(VERIFY_EXTRACT_RATE_PER_MIN=2):
+            # The module reads the ceiling at import time into a module constant,
+            # so patch it directly for the test.
+            with self._patch_rate(verify_mod, 2):
+                ok1 = self._post_paste("Iowa Code § 714.16 controls.")
+                _events(ok1)
+                ok2 = self._post_paste("Iowa Code § 714.16 controls.")
+                _events(ok2)
+                blocked = self._post_paste("Iowa Code § 714.16 controls.")
+        self.assertEqual(ok1.status_code, 200)
+        self.assertEqual(ok2.status_code, 200)
+        self.assertEqual(blocked.status_code, 429)
+
+    @staticmethod
+    def _patch_rate(module, value):
+        from unittest import mock
+
+        return mock.patch.object(module, "_EXTRACT_RATE_MAX", value)

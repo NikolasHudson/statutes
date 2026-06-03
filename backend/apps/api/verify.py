@@ -28,8 +28,12 @@ from ninja import File, Form, Router
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
+from django.conf import settings
+from django.utils import timezone
+
 from apps.api.accounts import _require_login
-from apps.api.chat import ALLOWED_CHAT_MODELS, _enforce_chat_quota
+from apps.api.chat import ALLOWED_CHAT_MODELS, _bump, _enforce_chat_quota
+from apps.api.session_auth import session_auth
 from apps.api.services.extract import ExtractionError, extract_text
 from apps.api.trace_capture import record_verification_run
 from apps.corpus.services.semantic_support import OpenAIChecker, default_checker
@@ -42,8 +46,30 @@ verify_router = Router()
 # is well under this, but one request can't chew unbounded text (and LLM spend).
 _MAX_CHARS = 250_000
 
+# Cheap per-user rate limit on the extract step itself (#17): even an in-quota
+# user shouldn't be able to flood the single docling worker with parse requests.
+# Counts every verify call (paste or upload) in a short window, separate from the
+# daily spend cap so it throttles abuse without burning the user's message budget.
+_EXTRACT_RATE_WINDOW = 60  # seconds
+_EXTRACT_RATE_MAX = getattr(settings, "VERIFY_EXTRACT_RATE_PER_MIN", 10)
 
-@verify_router.post("/verify/document", auth=None)
+
+def _enforce_extract_rate(user) -> None:
+    """Per-user sliding-ish window limit on verify/extract calls. Raises 429 when
+    a user exceeds the burst ceiling, independent of their daily spend quota."""
+    now = timezone.now()
+    bucket = int(now.timestamp()) // _EXTRACT_RATE_WINDOW
+    key = f"verify:extract:{user.pk}:{bucket}"
+    used = _bump(key, timeout=2 * _EXTRACT_RATE_WINDOW)
+    if used > _EXTRACT_RATE_MAX:
+        raise HttpError(
+            429,
+            "Too many document checks in a short time — please wait a minute "
+            "and try again.",
+        )
+
+
+@verify_router.post("/verify/document", auth=session_auth)
 def verify_document_endpoint(
     request,
     file: UploadedFile = File(None),  # noqa: B008 — ninja dependency marker
@@ -56,6 +82,12 @@ def verify_document_endpoint(
     if model and model not in ALLOWED_CHAT_MODELS:
         raise HttpError(400, f"unsupported model: {model}")
 
+    # Gate BEFORE extraction (#17) so an over-quota or flooding caller can't force
+    # docling parse work. The daily/global spend cap (shared with chat) plus a
+    # cheap per-user burst limit both run before any file is read or forwarded.
+    _enforce_chat_quota(user)
+    _enforce_extract_rate(user)
+
     try:
         extracted = extract_text(file=file, pasted=text)
     except ExtractionError as exc:
@@ -65,10 +97,6 @@ def verify_document_endpoint(
         raise HttpError(400, "The document is empty.")
     if len(extracted.text) > _MAX_CHARS:
         raise HttpError(400, f"Document exceeds {_MAX_CHARS:,} character limit.")
-
-    # Spends our OpenAI key for the semantic pass — gate it on the same budget
-    # as chat so the two features share one ceiling.
-    _enforce_chat_quota(user)
 
     # Use the model the user selected in chat. ``default_checker`` is None when
     # no OpenAI key is configured, in which case the semantic pass is skipped

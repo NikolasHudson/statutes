@@ -11,8 +11,14 @@ frontend register/login flow runs through a browser, so the session cookie
 is the right shape; the X-API-Key header is for headless callers (Claude
 Desktop, scripts, the REST API).
 
+Because these routes ride on the session cookie, they are also CSRF-protected
+(see apps/api/session_auth.py): the logged-in routes attach ``session_auth``
+and the public login/register/logout routes attach ``csrf_protect``, both of
+which enforce the CSRF token on unsafe methods. GET ``/csrf`` (and ``/me``)
+hand the SPA the token it must echo back as ``X-CSRFToken``.
+
 CORS_ALLOW_CREDENTIALS must be True in settings for the cookie to round-trip
-between the Vite dev server and Django.
+between the frontend dev server and Django.
 """
 
 from __future__ import annotations
@@ -25,11 +31,15 @@ from django.contrib.auth import (
     logout,
     update_session_auth_hash,
 )
+from django.core.cache import cache
+from django.middleware.csrf import get_token
 from django.utils import timezone
 from ninja import Router, Schema
 from ninja.errors import HttpError
 
+from apps.accounts.audit import AuditEvent, client_ip, record_event
 from apps.accounts.models import APIKey, User, generate_key
+from apps.api.session_auth import csrf_protect, session_auth
 
 
 auth_router = Router()
@@ -130,42 +140,133 @@ def _require_login(request) -> User:
 
 
 # ---------------------------------------------------------------------------
+# Registration throttle (#15). django-axes covers /login (it hooks the
+# authenticate() call), but /register is not an auth call, so we guard it with
+# the same cache-backed counter pattern used by the chat quota / API rate
+# limiter (apps/api/chat.py:_bump). Keyed on source IP so a single host cannot
+# spray account-creation/enumeration attempts; the per-attempt cost is one
+# atomic cache incr against the shared (Redis in prod) store.
+# ---------------------------------------------------------------------------
+_REGISTER_MAX_PER_HOUR = 10
+_REGISTER_WINDOW = 3600
+
+
+def _register_throttle(request) -> None:
+    """Raise 429 (generic) once an IP exceeds the hourly registration cap."""
+    ip = client_ip(request) or "unknown"
+    key = f"register:ip:{ip}:{timezone.now():%Y-%m-%d-%H}"
+    try:
+        used = cache.incr(key)
+    except ValueError:
+        if cache.add(key, 1, timeout=_REGISTER_WINDOW):
+            used = 1
+        else:
+            used = cache.incr(key)
+    if used > _REGISTER_MAX_PER_HOUR:
+        record_event(
+            event_type=AuditEvent.Event.REGISTER_BLOCKED,
+            request=request,
+            outcome=AuditEvent.Outcome.BLOCKED,
+            detail={"reason": "rate_limited"},
+        )
+        raise HttpError(429, "too many requests, please try again later")
+
+
+# ---------------------------------------------------------------------------
 # Auth — register / login / logout / me
 # ---------------------------------------------------------------------------
 
 
-@auth_router.post("/register", response={200: UserOut, 400: dict}, auth=None)
+@auth_router.get("/csrf", response={200: dict}, auth=None)
+def csrf(request):
+    """Hand the SPA a CSRF token and set the ``csrftoken`` cookie on the
+    response. The browser echoes the token back as the ``X-CSRFToken`` header
+    on every credentialed unsafe request (login, chat, key management, …).
+    Same-origin in prod, so the cookie round-trips."""
+    return {"csrfToken": get_token(request)}
+
+
+@auth_router.post(
+    "/register", response={200: UserOut, 400: dict, 429: dict}, auth=csrf_protect
+)
 def register(request, payload: RegisterRequest):
+    _register_throttle(request)
     email = payload.email.strip().lower()
     if not email or "@" not in email:
         raise HttpError(400, "valid email required")
     if len(payload.password) < 8:
         raise HttpError(400, "password must be at least 8 characters")
     if User.objects.filter(email__iexact=email).exists():
-        raise HttpError(400, "an account with that email already exists")
+        # Generic message (finding #15): do NOT confirm the email is taken, or
+        # the endpoint becomes an account-enumeration oracle. The duplicate is
+        # still recorded in the audit trail for monitoring.
+        record_event(
+            event_type=AuditEvent.Event.REGISTER_BLOCKED,
+            request=request,
+            actor_email=email,
+            outcome=AuditEvent.Outcome.BLOCKED,
+            detail={"reason": "duplicate_email"},
+        )
+        raise HttpError(400, "could not create account with those details")
 
     user = User.objects.create_user(
         email=email,
         password=payload.password,
         full_name=payload.full_name.strip(),
     )
-    # Log them in immediately so the next request can see them.
-    login(request, user)
+    # Log them in immediately so the next request can see them. login() fires
+    # user_logged_in, which the audit signal records as a LOGIN_SUCCESS; emit
+    # the registration event explicitly so account creation is its own line.
+    record_event(
+        event_type=AuditEvent.Event.REGISTER,
+        request=request,
+        actor=user,
+        outcome=AuditEvent.Outcome.SUCCESS,
+    )
+    # With multiple AUTHENTICATION_BACKENDS configured (axes + ModelBackend),
+    # login() can't infer which backend authenticated a user that was created
+    # rather than returned by authenticate(), so name the real one explicitly.
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     return _user_out(user)
 
 
-@auth_router.post("/login", response={200: UserOut, 401: dict}, auth=None)
+@auth_router.post(
+    "/login", response={200: UserOut, 401: dict, 429: dict}, auth=csrf_protect
+)
 def login_view(request, payload: LoginRequest):
-    user = authenticate(
-        request, email=payload.email.strip().lower(), password=payload.password
-    )
+    email = payload.email.strip().lower()
+    credentials = {"email": email}
+
+    # django-axes lockout check (findings #6/#15). When the IP+account is locked
+    # out, short-circuit BEFORE touching the password so we neither burn a hash
+    # nor reveal whether the account exists. The 429 body is intentionally
+    # generic. (AxesStandaloneBackend would also block this inside
+    # authenticate(); checking here lets us return a clear, attributed signal.)
+    from axes.handlers.proxy import AxesProxyHandler
+
+    if AxesProxyHandler.is_locked(request, credentials=credentials):
+        record_event(
+            event_type=AuditEvent.Event.LOGIN_LOCKED_OUT,
+            request=request,
+            actor_email=email,
+            outcome=AuditEvent.Outcome.BLOCKED,
+        )
+        raise HttpError(
+            429, "too many failed attempts, please try again later"
+        )
+
+    # authenticate(request, ...) lets axes observe the attempt (it hooks the
+    # user_login_failed signal Django fires when every backend returns None).
+    # The audit LOGIN_SUCCESS / LOGIN_FAILURE rows are written by the auth-signal
+    # receivers in apps/accounts/signals.py.
+    user = authenticate(request, email=email, password=payload.password)
     if user is None:
         raise HttpError(401, "invalid email or password")
     login(request, user)
     return _user_out(user)
 
 
-@auth_router.post("/logout", response={200: dict}, auth=None)
+@auth_router.post("/logout", response={200: dict}, auth=csrf_protect)
 def logout_view(request):
     logout(request)
     return {"status": "ok"}
@@ -173,12 +274,17 @@ def logout_view(request):
 
 @auth_router.get("/me", response={200: UserOut, 401: dict}, auth=None)
 def me(request):
+    # Touch the CSRF token so Django sets the ``csrftoken`` cookie on this
+    # response even when the caller is signed out. The SPA hits /me on load
+    # (signed in or not), so this is the common path on which the browser
+    # picks up the token it must echo back on later credentialed writes.
+    get_token(request)
     user = _require_login(request)
     return _user_out(user)
 
 
 @auth_router.patch(
-    "/me", response={200: UserOut, 400: dict, 401: dict}, auth=None
+    "/me", response={200: UserOut, 400: dict, 401: dict}, auth=session_auth
 )
 def update_me(request, payload: UpdateProfileRequest):
     """Edit the signed-in user's own profile (display name / login email).
@@ -210,11 +316,18 @@ def update_me(request, payload: UpdateProfileRequest):
 
     if update_fields:
         user.save(update_fields=update_fields)
+        record_event(
+            event_type=AuditEvent.Event.PROFILE_CHANGE,
+            request=request,
+            actor=user,
+            outcome=AuditEvent.Outcome.SUCCESS,
+            detail={"fields": update_fields},
+        )
     return _user_out(user)
 
 
 @auth_router.post(
-    "/change-password", response={200: dict, 400: dict, 401: dict}, auth=None
+    "/change-password", response={200: dict, 400: dict, 401: dict}, auth=session_auth
 )
 def change_password(request, payload: ChangePasswordRequest):
     user = _require_login(request)
@@ -227,6 +340,12 @@ def change_password(request, payload: ChangePasswordRequest):
     # set_password rotates the session auth hash; without this the user's
     # own cookie would be invalidated and they'd be logged out mid-edit.
     update_session_auth_hash(request, user)
+    record_event(
+        event_type=AuditEvent.Event.PASSWORD_CHANGE,
+        request=request,
+        actor=user,
+        outcome=AuditEvent.Outcome.SUCCESS,
+    )
     return {"status": "ok"}
 
 
@@ -235,7 +354,7 @@ def change_password(request, payload: ChangePasswordRequest):
 # ---------------------------------------------------------------------------
 
 
-@account_router.get("/api-keys", response=list[APIKeyOut], auth=None)
+@account_router.get("/api-keys", response=list[APIKeyOut], auth=session_auth)
 def list_keys(request):
     user = _require_login(request)
     rows = list(
@@ -245,7 +364,7 @@ def list_keys(request):
 
 
 @account_router.post(
-    "/api-keys", response={200: CreateKeyResponse, 400: dict}, auth=None
+    "/api-keys", response={200: CreateKeyResponse, 400: dict}, auth=session_auth
 )
 def create_key(request, payload: CreateKeyRequest):
     user = _require_login(request)
@@ -259,6 +378,15 @@ def create_key(request, payload: CreateKeyRequest):
     key = APIKey.objects.create(
         user=user, name=name, prefix=prefix, hashed_key=hashed
     )
+    # Record the key prefix only — never the raw key — so the audit trail can
+    # correlate a key to its lifecycle without storing a usable credential.
+    record_event(
+        event_type=AuditEvent.Event.API_KEY_CREATE,
+        request=request,
+        actor=user,
+        outcome=AuditEvent.Outcome.SUCCESS,
+        detail={"key_id": key.id, "prefix": prefix, "name": name},
+    )
     return CreateKeyResponse(
         id=key.id,
         name=key.name,
@@ -269,7 +397,7 @@ def create_key(request, payload: CreateKeyRequest):
 
 
 @account_router.delete(
-    "/api-keys/{key_id}", response={200: dict, 404: dict}, auth=None
+    "/api-keys/{key_id}", response={200: dict, 404: dict}, auth=session_auth
 )
 def revoke_key(request, key_id: int):
     user = _require_login(request)
@@ -279,4 +407,11 @@ def revoke_key(request, key_id: int):
         raise HttpError(404, "key not found") from exc
     key.revoked_at = timezone.now()
     key.save(update_fields=["revoked_at"])
+    record_event(
+        event_type=AuditEvent.Event.API_KEY_REVOKE,
+        request=request,
+        actor=user,
+        outcome=AuditEvent.Outcome.SUCCESS,
+        detail={"key_id": key_id, "prefix": key.prefix},
+    )
     return {"status": "revoked", "id": key_id}

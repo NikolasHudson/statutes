@@ -2,6 +2,7 @@
 // /api/verify/document endpoint. Mirrors lib/iowa-chat.ts: POST a document,
 // read NDJSON events, and yield them as the per-citation checklist fills in.
 
+import { csrfHeaders } from "./csrf";
 import { DJANGO_BASE } from "./iowa-chat";
 
 export type CitationStatus = "green" | "yellow" | "red";
@@ -79,6 +80,7 @@ export async function* streamVerify(
   try {
     r = await fetch(`${DJANGO_BASE}/api/verify/document`, {
       method: "POST",
+      headers: await csrfHeaders(),
       credentials: "include",
       signal,
       body: form,

@@ -1,0 +1,13 @@
+# Source-of-intent for local/CI dev deps. Layered on the prod lock: -c pins
+# every shared (transitive) dep to the exact version in requirements.txt so dev
+# and prod never diverge, and -r pulls the prod intent in so the dev lock is a
+# self-contained superset. Regenerate after editing with:
+#   pip-compile requirements-dev.in -o requirements-dev.txt --generate-hashes
+-c requirements.txt
+-r requirements.in
+django-extensions>=3.2,<5
+ipython>=8.0,<10
+# Dependency CVE scanner. Pinned to match the version run in CI
+# (.github/workflows/dependency-scan.yml) so local and CI results agree.
+# Run locally with: pip-audit -r requirements.txt
+pip-audit==2.9.0

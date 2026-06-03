@@ -7,6 +7,11 @@ from django.utils import timezone
 
 from .managers import UserManager
 
+# The append-only security audit model is defined in audit.py for readability;
+# re-export it here so Django's app registry and makemigrations discover it as
+# part of the accounts app.
+from .audit import AuditEvent  # noqa: E402,F401
+
 
 class Tier(models.TextChoices):
     FREE = "free", "Free"

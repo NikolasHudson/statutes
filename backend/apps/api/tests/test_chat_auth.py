@@ -93,6 +93,31 @@ class ChatAuthTests(TestCase):
             )
         self.assertEqual(blocked.status_code, 429)
 
+    def test_cross_site_post_without_csrf_token_rejected(self):
+        # The chat endpoint spends our OpenAI key, so a session-cookie POST
+        # driven from a hostile page must be blocked by CSRF before any spend.
+        # enforce_csrf_checks=True simulates that real browser request.
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.user)
+        with _fake_openai():
+            resp = _post(
+                client, {"messages": [{"role": "user", "content": "hi"}]}
+            )
+        self.assertEqual(resp.status_code, 403, resp.content)
+
+    def test_post_with_csrf_token_accepted(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.user)
+        token = client.get("/api/auth/csrf").json()["csrfToken"]
+        with _fake_openai():
+            resp = client.post(
+                "/api/chat",
+                data=json.dumps({"messages": [{"role": "user", "content": "hi"}]}),
+                content_type="application/json",
+                HTTP_X_CSRFTOKEN=token,
+            )
+        self.assertEqual(resp.status_code, 200, resp.content)
+
     @override_settings(CHAT_MONTHLY_GLOBAL_LIMIT=1)
     def test_global_monthly_ceiling_trips_for_everyone(self):
         self.client.force_login(self.user)

@@ -4,6 +4,8 @@
 // appended to the streamed text so the existing react-markdown pipeline
 // renders linked citations for free.
 
+import { csrfHeaders } from "./csrf";
+
 // Empty base = same-origin (Next.js rewrites forward /api/* to Django).
 export const DJANGO_BASE = "";
 
@@ -224,7 +226,7 @@ export async function* streamChat(
 ): AsyncGenerator<StreamEvent, void, void> {
   const r = await fetch(`${DJANGO_BASE}/api/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await csrfHeaders()) },
     credentials: "include",
     signal,
     body: JSON.stringify(body),

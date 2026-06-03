@@ -28,6 +28,7 @@ from ninja import Router, Schema
 from ninja.errors import HttpError
 
 from apps.api.accounts import _require_login
+from apps.api.session_auth import session_auth
 from apps.api.trace_capture import record_chat_trace
 from apps.corpus.models import NodeVersion, Source
 from apps.corpus.services.lookups import validate_citations, verify_quotes
@@ -1354,7 +1355,7 @@ def _stream_ndjson_events(
         )
 
 
-@chat_router.post("/chat/stream", auth=None)
+@chat_router.post("/chat/stream", auth=session_auth)
 def chat_stream(request, payload: ChatRequest):
     """Streaming sibling of ``/api/chat``. Returns ``application/x-ndjson``;
     each line is one event (``tool_start`` / ``delta`` / ``done`` / ``error``).
@@ -1387,7 +1388,7 @@ def chat_stream(request, payload: ChatRequest):
     return response
 
 
-@chat_router.post("/chat", response={200: ChatResponse}, auth=None)
+@chat_router.post("/chat", response={200: ChatResponse}, auth=session_auth)
 def chat(request, payload: ChatRequest):
     # Login required: this endpoint spends our OpenAI key.
     user = _require_login(request)

@@ -171,6 +171,124 @@ class APIKeyDashboardTests(TestCase):
         self.assertEqual(client.delete("/api/account/api-keys/1").status_code, 401)
 
 
+class CsrfProtectionTests(TestCase):
+    """The session-cookie routes must reject cross-site-style writes that
+    carry the session cookie but no valid CSRF token, and accept the same
+    write once a token is supplied. ``Client(enforce_csrf_checks=True)``
+    simulates a real browser POST without the SameSite shortcut the default
+    test client takes."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            email="csrf@example.com", password="csrfpass-123456"
+        )
+
+    def _logged_in_csrf_client(self) -> Client:
+        client = Client(enforce_csrf_checks=True)
+        # force_login establishes the session without going through the
+        # (now CSRF-protected) login route.
+        client.force_login(self.user)
+        return client
+
+    @staticmethod
+    def _token(client: Client) -> str:
+        # GET is a safe method — no token needed — and the bootstrap endpoint
+        # both returns the token and sets the csrftoken cookie on the client.
+        return client.get("/api/auth/csrf").json()["csrfToken"]
+
+    # -- change-password ---------------------------------------------------
+
+    def test_change_password_without_token_rejected(self):
+        client = self._logged_in_csrf_client()
+        resp = _post(
+            client,
+            "/api/auth/change-password",
+            {"current_password": "csrfpass-123456", "new_password": "newpass-abcdef"},
+        )
+        self.assertEqual(resp.status_code, 403, resp.content)
+        # The password must be untouched.
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("csrfpass-123456"))
+
+    def test_change_password_with_token_accepted(self):
+        client = self._logged_in_csrf_client()
+        token = self._token(client)
+        resp = client.post(
+            "/api/auth/change-password",
+            data=json.dumps(
+                {
+                    "current_password": "csrfpass-123456",
+                    "new_password": "newpass-abcdef",
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+
+    # -- api-keys (DELETE) -------------------------------------------------
+
+    def test_revoke_key_without_token_rejected(self):
+        key = APIKey.objects.create(
+            user=self.user, name="k", prefix="abcd1234", hashed_key="x" * 64
+        )
+        client = self._logged_in_csrf_client()
+        resp = client.delete(f"/api/account/api-keys/{key.id}")
+        self.assertEqual(resp.status_code, 403, resp.content)
+        key.refresh_from_db()
+        self.assertIsNone(key.revoked_at)
+
+    def test_revoke_key_with_token_accepted(self):
+        key = APIKey.objects.create(
+            user=self.user, name="k", prefix="abcd1234", hashed_key="x" * 64
+        )
+        client = self._logged_in_csrf_client()
+        token = self._token(client)
+        resp = client.delete(
+            f"/api/account/api-keys/{key.id}", HTTP_X_CSRFTOKEN=token
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        key.refresh_from_db()
+        self.assertIsNotNone(key.revoked_at)
+
+    def test_create_key_without_token_rejected(self):
+        client = self._logged_in_csrf_client()
+        resp = _post(client, "/api/account/api-keys", {"name": "x"})
+        self.assertEqual(resp.status_code, 403, resp.content)
+        self.assertFalse(APIKey.objects.filter(user=self.user).exists())
+
+    # -- safe reads need no token ------------------------------------------
+
+    def test_safe_get_needs_no_token(self):
+        client = self._logged_in_csrf_client()
+        self.assertEqual(client.get("/api/account/api-keys").status_code, 200)
+
+    # -- public login route is CSRF-protected too (login CSRF) -------------
+
+    def test_login_without_token_rejected(self):
+        client = Client(enforce_csrf_checks=True)
+        resp = _post(
+            client,
+            "/api/auth/login",
+            {"email": "csrf@example.com", "password": "csrfpass-123456"},
+        )
+        self.assertEqual(resp.status_code, 403, resp.content)
+
+    def test_login_with_token_accepted(self):
+        client = Client(enforce_csrf_checks=True)
+        token = self._token(client)
+        resp = client.post(
+            "/api/auth/login",
+            data=json.dumps(
+                {"email": "csrf@example.com", "password": "csrfpass-123456"}
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+
+
 class ProfileEditTests(TestCase):
     @classmethod
     def setUpTestData(cls):

@@ -1251,6 +1251,7 @@ function SearchResultsPane({
                 <SearchResultRow
                   key={`${r.node_id}-${i}`}
                   result={r}
+                  query={query}
                   onPick={onPick}
                 />
               ))}
@@ -1339,11 +1340,49 @@ function ScopeButton({
   );
 }
 
+// Split the snippet on the query terms and wrap matches in <mark>. The snippet
+// is rendered as plain JSX children, so React auto-escapes every fragment —
+// no raw HTML ever reaches the DOM (the previous dangerouslySetInnerHTML sink
+// is gone). Highlighting is purely cosmetic and term-driven on the client.
+function highlightSnippet(snippet: string, query: string): ReactNode {
+  const terms = [
+    ...new Set(
+      query
+        .toLowerCase()
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 2),
+    ),
+  ].sort((a, b) => b.length - a.length);
+  if (terms.length === 0) return snippet;
+
+  const re = new RegExp(
+    `(${terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
+    "gi",
+  );
+  const parts = snippet.split(re);
+  // String.split with a capturing group interleaves matches at odd indices.
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <mark
+        key={i}
+        className="rounded-sm bg-primary/15 px-0.5 font-medium text-foreground"
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
+
 function SearchResultRow({
   result,
+  query,
   onPick,
 }: {
   result: BrowseSearchResult;
+  query: string;
   onPick: (r: BrowseSearchResult) => void;
 }) {
   return (
@@ -1378,12 +1417,9 @@ function SearchResultRow({
           ) : null}
         </div>
         {result.snippet && (
-          <div
-            className="mt-1 text-foreground/75 text-sm leading-relaxed"
-            // Snippet comes from Postgres ts_headline with HTML <mark>
-            // wrappers; render as HTML so highlights show.
-            dangerouslySetInnerHTML={{ __html: result.snippet }}
-          />
+          <div className="mt-1 text-foreground/75 text-sm leading-relaxed">
+            {highlightSnippet(result.snippet, query)}
+          </div>
         )}
       </button>
     </li>

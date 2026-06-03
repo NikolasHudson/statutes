@@ -3,6 +3,10 @@
 // existing Vite frontend's api.ts — keep them in sync.
 
 import type { AuthUser } from "@/components/auth-gate";
+import { csrfHeaders } from "./csrf";
+
+// Methods that mutate state need a CSRF token; safe reads (GET/HEAD) don't.
+const UNSAFE = /^(POST|PUT|PATCH|DELETE)$/i;
 
 export type APIKey = {
   id: number;
@@ -29,13 +33,16 @@ export class AccountError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = init.method ?? "GET";
+  const csrf = UNSAFE.test(method) ? await csrfHeaders() : {};
   const r = await fetch(path, {
     credentials: "include",
+    ...init,
     headers: {
       "Content-Type": "application/json",
+      ...csrf,
       ...(init.headers ?? {}),
     },
-    ...init,
   });
   const text = await r.text();
   let body: unknown = null;
