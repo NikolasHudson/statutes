@@ -105,6 +105,38 @@ def _is_real_section(citation) -> bool:
     return bool(rest) and rest[0].isdigit()
 
 
+# A short decimal — single/double-digit chapter, a "." separator, and a
+# single-digit tail ("4.1", "2.0", "9.5"). This shape is section-valid but
+# collides with everyday numbers: engine sizes ("a 4.1 motor"), versions
+# ("v2.0"), ratios, and outline markers. Structurally unambiguous cites are
+# NOT matched: 3+ digit chapters ("714.16"), 2+ digit tails ("1.305", "2.19"),
+# the colon court-rule form ("32:1.10"), and anything carrying a subdivision.
+_AMBIGUOUS_BARE_RE = re.compile(r"^\d{1,2}\.\d$")
+
+
+def _is_ambiguous_bare_decimal(citation) -> bool:
+    """True for a short ``N.M`` decimal that parses section-shaped but reads as
+    an ordinary number in prose. Used to demand a citation cue before grading
+    such a token, so "a top of the line 4.1 motor" isn't flagged as a cite to
+    Iowa Code § 4.1."""
+    if citation is None or getattr(citation, "subdivisions", ()):
+        return False
+    return bool(_AMBIGUOUS_BARE_RE.match(citation.section or ""))
+
+
+def _has_left_cue(text: str, start: int) -> bool:
+    """Whether a citation cue (§, "section", "chapter", "rule", "Iowa Code",
+    "I.C.", or a reporter abbreviation) sits immediately before ``start``.
+
+    ``_ITER_RE`` only folds §/section/chapter/I.C. into the matched token, so a
+    "rule 4.1" or "Iowa R. Civ. P. 4.1" comes back as a bare "4.1" with no
+    attached sigil. Scanning a short left window with the parser's own sigil
+    vocabulary recovers those — keeping a genuinely-cited short decimal while
+    still dropping one that stands alone in prose."""
+    left = text[max(0, start - 40):start]
+    return any(m.end() == len(left) for m in _SIGIL_TOKEN_RE.finditer(left))
+
+
 # ---------------------------------------------------------------------------
 # Result shapes
 # ---------------------------------------------------------------------------
@@ -319,6 +351,17 @@ def _build_findings(
         # "within 90 days". A sigil-bearing-but-unparseable match still gets
         # through here so a genuinely malformed citation is graded red.
         if not is_section and not has_sigil:
+            continue
+        # A sigil-less short decimal ("4.1 motor", "a 2.0 engine") is
+        # section-shaped but is far more often a number in prose than a cite to
+        # Iowa Code § 4.1 — which a brief writes as "§ 4.1" / "section 4.1" /
+        # "rule 4.1". Require a nearby cue before grading it; structurally
+        # unambiguous cites (714.16, 1.305, 32:1.10, subdivided) are unaffected.
+        if (
+            not has_sigil
+            and _is_ambiguous_bare_decimal(cit)
+            and not _has_left_cue(text, base.span[0])
+        ):
             continue
 
         items_here = [rep.items[idx] for rep in reports]
@@ -545,7 +588,12 @@ _SENTENCE_END = re.compile(
     # sentence in half.
     r"(?<!Ia)(?<!Va)(?<!Ga)(?<!La)(?<!Pa)(?<!Co)(?<!Inc)(?<!Corp)(?<!Ltd)"
     r"(?<!Mr)(?<!Mrs)(?<!Ms)(?<!Dr)(?<!Jr)(?<!Sr)(?<!St)(?<!vs)"
-    r"[.!?]+\s+(?=[\"“'(]?[A-Z])"
+    # A list/heading separator after terminal punctuation ("...goods. - IV.
+    # Breach of...") starts a new unit. Consuming the leading dash/bullet here
+    # breaks the heading off, so a citation living inside it ("...(§ 554.2314)")
+    # gets its OWN claim instead of inheriting the previous sentence's — which
+    # otherwise reads as a contradiction.
+    r"[.!?]+\s+(?:[-–—•*]\s+)?(?=[\"“'(]?[A-Z])"
 )
 
 

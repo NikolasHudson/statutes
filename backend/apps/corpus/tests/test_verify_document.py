@@ -134,6 +134,26 @@ class ClaimSentenceTests(SimpleTestCase):
         claim = _claim_sentence(text, (idx, idx + len("6.101(1)(b)")))
         self.assertTrue(claim.startswith("The rule in"))
         self.assertIn("thirty-day window", claim)
+
+    def test_dash_led_heading_breaks_from_prior_sentence(self):
+        # A citation living in a dash-joined section heading must NOT inherit the
+        # previous sentence's claim — otherwise the heading's cite is graded
+        # against an unrelated assertion and reads as a contradiction. Regression
+        # for the demand-letter "§ 554.2314 contradicted" false positive.
+        text = (
+            "Any disclaimer is inoperative under Iowa Code § 554.2316(1) because "
+            "it cannot negate your written descriptions. - IV. Breach of Implied "
+            "Warranty of Merchantability (Iowa Code § 554.2314)."
+        )
+        idx = text.index("554.2314")
+        claim = _claim_sentence(text, (idx, idx + len("554.2314")))
+        self.assertTrue(claim.startswith("IV. Breach of Implied Warranty"))
+        self.assertNotIn("disclaimer is inoperative", claim)
+        # And the disclaimer cite keeps its own sentence, minus the heading.
+        idx2 = text.index("554.2316(1)")
+        claim2 = _claim_sentence(text, (idx2, idx2 + len("554.2316(1)")))
+        self.assertIn("disclaimer is inoperative", claim2)
+        self.assertNotIn("Breach of Implied Warranty", claim2)
 from apps.corpus.services.semantic_support import SemanticVerdict
 from apps.corpus.services.verify_document import (
     GREEN,
@@ -245,6 +265,31 @@ class VerifyDocumentTests(TestCase):
         text = "The merchant had within 90 days to refund the $1,000 fee."
         report = verify_document(text, sources=[self.src])
         self.assertEqual(report.findings, [])
+
+    def test_ambiguous_bare_decimal_in_prose_is_dropped(self):
+        # "4.1" here is an engine size, not a cite to Iowa Code § 4.1. With no
+        # citation cue near it, it must not be graded. Regression for the
+        # demand-letter "4.1 contradicted" false positive.
+        text = "He ordered a top of the line 4.1 motor for the pull truck."
+        report = verify_document(text, sources=[self.src], semantic=None)
+        self.assertEqual(report.findings, [])
+
+    def test_short_decimal_with_cue_is_kept(self):
+        # The same shape WITH a preceding cue ("rule 4.1") is a real citation
+        # and must still be graded — the cue is recovered from the left context
+        # even though the matched token is bare.
+        text = "The motion was governed by rule 4.1 of the local procedures."
+        report = verify_document(text, sources=[self.src], semantic=None)
+        self._find(report, "4.1")  # fails if it was dropped
+
+    def test_bare_unambiguous_section_still_graded(self):
+        # A sigil-less but structurally unambiguous cite ("714.16", 3-digit
+        # chapter) must keep grading — the bare-decimal guard targets only the
+        # short N.M shape.
+        text = "Liability under 714.16 controls this dispute."
+        report = verify_document(text, sources=[self.src], semantic=None)
+        f = self._find(report, "714.16")
+        self.assertEqual(f.status, GREEN)
 
     def test_paraphrase_supported_is_green(self):
         text = (
