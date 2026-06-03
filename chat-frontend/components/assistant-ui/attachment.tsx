@@ -108,6 +108,13 @@ const AttachmentPreviewDialog: FC<PropsWithChildren> = ({ children }) => {
 
 const AttachmentThumb: FC = () => {
   const src = useAttachmentSrc();
+  // Tint PDFs red so the type reads at a glance. Detect by MIME or extension
+  // since the browser doesn't always report a contentType for picked files.
+  const isPdf = useAuiState((s) => {
+    const contentType = s.attachment.contentType ?? "";
+    const name = s.attachment.name ?? "";
+    return contentType === "application/pdf" || /\.pdf$/i.test(name);
+  });
 
   return (
     <Avatar className="aui-attachment-tile-avatar h-full w-full rounded-none">
@@ -116,8 +123,15 @@ const AttachmentThumb: FC = () => {
         alt="Attachment preview"
         className="aui-attachment-tile-image object-cover"
       />
-      <AvatarFallback>
-        <FileText className="aui-attachment-tile-fallback-icon size-8 text-muted-foreground" />
+      <AvatarFallback
+        className={cn("rounded-none", isPdf && "bg-red-600 dark:bg-red-700")}
+      >
+        <FileText
+          className={cn(
+            "aui-attachment-tile-fallback-icon size-8 text-muted-foreground",
+            isPdf && "text-white",
+          )}
+        />
       </AvatarFallback>
     </Avatar>
   );
@@ -197,7 +211,7 @@ export const UserMessageAttachments: FC = () => {
 
 export const ComposerAttachments: FC = () => {
   return (
-    <div className="aui-composer-attachments flex w-full flex-row items-center gap-2 overflow-x-auto empty:hidden">
+    <div className="aui-composer-attachments flex w-full flex-row items-center gap-2 overflow-x-auto px-2 pt-1 pb-1 empty:hidden">
       <ComposerPrimitive.Attachments>
         {() => <AttachmentUI />}
       </ComposerPrimitive.Attachments>

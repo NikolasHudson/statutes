@@ -1,0 +1,16 @@
+# Source-of-intent for the docling extraction microservice. Loose ranges live
+# HERE; the fully-pinned, hashed lock is the generated requirements.txt.
+# Regenerate after editing with:
+#   pip-compile requirements.in -o requirements.txt --generate-hashes
+#
+# Kept separate from the Django backend's requirements on purpose: docling
+# pulls in PyTorch + layout/table ML models (~2-3 GB), which we do NOT want
+# coupled to the API image. This service is its own App Platform component
+# (see ../.do/app.yaml). Upper bounds cap each dep below its next major so a
+# recompile never crosses a major boundary without a deliberate edit here.
+docling>=2.0,<3
+# ASGI app + server. python-multipart is intentionally omitted — /extract
+# takes the raw request body (filename via the X-Filename header), so there's
+# no multipart parsing on this side.
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1

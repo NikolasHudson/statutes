@@ -17,10 +17,10 @@ databases:
   db_name: defaultdb
   db_user: doadmin
 # Secret values are NOT committed. SECRET_KEY / OPENAI_API_KEY /
-# VOYAGE_API_KEY are already set as encrypted env vars on the App Platform
-# app; App Platform preserves an existing SECRET value when the spec omits
-# it. Set/rotate them in the App Platform UI or via `doctl`. Never commit
-# plaintext here.
+# VOYAGE_API_KEY / DOCLING_INTERNAL_TOKEN are already set (or must be set) as
+# encrypted env vars on the App Platform app; App Platform preserves an
+# existing SECRET value when the spec omits it. Set/rotate them in the App
+# Platform UI or via `doctl`. Never commit plaintext here.
 envs:
 - key: SECRET_KEY
   scope: RUN_AND_BUILD_TIME
@@ -31,18 +31,56 @@ envs:
 - key: VOYAGE_API_KEY
   scope: RUN_AND_BUILD_TIME
   type: SECRET
+# Shared secret authenticating Django -> docling internal calls (#9). The
+# Django caller (backend/apps/api/services/extract.py) sends it as a header
+# and the docling service (docling-service/app.py) verifies it with
+# hmac.compare_digest before doing any work. Declared at app level and scoped
+# RUN_TIME so BOTH the statutes caller and the docling verifier receive the
+# same value. No plaintext committed — set it once in the App Platform UI.
+- key: DOCLING_INTERNAL_TOKEN
+  scope: RUN_TIME
+  type: SECRET
 - key: DATABASE_URL
   scope: RUN_AND_BUILD_TIME
   value: ${iowa-db.DATABASE_URL}
+# DB transport security (#22). DO Managed Postgres mandates TLS server-side
+# and the bound DATABASE_URL above already carries ?sslmode=require, so the
+# connection is encrypted regardless. We set DATABASE_SSLMODE=require
+# explicitly so the spec is the source of truth rather than relying on the
+# Django default. NOTE: do NOT flip this to verify-full without first shipping
+# the DO cluster CA bundle — verify-full authenticates the server cert and a
+# missing/wrong CA path will break every prod DB connection. To upgrade later:
+#   1. download the cluster CA cert from the DO control panel,
+#   2. ship it in the image (or mount it) and set DATABASE_SSLROOTCERT to it,
+#   3. flip DATABASE_SSLMODE to verify-full (or verify-ca if the private
+#      endpoint hostname mismatches).
+# - key: DATABASE_SSLROOTCERT
+#   scope: RUN_TIME
+#   value: /app/certs/do-ca.crt
+- key: DATABASE_SSLMODE
+  scope: RUN_TIME
+  value: require
 - key: DEBUG
   scope: RUN_AND_BUILD_TIME
   value: "False"
+# Pin the Host allowlist instead of "*" (#19/#20/#29) to restore Django's
+# Host-header validation as defense-in-depth. corpus.nick.law is the PRIMARY
+# domain; ${APP_DOMAIN} resolves to the bare .ondigitalocean.app host App
+# Platform uses (e.g. for default routing / health probes) — no scheme, which
+# is what ALLOWED_HOSTS expects. settings.py parses this as a comma-list.
 - key: ALLOWED_HOSTS
   scope: RUN_TIME
-  value: "*"
+  value: "corpus.nick.law,${APP_DOMAIN}"
 - key: CSRF_TRUSTED_ORIGINS
   scope: RUN_TIME
   value: https://${APP_DOMAIN}
+# Explicit credentialed-CORS allowlist (#21/#34). Without this, prod silently
+# falls back to the localhost dev origin in settings.py. Prod is same-origin
+# (frontend served at /), so this is hardening/clarity; never combine with a
+# wildcard while CORS_ALLOW_CREDENTIALS=True.
+- key: CORS_ALLOWED_ORIGINS
+  scope: RUN_TIME
+  value: https://corpus.nick.law
 - key: CHAT_DAILY_USER_LIMIT
   scope: RUN_TIME
   value: "50"
@@ -55,6 +93,14 @@ envs:
 - key: CHAT_TRACE_RETENTION_DAYS
   scope: RUN_TIME
   value: "7"
+# HTTPS enforcement (#39) is layered, no spec directive required: (1) DO App
+# Platform terminates TLS and redirects HTTP->HTTPS at the edge for every
+# component (including the Next.js frontend at "/"), and (2) Django additionally
+# enforces SECURE_SSL_REDIRECT + HSTS when DEBUG is off (backend/core/settings.py)
+# for /api and /admin. The frontend ("/") relies on the platform edge, so DO
+# App Platform is the control owner for that path; Django HSTS is the durable
+# browser-side backstop for the API/admin paths.
+#
 # Ingress rules are evaluated top-down; first prefix match wins. The Next.js
 # chat-frontend serves the entire SPA at "/"; Django keeps /api/* and
 # /admin/*. preserve_path_prefix is REQUIRED everywhere — without it App
@@ -92,6 +138,41 @@ services:
   http_port: 8080
   instance_count: 1
   instance_size_slug: apps-s-1vcpu-1gb
+  # HTTP health check (#30) so App Platform pulls unhealthy instances from
+  # rotation and blocks promotion of a broken revision during rolling deploys,
+  # instead of falling back to a bare TCP probe. /api/health is the existing
+  # Django liveness endpoint (backend/apps/api/api.py).
+  health_check:
+    http_path: /api/health
+    timeout_seconds: 5
+    failure_threshold: 3
+  envs:
+  # Reach the docling extractor over the app's private LAN. PRIVATE_URL is a
+  # full http URL with the internal port baked in (e.g. http://docling:8080);
+  # the extract client appends /extract. Only this service talks to docling,
+  # so the binding lives here rather than at app level.
+  - key: DOCLING_SERVICE_URL
+    scope: RUN_TIME
+    value: ${docling.PRIVATE_URL}
+# Docling extraction microservice: turns uploaded PDF/DOCX into text for the
+# Verify Document feature. Internal-only (no ingress, internal_ports) so it's
+# never exposed publicly — only the Django service calls it. Carries the
+# PyTorch + layout-model weight that we deliberately keep OUT of the API image,
+# so it gets its own, larger instance. Bump the size slug if extraction OOMs on
+# big briefs.
+- name: docling
+  dockerfile_path: /docling-service/Dockerfile
+  source_dir: /docling-service
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    deploy_on_push: true
+  internal_ports:
+  - 8080
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-2gb
+  health_check:
+    http_path: /health
 # Next.js assistant-ui app: the canonical frontend. Lives in /chat-frontend
 # in the repo and ships its own Node 20 Dockerfile. Mounted at / by the
 # ingress rule above; no basePath since it owns the root.
@@ -105,6 +186,12 @@ services:
   http_port: 8080
   instance_count: 1
   instance_size_slug: apps-s-1vcpu-0.5gb
+  # HTTP health check (#30): probe the app root so an up-but-broken Next.js
+  # process is pulled from rotation rather than relying on a bare TCP probe.
+  health_check:
+    http_path: /
+    timeout_seconds: 5
+    failure_threshold: 3
 # Retention worker: DO App Platform has no native cron, so a long-lived worker
 # enforces the chat-trace retention window itself. It reuses the Django image
 # and inherits the app-level envs (DATABASE_URL, CHAT_TRACE_RETENTION_DAYS),
