@@ -8,6 +8,18 @@
 # coupled to the API image. This service is its own App Platform component
 # (see ../.do/app.yaml). Upper bounds cap each dep below its next major so a
 # recompile never crosses a major boundary without a deliberate edit here.
+#
+# CPU-only PyTorch. App Platform components have no GPU, so the default CUDA
+# build of torch (pulled in transitively by docling) only adds ~5 GB of
+# unusable nvidia-cu13/cuda-toolkit libraries — enough to overflow the build
+# disk and fail the image snapshot. Pinning the +cpu wheels from PyTorch's CPU
+# index drops every nvidia-* dep with zero runtime cost (no GPU = the CUDA
+# build already ran on CPU). pip-compile emits this --extra-index-url into the
+# generated lock so the Docker build can resolve the +cpu wheels. To bump
+# torch, re-resolve the matching torch/torchvision +cpu pair from that index.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.12.0+cpu
+torchvision==0.27.0+cpu
 docling>=2.0,<3
 # ASGI app + server. python-multipart is intentionally omitted — /extract
 # takes the raw request body (filename via the X-Filename header), so there's
