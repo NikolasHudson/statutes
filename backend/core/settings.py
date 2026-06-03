@@ -76,6 +76,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # FIRST, before host/SSL middleware: answer the App Platform container
+    # health probe (pod-IP Host, plain HTTP) so the tightened ALLOWED_HOSTS /
+    # SECURE_SSL_REDIRECT don't 400/301 it. See core/middleware.py.
+    "core.middleware.HealthCheckMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     # WhiteNoise serves collected static (Django admin + the built React
