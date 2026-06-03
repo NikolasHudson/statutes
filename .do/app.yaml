@@ -195,9 +195,16 @@ services:
 # Retention worker: DO App Platform has no native cron, so a long-lived worker
 # enforces the chat-trace retention window itself. It reuses the Django image
 # and inherits the app-level envs (DATABASE_URL, CHAT_TRACE_RETENTION_DAYS),
-# wakes once a day, purges expired traces, and sleeps. `while true` keeps it
-# alive even if a purge run exits non-zero, so a transient DB blip never kills
-# the loop — it just retries on the next tick.
+# wakes once a day, purges expired traces, and sleeps.
+#
+# run_command is a single shell-free argv ON PURPOSE. An earlier
+# `while true; do ...; sleep; done` form failed every deploy with
+# DeployContainerTerminated: the slim runtime image has no bash and App
+# Platform did not run the string through a shell, so the loop never executed
+# and the container exited immediately. The loop + sleep + per-pass error
+# guard now live inside the management command (--forever); see
+# backend/apps/api/management/commands/purge_chat_traces.py. Keep this a plain
+# argv with no shell operators.
 workers:
 - name: trace-purge
   dockerfile_path: /Dockerfile
@@ -207,5 +214,8 @@ workers:
     branch: main
     deploy_on_push: true
   instance_count: 1
+  # 0.5GB is ample: the purge command boots Django (no ML libs) and peaks at
+  # ~80MB RSS. The earlier deploy failures were NOT memory (see run_command
+  # note above), so there's no reason to pay for a larger slug here.
   instance_size_slug: apps-s-1vcpu-0.5gb
-  run_command: while true; do python manage.py purge_chat_traces; sleep 86400; done
+  run_command: python manage.py purge_chat_traces --forever
