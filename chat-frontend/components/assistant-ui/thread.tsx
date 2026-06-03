@@ -5,6 +5,7 @@ import {
   ArrowUpIcon,
   BotIcon,
   CheckIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CopyIcon,
@@ -12,10 +13,12 @@ import {
   LoaderIcon,
   PencilIcon,
   RefreshCwIcon,
+  SlidersHorizontalIcon,
   SquareIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
   UserIcon,
+  XIcon,
 } from "lucide-react";
 import {
   ActionBarPrimitive,
@@ -51,12 +54,34 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+
+// A selectable tool surfaced in the composer's slash menu, Tools dropdown, and
+// (when active) the pill above the input. "Chat" is the absence of a tool, so
+// it is NOT a member of this list — clearing the active tool returns to chat.
+export type ComposerTool = {
+  id: string;
+  label: string;
+  description: string;
+  icon?: React.ComponentType<{ className?: string }>;
+};
+
 export function Thread({
   composerPlaceholder,
+  tools = [],
+  activeTool,
   onSelectTool,
 }: {
   composerPlaceholder?: string;
+  tools?: readonly ComposerTool[];
+  activeTool?: string | null;
   onSelectTool?: (id: string) => void;
 } = {}) {
   return (
@@ -69,6 +94,12 @@ export function Thread({
           "--thread-max-width": "48rem",
           "--accent-color": "#2563eb",
           "--accent-foreground": "#ffffff",
+          // Consumed by the attachment tile's rounded-[calc(...)] in
+          // attachment.tsx. Without these the calc is invalid and the browser
+          // drops border-radius entirely (square tiles). 24px matches the
+          // composer's rounded-3xl; 14px (24-10) is the resulting tile radius.
+          "--composer-radius": "24px",
+          "--composer-padding": "10px",
         } as React.CSSProperties
       }
     >
@@ -92,6 +123,8 @@ export function Thread({
           
           <Composer
             placeholder={composerPlaceholder}
+            tools={tools}
+            activeTool={activeTool}
             onSelectTool={onSelectTool}
           />
         </ThreadPrimitive.ViewportFooter>
@@ -129,24 +162,29 @@ function ThreadWelcome() {
 
 function Composer({
   placeholder,
+  tools = [],
+  activeTool,
   onSelectTool,
 }: {
   placeholder?: string;
+  tools?: readonly ComposerTool[];
+  activeTool?: string | null;
   onSelectTool?: (id: string) => void;
 } = {}) {
   // Slash-command menu: typing "/" in the composer opens a menu of tools.
-  // Selecting one runs its `execute` (here: switch chat mode); `removeOnExecute`
-  // strips the "/verify" text so the composer is clean for the document.
+  // Selecting one runs its `execute` (switch chat mode); `removeOnExecute`
+  // strips the "/verify" text so the composer is clean for the document. The
+  // list is derived from `tools` plus a trailing "Chat" entry that clears any
+  // active tool — same set of choices as the Tools dropdown below.
   const slash = unstable_useSlashCommandAdapter({
     commands: useMemo(
       () => [
-        {
-          id: "verify",
-          label: "Verify Document",
-          description:
-            "Check every citation's format and language against the source",
-          execute: () => onSelectTool?.("verify"),
-        },
+        ...tools.map((t) => ({
+          id: t.id,
+          label: t.label,
+          description: t.description,
+          execute: () => onSelectTool?.(t.id),
+        })),
         {
           id: "chat",
           label: "Chat",
@@ -154,16 +192,24 @@ function Composer({
           execute: () => onSelectTool?.("chat"),
         },
       ],
-      [onSelectTool],
+      [tools, onSelectTool],
     ),
     removeOnExecute: true,
   });
+
+  const active = tools.find((t) => t.id === activeTool) ?? null;
 
   return (
     <ComposerPrimitive.Root className="relative flex w-full flex-col">
       <ComposerPrimitive.Unstable_TriggerPopoverRoot>
         <ComposerPrimitive.AttachmentDropzone className="flex w-full flex-col rounded-3xl border border-input bg-background px-1 pt-2 outline-none transition-shadow has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-ring/20 data-[dragging=true]:border-ring data-[dragging=true]:border-dashed data-[dragging=true]:bg-accent/50">
           <ComposerAttachments />
+          {active && (
+            <ActiveToolPill
+              tool={active}
+              onClear={() => onSelectTool?.("chat")}
+            />
+          )}
           <div className="relative">
             <ComposerPrimitive.Unstable_TriggerPopover
               char="/"
@@ -202,17 +248,118 @@ function Composer({
               aria-label="Message input"
             />
           </div>
-          <ComposerAction />
+          <ComposerAction
+            tools={tools}
+            activeTool={activeTool}
+            onSelectTool={onSelectTool}
+          />
         </ComposerPrimitive.AttachmentDropzone>
       </ComposerPrimitive.Unstable_TriggerPopoverRoot>
     </ComposerPrimitive.Root>
   );
 }
 
-function ComposerAction() {
+// Pill above the input announcing the tool that will run on the next send.
+// The X clears it back to plain chat.
+function ActiveToolPill({
+  tool,
+  onClear,
+}: {
+  tool: ComposerTool;
+  onClear: () => void;
+}) {
+  const Icon = tool.icon;
+  return (
+    <div className="mx-2 mb-1 flex">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-color)]/30 bg-[var(--accent-color)]/10 py-1 ps-2.5 pe-1.5 font-medium text-[var(--accent-color)] text-xs">
+        {Icon && <Icon className="size-3.5" />}
+        {tool.label}
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label={`Turn off ${tool.label}`}
+          className="flex size-4 items-center justify-center rounded-full text-[var(--accent-color)]/70 transition-colors hover:bg-[var(--accent-color)]/15 hover:text-[var(--accent-color)]"
+        >
+          <XIcon className="size-3" />
+        </button>
+      </span>
+    </div>
+  );
+}
+
+// Tools dropdown next to the add button. Each tool is a checkable toggle:
+// selecting the active tool again clears it (back to chat).
+function ToolsMenu({
+  tools,
+  activeTool,
+  onSelectTool,
+}: {
+  tools: readonly ComposerTool[];
+  activeTool?: string | null;
+  onSelectTool?: (id: string) => void;
+}) {
+  if (tools.length === 0) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 rounded-full px-2.5 text-muted-foreground text-xs hover:bg-muted-foreground/15 hover:text-foreground"
+          aria-label="Tools"
+        >
+          <SlidersHorizontalIcon className="size-4 stroke-[1.5px]" />
+          Tools
+          <ChevronDownIcon className="size-3.5 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="top">
+        <DropdownMenuLabel>Tools</DropdownMenuLabel>
+        {tools.map((tool) => {
+          const Icon = tool.icon;
+          const checked = tool.id === activeTool;
+          return (
+            <DropdownMenuCheckboxItem
+              key={tool.id}
+              checked={checked}
+              // Selecting clears when already active, else activates the tool.
+              onSelect={() => onSelectTool?.(checked ? "chat" : tool.id)}
+            >
+              {Icon && <Icon className="mt-0.5 size-4 text-muted-foreground" />}
+              <span className="flex flex-col gap-0.5">
+                <span className="font-medium">{tool.label}</span>
+                <span className="text-muted-foreground text-xs">
+                  {tool.description}
+                </span>
+              </span>
+            </DropdownMenuCheckboxItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ComposerAction({
+  tools = [],
+  activeTool,
+  onSelectTool,
+}: {
+  tools?: readonly ComposerTool[];
+  activeTool?: string | null;
+  onSelectTool?: (id: string) => void;
+} = {}) {
   return (
     <div className="relative mx-2 mb-2 flex items-center justify-between">
-      <ComposerAddAttachment />
+      <div className="flex items-center gap-1">
+        <ComposerAddAttachment />
+        <ToolsMenu
+          tools={tools}
+          activeTool={activeTool}
+          onSelectTool={onSelectTool}
+        />
+      </div>
 
       <AuiIf condition={(s) => !s.thread.isRunning}>
         <ComposerPrimitive.Send asChild>
