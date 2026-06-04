@@ -14,13 +14,24 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import re
 
 from django.http import HttpResponse, HttpResponseNotModified, JsonResponse
 from django.db.models import Count, Q
+from django.db.models.fields.json import KeyTextTransform
 from django.shortcuts import get_object_or_404
 from ninja import Router
 
-from apps.corpus.models import Edition, Node, Source
+from apps.corpus.models import (
+    Court,
+    CrossReference,
+    Edition,
+    Node,
+    NodeVersion,
+    ReporterCitation,
+    ReviewStatus,
+    Source,
+)
 from apps.corpus.services.editions import compare_editions, section_diff
 from apps.corpus.services.lookups import (
     citation_links,
@@ -81,24 +92,33 @@ def _official_url(node: Node) -> str:
 
 @browse_router.get("/sources", auth=None)
 def list_sources(request):
-    """Every source with its top-level node count, for the landing list."""
+    """Every source with its top-level node count, for the landing list.
+
+    Sources come in two shapes the browser renders differently: statute-style
+    sources have a ``chapter`` tier (browsed as a chapter index) while caselaw
+    has none (browsed search-first). ``kind`` / ``has_chapters`` let the UI pick
+    the right index without hard-coding slugs."""
     out = []
     for s in Source.objects.select_related("jurisdiction").all():
         types = {nt.key: nt for nt in s.node_types.all()}
-        top_key = "chapter" if "chapter" in types else min(
-            types.values(), key=lambda nt: nt.level
-        ).key if types else None
-        leaf_keys = [k for k in ("rule", "section") if k in types]
+        has_chapters = "chapter" in types
+        # Leaf tier counted as "entries": statute sections / rules, or — for a
+        # chapter-less source like caselaw — its top-level decisions.
+        leaf_keys = [k for k in ("rule", "section", "decision") if k in types]
         out.append(
             {
                 "slug": s.slug,
                 "name": s.name,
                 "abbreviation": s.citation_abbreviation,
                 "jurisdiction": s.jurisdiction.name,
+                "kind": "statutes" if has_chapters else "caselaw",
+                "has_chapters": has_chapters,
+                # A chapter-less source reports 0 chapters — previously it
+                # miscounted every decision as a "chapter" (76k for caselaw).
                 "chapters": Node.objects.filter(
-                    source=s, node_type__key=top_key
+                    source=s, node_type__key="chapter"
                 ).count()
-                if top_key
+                if has_chapters
                 else 0,
                 "entries": Node.objects.filter(
                     source=s, node_type__key__in=leaf_keys, is_repealed=False
@@ -239,6 +259,341 @@ def node_detail(request, node_id: int):
     })
 
 
+def _caselaw_official_url(node: Node) -> str:
+    """CourtListener permalink for a decision, built from its source template
+    plus the cluster id/slug in source_metadata (the generic ``{year}/{path}``
+    helper can't fill the caselaw ``{cl_cluster_id}/{slug}`` template)."""
+    md = node.source_metadata
+    try:
+        return node.source.official_url_template.format(
+            cl_cluster_id=md.get("cl_cluster_id", ""),
+            slug=md.get("slug", ""),
+        )
+    except (KeyError, IndexError, AttributeError):
+        return ""
+
+
+# A decision's text often arrives as a single "combined" opinion whose head is
+# the formal caption (court / docket / parties / counsel) and whose body then
+# duplicates the separately-stored lead + concurrences. Split that prefatory
+# caption off so the UI can show it once (centered) without repeating the text.
+_BYLINE_RE = re.compile(
+    r"^[A-Z][A-Z.\s,'’-]{2,40},\s*"
+    r"(?:Chief Justice|Justice|Judge|C\.?J\.?|P\.?J\.?|J\.)\.?$"
+)
+_RULE_RE = re.compile(r"^[_=–—-]{3,}$")
+
+
+def _split_caption(text: str) -> tuple[str, str]:
+    """Return ``(caption, body)`` — the prefatory caption matter and the opinion
+    body after it. The boundary is the first author byline (e.g. "HECHT,
+    Justice.") or, failing that, a horizontal rule. ``("", text)`` when neither
+    is found."""
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if _BYLINE_RE.match(s):
+            return "\n".join(lines[:i]).strip(), "\n".join(lines[i:])
+        if _RULE_RE.match(s) and i > 0:
+            return "\n".join(lines[:i]).strip(), "\n".join(lines[i + 1 :])
+    return "", text
+
+
+# Caselaw browse list (the search-first caselaw index's "recent decisions" +
+# court facets). Distinct from the ``/cases/{int:node_id}`` detail route below —
+# the int converter means a bare ``/cases`` never collides with it.
+CASES_LIMIT_DEFAULT = 25
+CASES_LIMIT_MAX = 100
+
+
+@browse_router.get("/cases", auth=None)
+def list_cases(
+    request,
+    court: str | None = None,
+    status: str | None = None,
+    year: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int = CASES_LIMIT_DEFAULT,
+    offset: int = 0,
+    facets: bool = False,
+):
+    """Iowa caselaw decisions, newest first, for the caselaw index.
+
+    ``court`` (CourtListener slug) and ``status`` (precedential) filter via
+    indexed ``source_metadata`` containment (``@>`` → ``node_source_metadata_gin``);
+    ``year`` or ``date_from``/``date_to`` bound ``date_filed``. Ordering and the
+    range use ``KeyTextTransform`` (``->>``) so the partial functional index
+    ``node_caselaw_date_filed`` is hit — the ``has_key`` filter matches its
+    partial predicate so the planner can use it. ``has_more`` is computed with a
+    +1 fetch to avoid a COUNT over ~76k rows. ``facets=true`` adds per-court
+    decision counts. Public + edge-cached like the rest of browse."""
+    src = Source.objects.filter(slug="iowa-caselaw").first()
+    if src is None:
+        return _cached_json(
+            request,
+            {"results": [], "limit": 0, "offset": 0, "has_more": False,
+             "facets": None},
+        )
+
+    limit = max(1, min(limit, CASES_LIMIT_MAX))
+    offset = max(0, offset)
+
+    # Shared filters: source + decision + status + date bounds. Court is the
+    # facet's pivot dimension, so it's applied to the page list only — the facet
+    # counts honor every *other* active filter (date/status) so the chip numbers
+    # match the list.
+    base = Node.objects.filter(
+        source=src,
+        node_type__key="decision",
+        # Matches the partial index predicate so the planner can use it; every
+        # decision carries date_filed, so this never drops a real row.
+        source_metadata__has_key="date_filed",
+    ).annotate(_date_filed=KeyTextTransform("date_filed", "source_metadata"))
+    if status:
+        base = base.filter(source_metadata__contains={"precedential_status": status})
+    if year:
+        base = base.filter(
+            _date_filed__gte=f"{year:04d}-01-01",
+            _date_filed__lte=f"{year:04d}-12-31",
+        )
+    if date_from:
+        base = base.filter(_date_filed__gte=date_from)
+    if date_to:
+        base = base.filter(_date_filed__lte=date_to)
+
+    qs = base
+    if court:
+        qs = qs.filter(source_metadata__contains={"court_id": court})
+    qs = qs.order_by("-_date_filed", "-id")
+
+    # +1 fetch → has_more without paying a COUNT over the whole corpus.
+    page = list(qs[offset : offset + limit + 1])
+    has_more = len(page) > limit
+    page = page[:limit]
+
+    facet_rows = None
+    if facets:
+        fqs = base.annotate(_court=KeyTextTransform("court_id", "source_metadata"))
+        facet_rows = [
+            {"court_id": r["_court"], "count": r["n"]}
+            for r in fqs.values("_court").annotate(n=Count("id")).order_by("-n")
+            if r["_court"]
+        ]
+
+    # One batched Court lookup serving both the page rows and the facet rows.
+    needed = {n.source_metadata.get("court_id", "") for n in page}
+    if facet_rows:
+        needed |= {r["court_id"] for r in facet_rows}
+    courts = {
+        c.court_id: c
+        for c in Court.objects.filter(court_id__in=[c for c in needed if c])
+    }
+
+    def _court_name_level(cid: str) -> tuple[str, int | None]:
+        c = courts.get(cid)
+        return (c.name if c else cid, c.level if c else None)
+
+    results = []
+    for n in page:
+        md = n.source_metadata
+        cid = md.get("court_id", "")
+        cname, clevel = _court_name_level(cid)
+        results.append(
+            {
+                "id": n.id,
+                "case_name": n.heading,
+                "court_id": cid,
+                "court_name": md.get("court_name", "") or cname,
+                "court_level": clevel,
+                "date_filed": md.get("date_filed", ""),
+                "docket_number": md.get("docket_number", ""),
+                "precedential_status": md.get("precedential_status", ""),
+                "citations": list(md.get("citations", [])),
+            }
+        )
+
+    facets_payload = None
+    if facet_rows is not None:
+        facets_payload = {
+            "courts": [
+                {
+                    "court_id": r["court_id"],
+                    "court_name": _court_name_level(r["court_id"])[0],
+                    "court_level": _court_name_level(r["court_id"])[1],
+                    "count": r["count"],
+                }
+                for r in facet_rows
+            ]
+        }
+
+    return _cached_json(
+        request,
+        {
+            "results": results,
+            "limit": limit,
+            "offset": offset,
+            "has_more": has_more,
+            "facets": facets_payload,
+        },
+    )
+
+
+@browse_router.get("/cases/{int:node_id}", auth=None)
+def case_detail(request, node_id: int):
+    """One Iowa caselaw decision: case metadata + optional head-matter
+    (syllabus/headnotes) + every opinion (lead/concurrence/dissent) with its
+    text, plus the in-corpus cases it cites. Public + edge-cached like the
+    rest of the browser; serves only approved, currently-effective text."""
+    decision = get_object_or_404(
+        Node.objects.select_related("source", "node_type"),
+        pk=node_id,
+        node_type__key="decision",
+    )
+    md = decision.source_metadata
+    head = current_version(decision)  # head-matter version, or None when absent
+
+    opinions = list(
+        Node.objects.filter(parent=decision, node_type__key="opinion")
+        .select_related("node_type")
+        # ordinal is the 3-digit type prefix (010 lead → 020 → 030 concurrence
+        # → 040 dissent …); path tie-breaks the opinions that share an ordinal.
+        .order_by("ordinal", "path")
+    )
+    # One query for every opinion's current (open, approved) version, and one
+    # for all their outgoing inline-citation edges — constant in the opinion
+    # and citation counts (no per-opinion round trips).
+    versions = {
+        v.node_id: v
+        for v in NodeVersion.objects.filter(
+            node__in=opinions,
+            effective_to__isnull=True,
+            review_status=ReviewStatus.APPROVED,
+        )
+    }
+    edges: dict[int, list[CrossReference]] = {}
+    version_ids = [v.id for v in versions.values()]
+    if version_ids:
+        refs = (
+            CrossReference.objects.filter(
+                from_version_id__in=version_ids, source="caselaw_link"
+            )
+            .select_related("to_node", "to_node__parent", "to_node__node_type")
+            .order_by("id")
+        )
+        for ref in refs:
+            edges.setdefault(ref.from_version_id, []).append(ref)
+
+    # A "combined" (ordinal 010) opinion that coexists with separate opinions is
+    # a duplicate of them prefixed by the caption — render the separate opinions
+    # and lift just the caption. A lone opinion usually embeds the caption too;
+    # split it off so the caption shows once, centered, above a clean body.
+    caption_block = ""
+    body_overrides: dict[int, str] = {}
+    render_opinions = opinions
+    combined = next((o for o in opinions if o.ordinal == "010"), None)
+    subs = [o for o in opinions if o.ordinal != "010"]
+    if combined is not None and subs:
+        cver = versions.get(combined.id)
+        caption_block, _ = _split_caption(cver.body_text if cver else "")
+        render_opinions = subs
+    elif len(opinions) == 1:
+        only = opinions[0]
+        over = versions.get(only.id)
+        cap, body_after = _split_caption(over.body_text if over else "")
+        if cap:
+            caption_block = cap
+            body_overrides[only.id] = body_after
+
+    opinion_rows = []
+    cited_cases: dict[int, dict] = {}
+    external_texts: set[str] = set()
+    for op in render_opinions:
+        ver = versions.get(op.id)
+        for ref in edges.get(ver.id, []) if ver else []:
+            if ref.to_node_id is not None:
+                cited = ref.to_node
+                # Internal edges point at the cited OPINION; the case page is
+                # keyed by the DECISION, so resolve to that opinion's parent.
+                case_node = (
+                    cited.parent
+                    if cited.node_type.key == "opinion"
+                    else cited
+                )
+                if case_node and case_node.id != decision.id:
+                    row = cited_cases.setdefault(
+                        case_node.id,
+                        {
+                            "case_id": case_node.id,
+                            "case_name": case_node.heading,
+                            "count": 0,
+                        },
+                    )
+                    row["count"] += 1
+            else:
+                txt = " ".join((ref.external_text or "").split())
+                if txt:
+                    external_texts.add(txt)
+        opinion_rows.append(
+            {
+                "id": op.id,
+                "heading": op.heading,
+                "type": op.source_metadata.get("type", ""),
+                "author_str": op.source_metadata.get("author_str", ""),
+                "per_curiam": bool(op.source_metadata.get("per_curiam")),
+                "body_text": body_overrides.get(
+                    op.id, ver.body_text if ver else ""
+                ),
+                # Display-only rich structure with linked citations, when built.
+                # Suppressed for the combined-only caption-strip case (its body
+                # was overridden, so the segments wouldn't match).
+                "body_segments": (
+                    ver.body_segments
+                    if ver and op.id not in body_overrides
+                    else None
+                ),
+                "has_content": ver is not None,
+            }
+        )
+
+    court = Court.objects.filter(court_id=md.get("court_id", "")).first()
+
+    return _cached_json(request, {
+        "id": decision.id,
+        "type": decision.node_type.label_singular,
+        "source": decision.source.name,
+        "source_slug": decision.source.slug,
+        "path": decision.path,
+        "cl_cluster_id": md.get("cl_cluster_id"),
+        # Node.heading is the (≤500-char) case name; case_name_full is uncapped.
+        "case_name": decision.heading,
+        "case_name_full": md.get("case_name_full", ""),
+        "court_id": md.get("court_id", ""),
+        "court_name": md.get("court_name", ""),
+        "court_level": court.level if court else None,
+        "date_filed": md.get("date_filed", ""),
+        "docket_number": md.get("docket_number", ""),
+        "precedential_status": md.get("precedential_status", ""),
+        "judges": md.get("judges", ""),
+        "disposition": md.get("disposition", ""),
+        "posture": md.get("posture", ""),
+        "nature_of_suit": md.get("nature_of_suit", ""),
+        # This case's own reporter citations (how to cite it).
+        "citations": list(md.get("citations", [])),
+        "official_url": _caselaw_official_url(decision),
+        # Prefatory caption (court / docket / parties / counsel), lifted from the
+        # opinion text so the UI can render it once, centered. "" when none.
+        "caption_block": caption_block,
+        "head_matter": head.body_text if head else None,
+        "opinions": opinion_rows,
+        # In-corpus authorities this case cites, most-cited first.
+        "cited_cases": sorted(
+            cited_cases.values(), key=lambda r: (-r["count"], r["case_name"])
+        ),
+        "external_citation_count": len(external_texts),
+    })
+
+
 @browse_router.get("/editions", auth=None)
 def list_editions(request, source: str):
     """Editions registered for a source, newest first, for the diff picker."""
@@ -345,11 +700,16 @@ def resolve_node(request, source: str, cite: str):
 # embeddings and no reranker, so an unauthenticated box can't run up a Voyage
 # bill and stays instant. Semantic retrieval lives behind the authenticated
 # chat surface, not here.
-SEARCH_LIMIT_DEFAULT = 25
+SEARCH_LIMIT_DEFAULT = 10
 SEARCH_LIMIT_MAX = 50
 # Don't fire a corpus query on a stray keystroke / single letter.
 SEARCH_MIN_QUERY_LEN = 2
 SNIPPET_CHARS = 240
+# How deep pagination can reach: the fused candidate pool is capped here, so the
+# last reachable page is ~SEARCH_FUSED_MAX/limit (less for caselaw, which
+# over-fetches to survive per-decision dedup). Exhaustive caselaw browsing is
+# what /api/browse/cases is for.
+SEARCH_FUSED_MAX = 200
 
 
 def _search_snippet(body: str, query: str) -> str:
@@ -388,19 +748,50 @@ def _search_snippet(body: str, query: str) -> str:
 def _search_row(
     node: Node, body_text: str, query: str, *, exact: bool = False
 ) -> dict:
-    """Browse-shaped result row. ``node_id`` is all the UI needs to open the
-    hit — it reuses the same node→chapter deep-link resolution the chat
-    source cards use. ``body_text`` is passed in (the search hit already
-    carries it) to avoid a per-row version query."""
+    """Browse-shaped result row. ``kind`` discriminates how the UI opens the hit:
+    a ``"case"`` row routes to ``/cases/<case_id>`` (the decision page — an
+    opinion hit resolves to its parent decision, a head-matter hit is the
+    decision itself), while ``"code"``/``"rule"`` rows open in the section reader
+    via ``node_id``. ``body_text`` is passed in (the search hit already carries
+    it) to avoid a per-row version query."""
     parent = node.parent
+    slug = node.source.slug
+    if slug == "iowa-caselaw":
+        kind = "case"
+        # The /cases page is keyed by the DECISION node; opinion hits point at
+        # their parent decision, a head-matter hit IS the decision.
+        decision = parent if node.node_type.key == "opinion" else node
+        case_id = decision.id if decision is not None else node.id
+        case_name = decision.heading if decision is not None else node.heading
+        dmd = decision.source_metadata if decision is not None else {}
+        court_name = dmd.get("court_name", "")
+        date_filed = dmd.get("date_filed", "")
+        citations = list(dmd.get("citations", []))
+    else:
+        kind = "rule" if slug == "iowa-court-rules" else "code"
+        case_id = None
+        case_name = None
+        court_name = ""
+        date_filed = ""
+        citations = []
     return {
         "node_id": node.id,
+        "kind": kind,
+        "case_id": case_id,
+        "case_name": case_name,
+        # Caselaw display meta (empty for statutes/rules).
+        "court_name": court_name,
+        "date_filed": date_filed,
+        # This case's own reporter citation(s), e.g. ["223 N.W.2d 270", …].
+        "citations": citations,
         "type": node.node_type.label_singular,
         "citation": _citation(node),
         "source": node.source.name,
-        "source_slug": node.source.slug,
+        "source_slug": slug,
         "chapter": (
-            {"ordinal": parent.ordinal or parent.path, "heading": parent.heading}
+            None
+            if kind == "case"
+            else {"ordinal": parent.ordinal or parent.path, "heading": parent.heading}
             if parent is not None
             else None
         ),
@@ -410,28 +801,129 @@ def _search_row(
     }
 
 
+def _normalize_fts_query(q: str) -> str:
+    """Map user-typed UPPERCASE boolean operators to ``websearch_to_tsquery``
+    syntax so the operators the UI advertises actually work: ``AND`` → implicit
+    (space), ``OR`` → ``or``, ``NOT foo`` → ``-foo``. Lowercase ``or`` / ``-`` /
+    ``"phrases"`` are already understood by websearch and pass through. Only
+    whole-word UPPERCASE operators are touched, so ordinary text (e.g. a party
+    name) is left alone."""
+    q = re.sub(r"\bNOT\s+", "-", q)  # NOT foo -> -foo
+    q = re.sub(r"\bAND\b", " ", q)  # space is implicit AND in websearch
+    q = re.sub(r"\bOR\b", " or ", q)  # websearch OR
+    return " ".join(q.split())
+
+
+# A free-text reporter citation, e.g. "998 N.W.2d 646" -> (volume, reporter,
+# page). Reporter is the middle run; volume and page are the bounding integers
+# (page may carry a trailing letter).
+_REPORTER_CITE_RE = re.compile(r"^\s*(\d+)\s+(.+?)\s+(\d+[A-Za-z]?)\s*$")
+
+
+def _resolve_reporter_citation(q: str) -> int | None:
+    """Resolve a reporter-citation query (e.g. "998 N.W.2d 646") to the decision
+    Node it names. Returns None when the query isn't a reporter cite, doesn't
+    resolve, or is ambiguous (one triple naming >1 case — never guess, matching
+    ReporterCitation's own policy)."""
+    m = _REPORTER_CITE_RE.match(q)
+    if not m:
+        return None
+    volume, reporter, page = m.group(1), m.group(2).strip(), m.group(3)
+    ids = list(
+        ReporterCitation.objects.filter(
+            reporter=reporter, volume=volume, page=page, to_node__isnull=False
+        )
+        .values_list("to_node_id", flat=True)
+        .distinct()[:2]
+    )
+    return ids[0] if len(ids) == 1 else None
+
+
+# Friendly ``doc_type`` aliases the advanced-search UI sends, mapped to source
+# slugs. The bare ``source`` slug still wins when both are given (in-context
+# scoped search passes it directly); ``all``/unknown leaves scope unset.
+_DOC_TYPE_SLUG = {
+    "code": "iowa-code",
+    "statutes": "iowa-code",
+    "rules": "iowa-court-rules",
+    "cases": "iowa-caselaw",
+    "caselaw": "iowa-caselaw",
+}
+
+
 @browse_router.get("/search", auth=None)
-def search(request, q: str, source: str | None = None, limit: int = SEARCH_LIMIT_DEFAULT):
+def search(
+    request,
+    q: str,
+    source: str | None = None,
+    doc_type: str | None = None,
+    court: str | None = None,
+    status: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int = SEARCH_LIMIT_DEFAULT,
+    offset: int = 0,
+):
     """Keyword search across the *approved, currently effective* corpus.
 
     Visibility is identical to the rest of browse: ``hybrid_search`` defaults
     to ``include_pending=False`` + ``review_status=approved``, so a pending
     ingest never leaks here.
 
-    A citation-shaped query (``714.16``, ``32:1.10``) is short-circuited to an
-    exact lookup and pinned as the top result — the retrievers index heading
-    and body text but not ``node.path``, so a bare citation would otherwise
-    rank poorly or miss."""
+    A citation-shaped query is short-circuited to an exact lookup and pinned as
+    the top result: a statute cite (``714.16``, ``32:1.10``) via the citation
+    parser, and a reporter cite (``998 N.W.2d 646``) via ``ReporterCitation`` →
+    the case it names. The retrievers index heading + body text but not the
+    citation, so a bare cite would otherwise rank poorly or miss.
+
+    Paginated via ``offset`` + ``limit`` (page size); the response carries
+    ``has_more``. Depth is bounded by ``SEARCH_FUSED_MAX``.
+
+    Fielded filters (advanced search): ``doc_type`` scopes to one corpus
+    (code/rules/cases); ``court``/``status`` filter caselaw via indexed
+    ``source_metadata`` containment pushed *pre-fusion*; ``date_from``/``date_to``
+    bound a decision's filing date (post-filter — ISO dates sort
+    lexicographically). Any caselaw-only filter forces the cases scope. Caselaw
+    rows are deduped to one per decision (multiple opinions of one case would
+    otherwise repeat)."""
     q = (q or "").strip()
     limit = max(1, min(limit, SEARCH_LIMIT_MAX))
+    offset = max(0, offset)
+
+    # Resolve scope: explicit slug wins, else the doc_type alias; any
+    # caselaw-only filter implies the cases scope.
+    effective_source = source or _DOC_TYPE_SLUG.get((doc_type or "").lower())
+    caselaw_filtered = bool(court or status or date_from or date_to)
+    if caselaw_filtered:
+        effective_source = "iowa-caselaw"
+
     scope_source = (
-        Source.objects.filter(slug=source).first() if source else None
+        Source.objects.filter(slug=effective_source).first()
+        if effective_source
+        else None
     )
-    empty = {"query": q, "scope": source, "count": 0, "results": []}
+    empty = {
+        "query": q,
+        "scope": effective_source,
+        "count": 0,
+        "results": [],
+        "offset": offset,
+        "limit": limit,
+        "has_more": False,
+    }
     if len(q) < SEARCH_MIN_QUERY_LEN:
         return _cached_json(request, empty)
 
+    # court/status → indexed containment, pushed into every retriever.
+    md: dict = {}
+    if court:
+        md["court_id"] = court
+    if status:
+        md["precedential_status"] = status
+    metadata_contains = md or None
+
     results: list[dict] = []
+    seen_case_ids: set[int] = set()
     pinned_node_id: int | None = None
 
     # Exact-citation short-circuit. Best-effort: a parser quirk must never
@@ -448,35 +940,99 @@ def search(request, q: str, source: str | None = None, limit: int = SEARCH_LIMIT
                 Node.objects.select_related("source", "node_type", "parent")
                 .get(pk=lr.node.id)
             )
-            results.append(
-                _search_row(node, lr.version.body_text, q, exact=True)
-            )
+            pinned = _search_row(node, lr.version.body_text, q, exact=True)
+            results.append(pinned)
             pinned_node_id = node.id
+            if pinned["case_id"] is not None:
+                seen_case_ids.add(pinned["case_id"])
     except Exception:  # noqa: BLE001 — search must degrade, never 500
         pass
 
-    hits = hybrid_search(q, limit=limit, use_vector=False, source_slug=source)
+    # Reporter-citation pin (caselaw): "998 N.W.2d 646" -> the case it names,
+    # at the very top. Only when the scope permits caselaw; an ambiguous/missing
+    # cite just falls through to keyword search.
+    if pinned_node_id is None and effective_source in (None, "iowa-caselaw"):
+        try:
+            dec_id = _resolve_reporter_citation(q)
+            if dec_id is not None:
+                node = Node.objects.select_related(
+                    "source", "node_type", "parent"
+                ).get(pk=dec_id)
+                pinned = _search_row(node, "", q, exact=True)
+                results.append(pinned)
+                pinned_node_id = node.id
+                if pinned["case_id"] is not None:
+                    seen_case_ids.add(pinned["case_id"])
+        except Exception:  # noqa: BLE001 — search must degrade, never 500
+            pass
+
+    # Translate boolean operators for FTS, and gate the fuzzy trigram retriever:
+    # it's a single-token typo tool, so on a multi-word query it only fuzzy-
+    # matches unrelated headings (apple≈appeal) and pollutes the results. A
+    # single-term query still gets trigram for typo/partial-title recall.
+    fts_q = _normalize_fts_query(q)
+    use_trigram = len(fts_q.split()) <= 1
+
+    # A FIXED candidate pool per query (independent of the page) so every page
+    # slices the same deterministically-ordered list — the basis for stable
+    # pagination. Court/status are filtered pre-fusion (indexed); the date range
+    # is post-filtered and caselaw opinions dedup to one row per decision, all of
+    # which the full pool below absorbs.
+    hits = hybrid_search(
+        fts_q,
+        limit=SEARCH_FUSED_MAX,
+        per_retriever=SEARCH_FUSED_MAX,
+        use_vector=False,
+        use_trigram=use_trigram,
+        source_slug=effective_source,
+        metadata_contains=metadata_contains,
+    )
     nodes = {
         n.id: n
         for n in Node.objects.filter(
             id__in=[h.node_id for h in hits]
         ).select_related("source", "node_type", "parent")
     }
+    # `results` is the full ordered list (any pin is already at index 0); we
+    # build one past the page end to know has_more, then slice the page.
     for h in hits:
         node = nodes.get(h.node_id)
         if node is None or node.id == pinned_node_id:
             continue
-        results.append(_search_row(node, h.body_text, q))
-        if len(results) >= limit:
-            break
+        row = _search_row(node, h.body_text, q)
+        # Date-range post-filter (caselaw only; ISO dates sort chronologically).
+        if (date_from or date_to) and row["kind"] == "case":
+            df = row["date_filed"] or ""
+            if date_from and df < date_from:
+                continue
+            if date_to and df > date_to:
+                continue
+        # Collapse multiple opinion hits of one decision to a single row.
+        cid = row["case_id"]
+        if cid is not None:
+            if cid in seen_case_ids:
+                continue
+            seen_case_ids.add(cid)
+        results.append(row)
+
+    has_more = offset + limit < len(results)
+    page = results[offset : offset + limit]
 
     # Search visibility is identical to the rest of browse (approved + current
     # only), so it earns the same edge cache. The ETag covers query + scope +
-    # results, so the CDN keys per distinct query and a revalidation of a
-    # repeated search comes back as a 304 instead of paying the retrievers.
+    # page + offset, so the CDN keys per distinct page and a revalidation comes
+    # back as a 304 instead of paying the retrievers.
     return _cached_json(
         request,
-        {"query": q, "scope": source, "count": len(results), "results": results},
+        {
+            "query": q,
+            "scope": effective_source,
+            "offset": offset,
+            "limit": limit,
+            "count": len(page),
+            "has_more": has_more,
+            "results": page,
+        },
     )
 
 

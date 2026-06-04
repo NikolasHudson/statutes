@@ -7,6 +7,9 @@ export type BrowseSource = {
   name: string;
   abbreviation: string;
   jurisdiction: string;
+  // "statutes" → chapter-index browsing; "caselaw" → search-first index.
+  kind: "statutes" | "caselaw";
+  has_chapters: boolean;
   chapters: number;
   entries: number;
   entry_label: string;
@@ -67,8 +70,85 @@ export type NodeDetail = {
   cross_refs: CrossRef[];
 };
 
+// Iowa caselaw — one decision served by /api/browse/cases/{id}. Shapes mirror
+// the hand-serialized dict in apps/api/browse.py case_detail — keep in sync.
+// One inline run of opinion text. `case` links to /cases/<id>; `star` is a
+// West page break; `sup` a footnote mark; `em` italic; plain otherwise.
+export type CaseRun = {
+  t?: string;
+  em?: boolean;
+  case?: number;
+  star?: string;
+  sup?: string;
+};
+
+export type CaseSegment = {
+  k: "byline" | "p" | "quote" | "fn";
+  runs: CaseRun[];
+  mark?: string;
+};
+
+export type CaseOpinion = {
+  id: number;
+  heading: string;
+  type: string;
+  author_str: string;
+  per_curiam: boolean;
+  body_text: string;
+  // Rich display structure with linked citations; null → render body_text.
+  body_segments: CaseSegment[] | null;
+  has_content: boolean;
+};
+
+export type CitedCase = {
+  case_id: number;
+  case_name: string;
+  count: number;
+};
+
+export type CaseDetail = {
+  id: number;
+  type: string;
+  source: string;
+  source_slug: string;
+  path: string;
+  cl_cluster_id: number | null;
+  case_name: string;
+  case_name_full: string;
+  court_id: string;
+  court_name: string;
+  court_level: number | null;
+  date_filed: string;
+  docket_number: string;
+  precedential_status: string;
+  judges: string;
+  disposition: string;
+  posture: string;
+  nature_of_suit: string;
+  citations: string[];
+  official_url: string;
+  // Prefatory caption (court / docket / parties / counsel) lifted from the
+  // opinion text; "" when none. Rendered centered + bold.
+  caption_block: string;
+  head_matter: string | null;
+  opinions: CaseOpinion[];
+  cited_cases: CitedCase[];
+  external_citation_count: number;
+};
+
 export type BrowseSearchResult = {
   node_id: number;
+  // How the UI opens the hit: "case" → /cases/<case_id>; "code"/"rule" → reader.
+  kind: "code" | "rule" | "case";
+  // Decision node id for a caselaw hit (opinion hits resolve to their parent
+  // decision); null for statutes/rules.
+  case_id: number | null;
+  case_name: string | null;
+  // Caselaw display meta ("" / [] for statutes/rules).
+  court_name: string;
+  date_filed: string;
+  // The case's own reporter citation(s), e.g. ["223 N.W.2d 270"].
+  citations: string[];
   type: string;
   citation: string;
   source: string;
@@ -80,12 +160,46 @@ export type BrowseSearchResult = {
   exact: boolean;
 };
 
+// One row of the caselaw browse list (GET /api/browse/cases).
+export type CaseListItem = {
+  id: number;
+  case_name: string;
+  court_id: string;
+  court_name: string;
+  court_level: number | null;
+  date_filed: string;
+  docket_number: string;
+  precedential_status: string;
+  citations: string[];
+};
+
+export type CaseFacetCourt = {
+  court_id: string;
+  court_name: string;
+  court_level: number | null;
+  count: number;
+};
+
+export type CaseListResponse = {
+  results: CaseListItem[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+  facets: { courts: CaseFacetCourt[] } | null;
+};
+
 export type BrowseSearchResponse = {
   query: string;
   scope: string | null;
   count: number;
+  offset: number;
+  limit: number;
+  has_more: boolean;
   results: BrowseSearchResult[];
 };
+
+// Results per search page (kept in sync with the backend default).
+export const SEARCH_PAGE_SIZE = 10;
 
 export type ResolveResult =
   | { found: true; node_id: number; path: string; is_chapter: boolean }
@@ -180,14 +294,58 @@ export const browseChapter = (id: number) =>
 export const browseNode = (id: number) =>
   json<NodeDetail>(`/api/browse/nodes/${id}`);
 
-// Keyword search (FTS + trigram) over the approved, currently-effective
-// corpus. `source` scopes to one slug; omit to search everything.
-export const browseSearch = (q: string, source?: string | null) => {
+// One Iowa caselaw decision: metadata + head-matter + opinions + cited cases.
+export const browseCase = (id: number) =>
+  json<CaseDetail>(`/api/browse/cases/${id}`);
+
+// Advanced-search filters. `source` scopes to a slug directly; `doc_type`
+// (code/rules/cases/all) is the friendly alias; the caselaw filters
+// (court/status/date) imply the cases scope server-side.
+export type SearchFilters = {
+  source?: string | null;
+  doc_type?: string | null;
+  court?: string | null;
+  status?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+};
+
+// Keyword search (FTS + trigram, RRF-fused) over the approved, currently
+// effective corpus. Pass filters to scope/facet; `page` (1-based) paginates.
+export const browseSearch = (
+  q: string,
+  filters: SearchFilters = {},
+  page = 1,
+) => {
   const params = new URLSearchParams({ q });
-  if (source) params.set("source", source);
-  return json<BrowseSearchResponse>(
-    `/api/browse/search?${params.toString()}`,
-  );
+  for (const [k, v] of Object.entries(filters)) {
+    if (v) params.set(k, v);
+  }
+  params.set("limit", String(SEARCH_PAGE_SIZE));
+  params.set("offset", String((Math.max(1, page) - 1) * SEARCH_PAGE_SIZE));
+  return json<BrowseSearchResponse>(`/api/browse/search?${params.toString()}`);
+};
+
+// Caselaw browse list — recent decisions, optionally filtered by
+// court/status/year/date and faceted. Powers the search-first caselaw index.
+export type CaseListFilters = {
+  court?: string | null;
+  status?: string | null;
+  year?: number | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  limit?: number;
+  offset?: number;
+  facets?: boolean;
+};
+
+export const browseCases = (filters: CaseListFilters = {}) => {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
+  }
+  const qs = params.toString();
+  return json<CaseListResponse>(`/api/browse/cases${qs ? `?${qs}` : ""}`);
 };
 
 // Editions registered for a source, newest first, plus a default compare pair.

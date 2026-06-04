@@ -140,6 +140,10 @@ class NodeVersion(models.Model):
 
     node = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="versions")
     body_text = models.TextField()
+    # Display-only rich structure (paragraphs + runs with citation links),
+    # derived from the source HTML. NULL = render from body_text. Never feeds
+    # FTS / content_hash / embeddings — those stay on the plain body_text.
+    body_segments = models.JSONField(null=True, blank=True)
     effective_from = models.DateField()
     effective_to = models.DateField(null=True, blank=True)
     enacted_by = models.TextField(blank=True)

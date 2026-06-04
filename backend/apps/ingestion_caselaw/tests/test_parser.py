@@ -127,6 +127,25 @@ class ParseDecisionTests(SimpleTestCase):
         self.assertIsNone(parse_decision(_dec_record(date_filed="")).date_filed)
         self.assertIsNone(parse_decision(_dec_record(date_filed="0000-00-00")).date_filed)
 
+    def test_overlong_case_name_capped_in_heading_but_kept_in_metadata(self):
+        # A real CourtListener case_name_full party list can exceed the
+        # varchar(500) Node.heading column. The heading must be capped (so the
+        # write does not crash) while the full name survives in source_metadata.
+        long_full = "A " + "Very Long Party Name, " * 40 + "et al."
+        self.assertGreater(len(long_full), 500)
+        dec = parse_decision(_dec_record(
+            case_name="", case_name_short="", case_name_full=long_full,
+        ))
+        self.assertEqual(len(dec.heading), 500)
+        self.assertTrue(dec.heading.endswith("…"))
+        self.assertEqual(dec.source_metadata["case_name_full"], long_full)
+
+    def test_short_case_name_unchanged(self):
+        dec = parse_decision(_dec_record())
+        self.assertEqual(dec.heading, "State v. Smith")
+        self.assertEqual(dec.source_metadata["case_name"], "State v. Smith")
+        self.assertEqual(dec.source_metadata["case_name_full"], "State v. John Smith")
+
     def test_head_matter_only_when_present(self):
         self.assertFalse(parse_decision(_dec_record()).has_head_matter)
         dec = parse_decision(_dec_record(syllabus="<p>The syllabus.</p>"))

@@ -22,6 +22,7 @@ review.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Iterable
 
@@ -66,23 +67,44 @@ def _approved_filter_clause(include_pending: bool) -> tuple[str, list]:
     return ("AND nv.review_status = %s", [ReviewStatus.APPROVED.value])
 
 
-def _source_filter_clause(source_slug: str | None) -> tuple[str, str, list]:
-    """Returns ``(extra_join, where_fragment, params)`` to scope a retriever to
-    a single Source by slug.
+def _source_filter_clause(
+    source_slug: str | None, metadata_contains: dict | None = None
+) -> tuple[str, str, list]:
+    """Returns ``(extra_join, where_fragment, params)`` scoping a retriever to a
+    single Source by slug and/or a ``source_metadata`` containment filter.
 
-    The filter is pushed into each retriever's own query rather than applied
-    after fusion: post-fusion filtering would let an off-source corpus crowd
-    out the in-scope hits before we ever see them. Dedicated aliases
-    (``n_src``/``s_src``) keep this independent of any join a retriever
-    already has (trigram joins ``corpus_node n``)."""
-    if not source_slug:
+    Both filters are pushed into each retriever's own query rather than applied
+    after fusion: post-fusion filtering would let off-scope hits crowd out the
+    in-scope ones before we ever see them. The containment filter (``@>``) is
+    served by the ``node_source_metadata_gin`` (jsonb_path_ops) index — used for
+    caselaw facets like ``{"court_id": "iowa"}`` / ``{"precedential_status":
+    "Published"}``. Dedicated aliases (``n_src``/``s_src``) keep this independent
+    of any join a retriever already has (trigram joins ``corpus_node n``); the
+    node join is emitted once and shared by both filters."""
+    if not source_slug and not metadata_contains:
         return ("", "", [])
-    return (
-        "JOIN corpus_node n_src ON n_src.id = nv.node_id "
-        "JOIN corpus_source s_src ON s_src.id = n_src.source_id",
-        "AND s_src.slug = %s",
-        [source_slug],
-    )
+    join = "JOIN corpus_node n_src ON n_src.id = nv.node_id"
+    wheres: list[str] = []
+    params: list = []
+    if source_slug:
+        join += " JOIN corpus_source s_src ON s_src.id = n_src.source_id"
+        wheres.append("AND s_src.slug = %s")
+        params.append(source_slug)
+    if metadata_contains:
+        # Match the hit node's own metadata OR its parent's: a caselaw hit is
+        # usually an *opinion* whose court/status live on the parent *decision*
+        # (a decision head-matter hit matches via its own metadata). Both use
+        # the jsonb_path_ops GIN index.
+        md_json = json.dumps(metadata_contains)
+        wheres.append(
+            "AND (n_src.source_metadata @> %s::jsonb "
+            "OR EXISTS (SELECT 1 FROM corpus_node p_src "
+            "WHERE p_src.id = n_src.parent_id "
+            "AND p_src.source_metadata @> %s::jsonb))"
+        )
+        params.append(md_json)
+        params.append(md_json)
+    return (join, " ".join(wheres), params)
 
 
 def fts_search(
@@ -91,6 +113,7 @@ def fts_search(
     limit: int = RETRIEVER_TOP_N,
     include_pending: bool = False,
     source_slug: str | None = None,
+    metadata_contains: dict | None = None,
 ) -> list[tuple[int, float]]:
     """Full-text search via tsvector + ts_rank_cd.
 
@@ -101,7 +124,9 @@ def fts_search(
     if not query.strip():
         return []
     visibility, vis_params = _approved_filter_clause(include_pending)
-    src_join, src_where, src_params = _source_filter_clause(source_slug)
+    src_join, src_where, src_params = _source_filter_clause(
+        source_slug, metadata_contains
+    )
     sql = f"""
         SELECT nv.id,
                ts_rank_cd(nv.search_vector, websearch_to_tsquery('english', %s)) AS score
@@ -111,7 +136,7 @@ def fts_search(
           AND nv.search_vector @@ websearch_to_tsquery('english', %s)
           {visibility}
           {src_where}
-        ORDER BY score DESC
+        ORDER BY score DESC, nv.id
         LIMIT %s;
     """
     with connection.cursor() as cur:
@@ -126,6 +151,7 @@ def trigram_search(
     include_pending: bool = False,
     similarity_threshold: float = 0.1,
     source_slug: str | None = None,
+    metadata_contains: dict | None = None,
 ) -> list[tuple[int, float]]:
     """Fuzzy match against Node.heading using pg_trgm similarity — this is the
     typo / partial-title retriever ("incorportion" → "Incorporation").
@@ -145,7 +171,9 @@ def trigram_search(
     if not query.strip():
         return []
     visibility, vis_params = _approved_filter_clause(include_pending)
-    src_join, src_where, src_params = _source_filter_clause(source_slug)
+    src_join, src_where, src_params = _source_filter_clause(
+        source_slug, metadata_contains
+    )
     # SET LOCAL only sticks within an explicit transaction; without one, Django's
     # autocommit ends the transaction immediately and the threshold is lost. We
     # wrap both statements in atomic() to keep them in a single tx.
@@ -158,7 +186,7 @@ def trigram_search(
           AND n.heading %% %s
           {visibility}
           {src_where}
-        ORDER BY score DESC
+        ORDER BY score DESC, nv.id
         LIMIT %s;
     """
     with transaction.atomic(), connection.cursor() as cur:
@@ -174,6 +202,7 @@ def vector_search(
     include_pending: bool = False,
     client: EmbeddingClient | None = None,
     source_slug: str | None = None,
+    metadata_contains: dict | None = None,
 ) -> list[tuple[int, float]]:
     """Semantic search via pgvector cosine distance.
 
@@ -187,7 +216,9 @@ def vector_search(
     vector_literal = "[" + ",".join(f"{x:.7f}" for x in vector) + "]"
 
     visibility, vis_params = _approved_filter_clause(include_pending)
-    src_join, src_where, src_params = _source_filter_clause(source_slug)
+    src_join, src_where, src_params = _source_filter_clause(
+        source_slug, metadata_contains
+    )
     sql = f"""
         SELECT nv.id,
                1 - (nv.embedding <=> %s::vector) AS score
@@ -197,7 +228,7 @@ def vector_search(
           AND nv.embedding IS NOT NULL
           {visibility}
           {src_where}
-        ORDER BY nv.embedding <=> %s::vector
+        ORDER BY nv.embedding <=> %s::vector, nv.id
         LIMIT %s;
     """
     with connection.cursor() as cur:
@@ -233,7 +264,9 @@ def reciprocal_rank_fusion(
             (item_id, score, components.get(item_id, {}))
             for item_id, score in fused.items()
         ),
-        key=lambda row: row[1],
+        # Score DESC, then node_version_id ASC — a deterministic tiebreak so the
+        # fused order is stable across requests (required for stable pagination).
+        key=lambda row: (row[1], -row[0]),
         reverse=True,
     )
 
@@ -247,7 +280,9 @@ def hybrid_search(
     client: EmbeddingClient | None = None,
     expander: QueryExpander | None = None,
     use_vector: bool = True,
+    use_trigram: bool = True,
     source_slug: str | None = None,
+    metadata_contains: dict | None = None,
 ) -> list[SearchHit]:
     """The public entrypoint. Runs FTS + trigram + (optional) vector and
     fuses the rankings with RRF.
@@ -258,7 +293,17 @@ def hybrid_search(
     would just add noise.
 
     ``use_vector=False`` skips embeddings — set it during dev when no Voyage
-    key is available and you don't want fake vectors polluting the ranking."""
+    key is available and you don't want fake vectors polluting the ranking.
+
+    ``use_trigram=False`` skips the fuzzy heading retriever. Trigram is a
+    single-token typo/partial-title tool; on a multi-word query it fuzzy-matches
+    unrelated headings (``apple`` ≈ ``appeal``) and RRF-unions them into the
+    results, so callers doing precise multi-term search should turn it off.
+
+    ``metadata_contains`` adds a ``source_metadata @> {...}`` filter pushed into
+    every retriever (pre-fusion), for caselaw facets like court / precedential
+    status. Pair it with ``source_slug`` so the scoped node join is present and
+    the jsonb_path_ops GIN index is used."""
 
     if not query.strip():
         return []
@@ -271,14 +316,17 @@ def hybrid_search(
             limit=per_retriever,
             include_pending=include_pending,
             source_slug=source_slug,
+            metadata_contains=metadata_contains,
         ),
-        "trigram": trigram_search(
+    }
+    if use_trigram:
+        rankings["trigram"] = trigram_search(
             expanded,
             limit=per_retriever,
             include_pending=include_pending,
             source_slug=source_slug,
-        ),
-    }
+            metadata_contains=metadata_contains,
+        )
     if use_vector:
         rankings["vector"] = vector_search(
             query,
@@ -286,6 +334,7 @@ def hybrid_search(
             include_pending=include_pending,
             client=client,
             source_slug=source_slug,
+            metadata_contains=metadata_contains,
         )
 
     fused = reciprocal_rank_fusion(rankings)[:limit]

@@ -7,6 +7,7 @@ import hashlib
 
 from apps.accounts.models import APIKey, Tier, User, generate_key
 from apps.corpus.models import (
+    Court,
     Jurisdiction,
     Node,
     NodeType,
@@ -46,6 +47,27 @@ def make_iowa_caselaw_source() -> tuple[Source, NodeType, NodeType]:
     return src, decision_t, opinion_t
 
 
+# CourtListener slug → (name, authority level). Matches the 0011/Court seed.
+_COURT_DEFAULTS = {
+    "iowa": ("Supreme Court of Iowa", 1),
+    "iowactapp": ("Court of Appeals of Iowa", 2),
+}
+
+
+def make_court(court_id: str = "iowa") -> Court:
+    """The Court row a decision's ``court_id`` resolves to (name + level).
+    Idempotent so many cases can share a court in one test."""
+    j, _ = Jurisdiction.objects.get_or_create(
+        slug="iowa", defaults={"name": "Iowa", "abbreviation": "IA"}
+    )
+    name, level = _COURT_DEFAULTS.get(court_id, (court_id, 1))
+    court, _ = Court.objects.get_or_create(
+        court_id=court_id,
+        defaults={"name": name, "jurisdiction": j, "level": level},
+    )
+    return court
+
+
 def make_caselaw_case(
     *,
     cl_cluster_id: int,
@@ -53,21 +75,40 @@ def make_caselaw_case(
     court_id: str = "iowa",
     precedential_status: str = "Published",
     body: str = "The opinion body.",
+    case_name: str = "State v. Example",
+    date_filed: str = "2020-01-01",
+    docket_number: str = "",
+    citations: list[str] | None = None,
+    head_matter: str | None = None,
     with_version: bool = True,
 ) -> tuple[Node, Node, NodeVersion | None]:
     """One decision Node + one opinion child Node (+ its open APPROVED version),
-    mirroring what ``ingest_iowa_caselaw`` writes. Returns
-    (decision_node, opinion_node, opinion_version)."""
+    mirroring what ``ingest_iowa_caselaw`` writes. ``date_filed`` lands in the
+    decision metadata (the browse list orders by it) and a matching Court row is
+    ensured. Pass ``head_matter`` to add a head-matter version on the decision.
+    Returns (decision_node, opinion_node, opinion_version)."""
     src, decision_t, opinion_t = make_iowa_caselaw_source()
+    court = make_court(court_id)
     decision = Node.objects.create(
         source=src, node_type=decision_t, ordinal=str(cl_cluster_id),
-        path=f"cl-cluster-{cl_cluster_id}", heading="State v. Example",
+        path=f"cl-cluster-{cl_cluster_id}", heading=case_name,
         source_metadata={
             "cl_cluster_id": cl_cluster_id,
             "court_id": court_id,
+            "court_name": court.name,
             "precedential_status": precedential_status,
+            "date_filed": date_filed,
+            "docket_number": docket_number,
+            "citations": list(citations or []),
         },
     )
+    if head_matter:
+        NodeVersion.objects.create(
+            node=decision, body_text=head_matter,
+            effective_from=dt.date.fromisoformat(date_filed),
+            content_hash=hashlib.sha256(head_matter.encode()).hexdigest(),
+            review_status=ReviewStatus.APPROVED,
+        )
     opinion = Node.objects.create(
         source=src, node_type=opinion_t, parent=decision, ordinal="020",
         path=f"cl-cluster-{cl_cluster_id}/op-{cl_opinion_id}",
@@ -77,7 +118,8 @@ def make_caselaw_case(
     version = None
     if with_version:
         version = NodeVersion.objects.create(
-            node=opinion, body_text=body, effective_from=dt.date(2020, 1, 1),
+            node=opinion, body_text=body,
+            effective_from=dt.date.fromisoformat(date_filed),
             content_hash=hashlib.sha256(body.encode()).hexdigest(),
             review_status=ReviewStatus.APPROVED,
         )

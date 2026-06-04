@@ -57,6 +57,18 @@ _OPINION_TYPE_LABELS = {
 }
 _TYPE_PREFIX_RE = re.compile(r"^(\d{3})")
 
+# corpus.Node.heading is varchar(500). Case names — especially CourtListener
+# ``case_name_full`` party lists — can exceed that and would otherwise crash the
+# write with a StringDataRightTruncation. The display heading is capped here; the
+# untruncated case name is preserved in ``ParsedDecision.source_metadata``.
+MAX_HEADING_LEN = 500
+
+
+def _cap_heading(value: str) -> str:
+    if len(value) <= MAX_HEADING_LEN:
+        return value
+    return value[: MAX_HEADING_LEN - 1] + "…"
+
 
 # ---------------------------------------------------------------------------
 # Text cleaning (pure)
@@ -167,7 +179,7 @@ class ParsedOpinion:
             label = f"{label} (Per Curiam)"
         elif self.author_str.strip():
             label = f"{label} ({self.author_str.strip()})"
-        return label
+        return _cap_heading(label)
 
     @property
     def content_hash(self) -> str:
@@ -251,7 +263,9 @@ class ParsedDecision:
 
     @property
     def heading(self) -> str:
-        return self.case_name or self.case_name_short or self.case_name_full or self.path
+        return _cap_heading(
+            self.case_name or self.case_name_short or self.case_name_full or self.path
+        )
 
     @property
     def head_matter_text(self) -> str:
@@ -278,6 +292,9 @@ class ParsedDecision:
     def source_metadata(self) -> dict:
         return {
             "cl_cluster_id": self.cl_cluster_id,
+            "case_name": self.case_name,
+            "case_name_short": self.case_name_short,
+            "case_name_full": self.case_name_full,
             "court_id": self.court_id,
             "court_name": self.court_name,
             "date_filed": self.date_filed_raw,

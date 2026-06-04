@@ -1,25 +1,30 @@
 "use client";
 
-// Corpus browser. Three-pane shell on top of /api/browse: sources tree on
-// the left, section reader in the middle, metadata sidecar on the right.
-// State is centralised here so deep-links (#/iowa-code/714.16) can drive
-// expansion + selection programmatically.
+// Corpus browser shell — "Westlaw era". The sidebar is a flat list of clickable
+// sources (no tree); selecting one opens that source's index in the main pane:
+// a chapter index → section reader for statutes/rules, or a search-first
+// decisions index for caselaw. The default landing and the header are centered
+// on search + advanced search. Search results are unified: a caselaw hit routes
+// to /cases/<id>, a statute/rule hit opens in the reader. Deep-links
+// (#/iowa-code/714.16) still resolve programmatically.
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
 import {
-  AlertCircleIcon,
-  BookOpenIcon,
-  CheckIcon,
-  ChevronRightIcon,
-  CircleEllipsisIcon,
-  Download,
-  ExternalLinkIcon,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
   GitCompareArrowsIcon,
   Loader2Icon,
-  Printer,
+  AlertCircleIcon,
+  BookOpenIcon,
   SearchIcon,
-  Share2,
+  SlidersHorizontalIcon,
   XIcon,
 } from "lucide-react";
 
@@ -56,30 +61,55 @@ import {
   browseResolve,
   browseSearch,
   browseSources,
-  fmtEffective,
   type BrowseChapter,
   type BrowseSearchResponse,
   type BrowseSearchResult,
   type BrowseSource,
   type ChapterDetail,
   type NodeDetail,
+  type SearchFilters,
 } from "@/lib/iowa-browse";
 import { AppSidebarFooter } from "@/components/app-sidebar-footer";
 import { AppSidebarNav } from "@/components/app-sidebar-nav";
+import { ReadingPane, type Selection } from "@/components/browse/reader";
+import { SearchResultsPane } from "@/components/browse/search-results";
+import {
+  AdvancedSearch,
+  COURT_LABEL,
+  DOC_TYPE_LABEL,
+  EMPTY_FILTERS,
+  HomeView,
+  SOURCE_ICON,
+  toSearchFilters,
+  type AdvancedFilters,
+} from "@/components/browse/advanced-search";
+import { CaselawIndex } from "@/components/browse/caselaw-index";
 
-type Selection = {
-  slug?: string;
-  chapterId?: number;
-  sectionId?: number;
-};
+type Mode = "home" | "search" | "browse";
 
-// Stable composite keys for the expanded/busy sets so source ids and node
-// ids can't collide.
+// Stable composite keys for the busy set so source slugs and node ids can't
+// collide.
 const srcKey = (slug: string) => `src:${slug}`;
 const chapKey = (id: number) => `chap:${id}`;
 
-// Parse the hash fragment "#/iowa-code/714.16" into {slug, cite}. Returns
-// null for shapes the resolver doesn't understand.
+// Read-only chips for the results pane, built from whatever SearchFilters drove
+// the search (so the caselaw index and the header advanced panel agree).
+function chipsFromSearchFilters(sf: SearchFilters): string[] {
+  const chips: string[] = [];
+  if (sf.doc_type) chips.push(DOC_TYPE_LABEL[sf.doc_type] ?? sf.doc_type);
+  if (sf.court) chips.push(COURT_LABEL[sf.court] ?? sf.court);
+  if (sf.status) chips.push(sf.status);
+  if (sf.date_from || sf.date_to)
+    chips.push(
+      `${(sf.date_from ?? "").slice(0, 4) || "earliest"}–${
+        (sf.date_to ?? "").slice(0, 4) || "latest"
+      }`,
+    );
+  return chips;
+}
+
+// Parse the hash fragment "#/iowa-code/714.16" into {slug, cite}. Returns null
+// for shapes the resolver doesn't understand.
 function parseHashTarget(): { slug: string; cite: string } | null {
   if (typeof window === "undefined") return null;
   const raw = window.location.hash.replace(/^#\/?/, "").split("?")[0];
@@ -91,7 +121,64 @@ function parseHashTarget(): { slug: string; cite: string } | null {
   };
 }
 
+// ---- URL <-> search-state adapters -------------------------------------
+// The search (and an opened section) live in the query string so the browser
+// back button restores them and a search is shareable. `from`/`to` are the
+// year inputs widened to full ISO bounds.
+function buildSearchQuery(q: string, sf: SearchFilters): string {
+  const p = new URLSearchParams();
+  p.set("q", q);
+  if (sf.doc_type) p.set("doc_type", sf.doc_type);
+  if (sf.court) p.set("court", sf.court);
+  if (sf.status) p.set("status", sf.status);
+  if (sf.date_from) p.set("from", sf.date_from);
+  if (sf.date_to) p.set("to", sf.date_to);
+  return p.toString();
+}
+
+function searchFiltersFromParams(sp: URLSearchParams): SearchFilters {
+  return {
+    doc_type: sp.get("doc_type"),
+    court: sp.get("court"),
+    status: sp.get("status"),
+    date_from: sp.get("from"),
+    date_to: sp.get("to"),
+  };
+}
+
+// Reconstruct the advanced-search panel inputs from the URL.
+function advancedFromParams(sp: URLSearchParams): AdvancedFilters {
+  const dt = sp.get("doc_type");
+  return {
+    docType:
+      dt === "code" || dt === "rules" || dt === "cases" ? dt : "all",
+    court: sp.get("court") ?? "",
+    status: sp.get("status") ?? "",
+    yearFrom: (sp.get("from") ?? "").slice(0, 4),
+    yearTo: (sp.get("to") ?? "").slice(0, 4),
+  };
+}
+
+// useSearchParams() must be read inside a Suspense boundary.
 export default function BrowsePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="grid h-dvh place-items-center text-muted-foreground text-sm">
+          Loading…
+        </div>
+      }
+    >
+      <BrowsePageInner />
+    </Suspense>
+  );
+}
+
+function BrowsePageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const spStr = searchParams.toString();
+
   // ---- data caches -------------------------------------------------------
   const [sources, setSources] = useState<BrowseSource[] | null>(null);
   const [sourcesError, setSourcesError] = useState<string | null>(null);
@@ -102,22 +189,48 @@ export default function BrowsePage() {
   const [nodes, setNodes] = useState<Record<number, NodeDetail>>({});
 
   // ---- UI state ----------------------------------------------------------
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // The view is DERIVED from the URL (search + open-section live in the query
+  // string) so the browser back button restores it. `browseSlug` is the only
+  // non-URL view state: a source opened from the sidebar (table-of-contents
+  // browsing isn't deep-linked).
+  const [browseSlug, setBrowseSlug] = useState<string | null>(null);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [sel, setSel] = useState<Selection>({});
   const [readerError, setReaderError] = useState<string | null>(null);
 
-  // ---- search state -----------------------------------------------------
-  const [searchInput, setSearchInput] = useState("");
-  const [searchActive, setSearchActive] = useState(false);
-  const [searchResults, setSearchResults] = useState<
-    BrowseSearchResponse | null
-  >(null);
+  // ---- search input state (hydrated from the URL) -----------------------
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  const [filters, setFilters] = useState<AdvancedFilters>(() =>
+    advancedFromParams(searchParams),
+  );
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [searchResults, setSearchResults] =
+    useState<BrowseSearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  // null = all sources. Initialised lazily to the active reading source so
-  // an in-context search defaults to "stay in this corpus".
-  const [searchScope, setSearchScope] = useState<string | null>(null);
+
+  // Last hash the deep-link effect resolved — lets it ignore re-runs caused by
+  // cache churn (vs. a genuine hashchange). See the resolve effect below.
+  const lastHashRef = useRef<string | null>(null);
+  // (query+filters) of the results currently in state — set only AFTER a fetch
+  // resolves, so a search isn't re-run when only ?sec changes, and a stale
+  // (StrictMode-cancelled) run never blocks the spinner from clearing.
+  const loadedSearchKeyRef = useRef<string | null>(null);
+
+  // ---- view derived from the URL ----------------------------------------
+  const urlQ = (searchParams.get("q") ?? "").trim();
+  const urlSec = searchParams.get("sec");
+  const mode: Mode = urlSec
+    ? "browse"
+    : urlQ
+      ? "search"
+      : browseSlug
+        ? "browse"
+        : "home";
+  const activeChips = useMemo(
+    () => chipsFromSearchFilters(searchFiltersFromParams(new URLSearchParams(spStr))),
+    [spStr],
+  );
 
   // ---- helpers -----------------------------------------------------------
   const setBusyKey = useCallback((key: string, on: boolean) => {
@@ -125,15 +238,6 @@ export default function BrowsePage() {
       const next = new Set(prev);
       if (on) next.add(key);
       else next.delete(key);
-      return next;
-    });
-  }, []);
-
-  const toggleExpanded = useCallback((key: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
       return next;
     });
   }, []);
@@ -194,7 +298,7 @@ export default function BrowsePage() {
     [nodes],
   );
 
-  // ---- mount: load sources + resolve any incoming citation ---------------
+  // ---- mount: load sources ----------------------------------------------
   useEffect(() => {
     let cancelled = false;
     browseSources()
@@ -210,15 +314,35 @@ export default function BrowsePage() {
     };
   }, []);
 
-  // Resolve hash deep-links once sources have loaded. Runs again whenever
-  // the hash changes (back/forward navigation).
+  // Resolve hash deep-links once sources have loaded. Runs again on hashchange
+  // (back/forward). Caselaw isn't cite-deep-linked (cases use /cases/[id]); a
+  // caselaw hash just opens its index.
   useEffect(() => {
     if (!sources) return;
 
     const resolveFromHash = async () => {
+      // The effect re-runs whenever a load* callback's identity changes (cache
+      // churn from in-page navigation). Only resolve when the hash *actually*
+      // changed, otherwise a stale hash would clobber the user's selection.
+      const hash = window.location.hash;
+      if (hash === lastHashRef.current) return;
+      lastHashRef.current = hash;
+
       const target = parseHashTarget();
-      if (!target) return;
-      if (!sources.some((s) => s.slug === target.slug)) return;
+      if (!target) {
+        // Hash removed (e.g. backing out of a cross-ref) — drop the hash-driven
+        // source so the derived mode falls back to the search/home view.
+        setBrowseSlug(null);
+        return;
+      }
+      const src = sources.find((s) => s.slug === target.slug);
+      if (!src) return;
+
+      if (src.kind === "caselaw") {
+        setBrowseSlug(target.slug);
+        setSel({ slug: target.slug });
+        return;
+      }
 
       let resolved;
       try {
@@ -229,26 +353,19 @@ export default function BrowsePage() {
       }
       if (!resolved.found) return;
 
-      // Open the source, then the chapter, then select the node.
-      setExpanded((p) => new Set(p).add(srcKey(target.slug)));
-      const chaps = await loadChapters(target.slug);
-      if (!chaps) return;
+      setBrowseSlug(target.slug);
+      await loadChapters(target.slug);
 
-      // If the resolved id IS a chapter, just stop there.
       if (resolved.is_chapter) {
+        await loadChapterDetail(resolved.node_id);
         setSel({ slug: target.slug, chapterId: resolved.node_id });
         return;
       }
 
-      // Otherwise it's a section: figure out which chapter it lives under
-      // by walking the chapter list and loading details until we find it.
-      // The resolve endpoint doesn't return the chapter id directly, but
-      // the node's payload will.
       const node = await loadNode(resolved.node_id);
       if (!node) return;
       const chapId = node.chapter?.id;
       if (chapId) {
-        setExpanded((p) => new Set(p).add(chapKey(chapId)));
         await loadChapterDetail(chapId);
         setSel({ slug: target.slug, chapterId: chapId, sectionId: node.id });
       } else {
@@ -262,31 +379,99 @@ export default function BrowsePage() {
     return () => window.removeEventListener("hashchange", onHash);
   }, [sources, loadChapters, loadChapterDetail, loadNode]);
 
-  // ---- user actions ------------------------------------------------------
-  const onToggleSource = useCallback(
-    (slug: string) => {
-      const key = srcKey(slug);
-      if (!expanded.has(key)) {
-        toggleExpanded(key);
-        void loadChapters(slug);
-      } else {
-        toggleExpanded(key);
-      }
-    },
-    [expanded, loadChapters, toggleExpanded],
-  );
+  // Fetch search results whenever the URL's q/filters change — covers initial
+  // load of a shared/bookmarked search and back/forward navigation.
+  useEffect(() => {
+    const sp = new URLSearchParams(spStr);
+    const q = (sp.get("q") ?? "").trim();
+    if (!q) {
+      setSearching(false);
+      return;
+    }
+    // Mirror the URL into the input controls and drop any sidebar selection.
+    setQuery(q);
+    setFilters(advancedFromParams(sp));
+    setShowAdvanced(false);
+    setBrowseSlug(null);
 
-  const onToggleChapter = useCallback(
-    (chapterId: number) => {
-      const key = chapKey(chapterId);
-      if (!expanded.has(key)) {
-        toggleExpanded(key);
-        void loadChapterDetail(chapterId);
-      } else {
-        toggleExpanded(key);
+    const sf = searchFiltersFromParams(sp);
+    const page = Math.max(1, Number(sp.get("page")) || 1);
+    const key = `${q} ${JSON.stringify(sf)}`;
+    // Same search+page already loaded (only ?sec changed) -> just clear spinner.
+    const pageKey = `${key} p${page}`;
+    if (pageKey === loadedSearchKeyRef.current) {
+      setSearching(false);
+      return;
+    }
+
+    let active = true;
+    setSearching(true);
+    setSearchError(null);
+    browseSearch(q, sf, page)
+      .then((d) => {
+        if (!active) return;
+        setSearchResults(d);
+        loadedSearchKeyRef.current = pageKey;
+        setSearching(false);
+      })
+      .catch((e) => {
+        if (!active) return;
+        setSearchError(e instanceof Error ? e.message : "Search failed.");
+        setSearchResults(null);
+        setSearching(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [spStr]);
+
+  // Open a section from the URL (?sec=<id>) — e.g. a statute search result, so
+  // the back button returns to the results it was opened from.
+  useEffect(() => {
+    const id = Number(searchParams.get("sec"));
+    if (!Number.isFinite(id) || id <= 0) return;
+    setReaderError(null);
+    setBrowseSlug(null);
+    let cancelled = false;
+    void (async () => {
+      const node = await loadNode(id);
+      if (cancelled) return;
+      if (!node) {
+        setSel({ sectionId: id });
+        return;
       }
+      const chapId = node.chapter?.id;
+      if (chapId) {
+        await loadChapterDetail(chapId);
+        if (!cancelled)
+          setSel({ slug: node.source_slug, chapterId: chapId, sectionId: id });
+      } else {
+        setSel({ slug: node.source_slug, sectionId: id });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [spStr, searchParams, loadNode, loadChapterDetail]);
+
+  // ---- navigation actions ------------------------------------------------
+  const goHome = useCallback(() => {
+    router.push("/browse");
+    setBrowseSlug(null);
+  }, [router]);
+
+  const openSource = useCallback(
+    (slug: string) => {
+      setReaderError(null);
+      setSel({ slug });
+      setBrowseSlug(slug);
+      // Drop any search/section query params so the derived mode shows this
+      // source's index.
+      router.push("/browse");
+      const src = sources?.find((s) => s.slug === slug);
+      if (src?.kind !== "caselaw") void loadChapters(slug);
     },
-    [expanded, loadChapterDetail, toggleExpanded],
+    [router, sources, loadChapters],
   );
 
   const onSelectChapter = useCallback(
@@ -308,83 +493,48 @@ export default function BrowsePage() {
   );
 
   // ---- search actions ---------------------------------------------------
+  // Run a search by writing it to the URL; the effect above does the fetch, so
+  // back/forward and shared links restore the results.
   const runSearch = useCallback(
-    async (query: string, scope: string | null) => {
-      const q = query.trim();
-      if (!q) return;
-      setSearchActive(true);
-      setSearching(true);
-      setSearchError(null);
-      setSearchScope(scope);
-      try {
-        const data = await browseSearch(q, scope);
-        setSearchResults(data);
-      } catch (e) {
-        setSearchError(
-          e instanceof Error ? e.message : "Search failed.",
-        );
-        setSearchResults(null);
-      } finally {
-        setSearching(false);
-      }
+    (q: string, sf: SearchFilters) => {
+      const trimmed = q.trim();
+      if (!trimmed) return;
+      router.push(`/browse?${buildSearchQuery(trimmed, sf)}`);
     },
-    [],
+    [router],
   );
 
-  const closeSearch = useCallback(() => {
-    setSearchActive(false);
-    setSearchResults(null);
-    setSearchError(null);
-    setSearchInput("");
-  }, []);
+  // Header / home search uses the shared advanced-filter state.
+  const submitFilterSearch = useCallback(() => {
+    runSearch(query, toSearchFilters(filters));
+  }, [query, filters, runSearch]);
 
-  // Result click: open the node in the reader and dismiss the search pane.
-  // The tree gets opened to that node so the sidebar reflects the new state.
+  // Result click: caselaw → the /cases reader; statute/rule → open the section
+  // via the URL (?…&sec=id) so the back button returns to these results.
   const onPickSearchResult = useCallback(
-    async (r: BrowseSearchResult) => {
-      const slug = r.source_slug;
-      setExpanded((p) => new Set(p).add(srcKey(slug)));
-      await loadChapters(slug);
-
-      // The search response doesn't carry the chapter id directly; the node
-      // payload does. Fetch it, then mirror the deep-link open logic.
-      const node = await loadNode(r.node_id);
-      if (!node) {
-        // Even without metadata, surface the node by id so the user sees
-        // _something_ — the reader will still render the body.
-        setSel({ slug, sectionId: r.node_id });
-        closeSearch();
+    (r: BrowseSearchResult) => {
+      if (r.kind === "case" && r.case_id != null) {
+        router.push(`/cases/${r.case_id}`);
         return;
       }
-      const chapId = node.chapter?.id;
-      if (chapId) {
-        setExpanded((p) => new Set(p).add(chapKey(chapId)));
-        await loadChapterDetail(chapId);
-        setSel({ slug, chapterId: chapId, sectionId: node.id });
-      } else {
-        setSel({ slug, sectionId: node.id });
-      }
-      closeSearch();
+      const sp = new URLSearchParams(spStr);
+      sp.set("sec", String(r.node_id));
+      router.push(`/browse?${sp.toString()}`);
     },
-    [closeSearch, loadChapterDetail, loadChapters, loadNode],
+    [router, spStr],
   );
 
-  // ---- side effects -----------------------------------------------------
-  // When the active section changes (deep-link, search pick, related-rules
-  // click), scroll its sidebar row into view. Use a small timeout so the
-  // tree's expand-and-mount has time to land the new row in the DOM. The
-  // SectionLink renders a stable data-section-id attribute we can target.
-  useEffect(() => {
-    if (!sel.sectionId) return;
-    const id = sel.sectionId;
-    const tick = window.setTimeout(() => {
-      const el = document.querySelector<HTMLElement>(
-        `[data-section-id="${id}"]`,
-      );
-      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }, 120);
-    return () => window.clearTimeout(tick);
-  }, [sel.sectionId, chapterDetails]);
+  // Move between result pages by updating ?page in the URL (so paging is in
+  // history and shareable). Page 1 drops the param for a clean URL.
+  const onSearchPageChange = useCallback(
+    (next: number) => {
+      const sp = new URLSearchParams(spStr);
+      if (next <= 1) sp.delete("page");
+      else sp.set("page", String(next));
+      router.push(`/browse?${sp.toString()}`);
+    },
+    [router, spStr],
+  );
 
   // ---- derived -----------------------------------------------------------
   const selSource = useMemo(
@@ -406,51 +556,140 @@ export default function BrowsePage() {
         <BrowseSidebar
           sources={sources}
           sourcesError={sourcesError}
-          chapters={chapters}
-          chapterDetails={chapterDetails}
-          expanded={expanded}
-          busy={busy}
-          sel={sel}
-          onToggleSource={onToggleSource}
-          onToggleChapter={onToggleChapter}
-          onSelectChapter={onSelectChapter}
-          onSelectSection={onSelectSection}
+          mode={mode}
+          activeSlug={mode === "browse" ? (sel.slug ?? null) : null}
+          onHome={goHome}
+          onOpenSource={openSource}
         />
         <SidebarInset>
-          <BrowseHeader
-            source={selSource}
-            chapter={selChapter}
-            node={selNode}
-            searchActive={searchActive}
-            searchInput={searchInput}
-            onSearchInput={setSearchInput}
-            onSubmit={() => runSearch(searchInput, sel.slug ?? null)}
-            onClose={closeSearch}
-          />
-          {searchActive ? (
+          <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4">
+            <SidebarTrigger />
+            <Separator orientation="vertical" className="mr-1 h-4" />
+            <BrowseBreadcrumb
+              mode={mode}
+              source={selSource}
+              chapter={selChapter}
+              node={selNode}
+              onSourceClick={() => selSource && openSource(selSource.slug)}
+              onChapterClick={() =>
+                selSource &&
+                selChapter &&
+                onSelectChapter(selSource.slug, selChapter.id)
+              }
+            />
+
+            <form
+              className="relative ml-auto w-full max-w-xs"
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitFilterSearch();
+              }}
+            >
+              <SearchIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && mode === "search") {
+                    e.preventDefault();
+                    goHome();
+                  }
+                }}
+                placeholder="Search the corpus…"
+                className="h-9 pr-9 pl-9"
+              />
+              {(query || mode === "search") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    if (mode === "search") goHome();
+                  }}
+                  aria-label="Clear search"
+                  className="-translate-y-1/2 absolute top-1/2 right-2 flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              )}
+            </form>
+
+            {/* Home already surfaces advanced search inline; avoid a second panel. */}
+            {mode !== "home" && (
+              <Button
+                variant={showAdvanced ? "secondary" : "outline"}
+                size="sm"
+                className="shrink-0"
+                onClick={() => setShowAdvanced((v) => !v)}
+              >
+                <SlidersHorizontalIcon className="size-4" />
+                <span className="hidden sm:inline">Advanced</span>
+              </Button>
+            )}
+
+            <Button asChild variant="outline" size="sm" className="shrink-0">
+              <Link href="/browse/compare">
+                <GitCompareArrowsIcon className="size-4" />
+                <span className="hidden lg:inline">Compare editions</span>
+              </Link>
+            </Button>
+          </header>
+
+          {showAdvanced && mode !== "home" && (
+            <div className="border-b bg-muted/20 px-4 py-3">
+              <div className="mx-auto max-w-3xl">
+                <AdvancedSearch filters={filters} onChange={setFilters} />
+                <div className="mt-3 flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFilters(EMPTY_FILTERS)}
+                  >
+                    Reset
+                  </Button>
+                  <Button size="sm" onClick={submitFilterSearch}>
+                    <SearchIcon className="size-4" /> Search
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {mode === "home" ? (
+            <HomeView
+              sources={sources}
+              query={query}
+              onQueryChange={setQuery}
+              filters={filters}
+              onFiltersChange={setFilters}
+              onSubmit={submitFilterSearch}
+              onOpenSource={openSource}
+            />
+          ) : mode === "search" ? (
             <SearchResultsPane
-              query={searchResults?.query ?? searchInput}
+              query={searchResults?.query ?? query}
               loading={searching}
               error={searchError}
               data={searchResults}
-              scope={searchScope}
-              scopeSource={selSource}
-              onSetScope={(slug) =>
-                runSearch(searchResults?.query ?? searchInput, slug)
-              }
+              chips={activeChips}
               onPick={onPickSearchResult}
-              onClose={closeSearch}
+              onClose={goHome}
+              onPageChange={onSearchPageChange}
             />
+          ) : selSource?.kind === "caselaw" ? (
+            <CaselawIndex source={selSource} onSearch={runSearch} />
           ) : (
             <ReadingPane
               sel={sel}
               source={selSource}
               chapter={selChapter}
               node={selNode}
+              chapters={sel.slug ? (chapters[sel.slug] ?? null) : null}
+              busySource={sel.slug ? busy.has(srcKey(sel.slug)) : false}
               busyChapter={
                 sel.chapterId != null && busy.has(chapKey(sel.chapterId))
               }
               error={readerError}
+              onSelectChapter={(id) => onSelectChapter(sel.slug!, id)}
               onSelectSection={(id) =>
                 onSelectSection(sel.slug!, sel.chapterId, id)
               }
@@ -463,144 +702,104 @@ export default function BrowsePage() {
 }
 
 // ---------------------------------------------------------------------------
-// Top header — breadcrumb + search
+// Breadcrumb
 // ---------------------------------------------------------------------------
 
-function BrowseHeader({
+function BrowseBreadcrumb({
+  mode,
   source,
   chapter,
   node,
-  searchActive,
-  searchInput,
-  onSearchInput,
-  onSubmit,
-  onClose,
+  onSourceClick,
+  onChapterClick,
 }: {
+  mode: Mode;
   source: BrowseSource | null;
   chapter: ChapterDetail | null;
   node: NodeDetail | null;
-  searchActive: boolean;
-  searchInput: string;
-  onSearchInput: (s: string) => void;
-  onSubmit: () => void;
-  onClose: () => void;
+  onSourceClick: () => void;
+  onChapterClick: () => void;
 }) {
+  const browsing = mode === "browse" && source != null;
+  // A crumb is a clickable link when something is below it (so it can step back
+  // up the hierarchy); the deepest crumb is a plain page label.
+  const sourceIsLeaf = browsing && !chapter && !node;
+  const chapterHeading = chapter
+    ? `${chapter.ordinal}${chapter.heading ? ` — ${chapter.heading}` : ""}`
+    : "";
+
+  let label = "Browse the corpus";
+  if (mode === "search") label = "Search results";
+  else if (browsing && source) label = source.name;
+
   return (
-    <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4">
-      <SidebarTrigger />
-      <Separator orientation="vertical" className="mr-2 h-4" />
-      <Breadcrumb className="min-w-0 flex-1">
-        <BreadcrumbList>
-          {source ? (
-            <>
-              <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="#">{source.name}</BreadcrumbLink>
-              </BreadcrumbItem>
-              {chapter && (
-                <>
-                  <BreadcrumbSeparator className="hidden md:block" />
-                  <BreadcrumbItem className="hidden lg:block">
-                    <BreadcrumbLink href="#">
-                      {chapter.ordinal}
-                      {chapter.heading ? ` — ${chapter.heading}` : ""}
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                </>
-              )}
-              {node && (
-                <>
-                  <BreadcrumbSeparator className="hidden lg:block" />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>{node.citation}</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </>
-              )}
-              {!chapter && !node && (
-                <>
-                  <BreadcrumbSeparator className="hidden md:block" />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>All chapters</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </>
-              )}
-            </>
+    <Breadcrumb className="min-w-0">
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          {browsing && !sourceIsLeaf ? (
+            <BreadcrumbLink asChild>
+              <button type="button" onClick={onSourceClick} className="truncate">
+                {label}
+              </button>
+            </BreadcrumbLink>
           ) : (
-            <BreadcrumbItem>
-              <BreadcrumbPage>Browse the corpus</BreadcrumbPage>
-            </BreadcrumbItem>
+            <BreadcrumbPage className="truncate">{label}</BreadcrumbPage>
           )}
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      <form
-        className="relative w-full max-w-sm"
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSubmit();
-        }}
-      >
-        <SearchIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-muted-foreground" />
-        <Input
-          value={searchInput}
-          onChange={(e) => onSearchInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape" && searchActive) {
-              e.preventDefault();
-              onClose();
-            }
-          }}
-          placeholder={
-            source
-              ? `Search ${source.name}…`
-              : "Search the corpus…"
-          }
-          className="h-9 pl-9 pr-9"
-        />
-        {(searchInput || searchActive) && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Clear search"
-            className="-translate-y-1/2 absolute top-1/2 right-2 flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <XIcon className="size-3.5" />
-          </button>
+        </BreadcrumbItem>
+        {browsing && chapter && (
+          <>
+            <BreadcrumbSeparator className="hidden md:block" />
+            <BreadcrumbItem className="hidden md:block">
+              {node ? (
+                <BreadcrumbLink asChild>
+                  <button
+                    type="button"
+                    onClick={onChapterClick}
+                    className="truncate"
+                  >
+                    {chapterHeading}
+                  </button>
+                </BreadcrumbLink>
+              ) : (
+                <BreadcrumbPage className="truncate">
+                  {chapterHeading}
+                </BreadcrumbPage>
+              )}
+            </BreadcrumbItem>
+          </>
         )}
-      </form>
-
-      <Button asChild variant="outline" size="sm" className="shrink-0">
-        <Link href="/browse/compare">
-          <GitCompareArrowsIcon className="size-4" />
-          <span className="hidden sm:inline">Compare editions</span>
-        </Link>
-      </Button>
-    </header>
+        {browsing && node && (
+          <>
+            <BreadcrumbSeparator className="hidden lg:block" />
+            <BreadcrumbItem className="hidden lg:block">
+              <BreadcrumbPage>{node.citation}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </>
+        )}
+      </BreadcrumbList>
+    </Breadcrumb>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar tree
+// Sidebar — flat clickable source list (no tree)
 // ---------------------------------------------------------------------------
 
-type SidebarProps = {
+function BrowseSidebar({
+  sources,
+  sourcesError,
+  mode,
+  activeSlug,
+  onHome,
+  onOpenSource,
+}: {
   sources: BrowseSource[] | null;
   sourcesError: string | null;
-  chapters: Record<string, BrowseChapter[]>;
-  chapterDetails: Record<number, ChapterDetail>;
-  expanded: Set<string>;
-  busy: Set<string>;
-  sel: Selection;
-  onToggleSource: (slug: string) => void;
-  onToggleChapter: (chapterId: number) => void;
-  onSelectChapter: (slug: string, chapterId: number) => void;
-  onSelectSection: (
-    slug: string,
-    chapterId: number | undefined,
-    sectionId: number,
-  ) => void;
-};
-
-function BrowseSidebar(props: SidebarProps) {
+  mode: Mode;
+  activeSlug: string | null;
+  onHome: () => void;
+  onOpenSource: (slug: string) => void;
+}) {
   return (
     <Sidebar>
       <SidebarHeader className="mb-2 border-b">
@@ -625,23 +824,58 @@ function BrowseSidebar(props: SidebarProps) {
 
       <SidebarContent className="px-2">
         <AppSidebarNav />
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Search</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={onHome}
+                isActive={mode === "home" || mode === "search"}
+              >
+                <SearchIcon className="size-4" />
+                <span>Search the corpus</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
         <SidebarGroup>
           <SidebarGroupLabel>Sources</SidebarGroupLabel>
           <SidebarMenu>
-            {props.sourcesError ? (
+            {sourcesError ? (
               <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-destructive text-xs">
                 <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
-                <span>{props.sourcesError}</span>
+                <span>{sourcesError}</span>
               </div>
-            ) : !props.sources ? (
+            ) : !sources ? (
               <div className="flex items-center gap-2 px-2 py-3 text-sidebar-foreground/60 text-xs">
                 <Loader2Icon className="size-3.5 animate-spin" />
                 <span>Loading sources…</span>
               </div>
             ) : (
-              props.sources.map((src) => (
-                <SourceBranch key={src.slug} src={src} {...props} />
-              ))
+              sources.map((src) => {
+                const Icon = SOURCE_ICON[src.slug] ?? BookOpenIcon;
+                return (
+                  <SidebarMenuItem key={src.slug}>
+                    <SidebarMenuButton
+                      onClick={() => onOpenSource(src.slug)}
+                      isActive={activeSlug === src.slug}
+                      className="h-auto items-start py-2"
+                      tooltip={src.name}
+                    >
+                      <Icon className="mt-0.5 size-4 shrink-0" />
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate font-medium">{src.name}</span>
+                        <span className="text-sidebar-foreground/50 text-xs">
+                          {src.entries.toLocaleString()}{" "}
+                          {src.entry_label.toLowerCase()}
+                        </span>
+                      </div>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })
             )}
           </SidebarMenu>
         </SidebarGroup>
@@ -653,1012 +887,5 @@ function BrowseSidebar(props: SidebarProps) {
         <AppSidebarFooter />
       </SidebarFooter>
     </Sidebar>
-  );
-}
-
-function SourceBranch({
-  src,
-  chapters,
-  chapterDetails,
-  expanded,
-  busy,
-  sel,
-  onToggleSource,
-  onToggleChapter,
-  onSelectChapter,
-  onSelectSection,
-}: { src: BrowseSource } & SidebarProps) {
-  const key = srcKey(src.slug);
-  const isOpen = expanded.has(key);
-  const isLoading = busy.has(key) && !chapters[src.slug];
-  const list = chapters[src.slug];
-  const isActive = sel.slug === src.slug;
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        onClick={() => onToggleSource(src.slug)}
-        isActive={isActive}
-        className="font-semibold"
-      >
-        <ChevronRightIcon
-          className={`size-3.5 transition-transform ${isOpen ? "rotate-90" : ""}`}
-        />
-        <span className="flex-1 truncate">{src.name}</span>
-        <span className="ml-1 text-sidebar-foreground/50 text-xs">
-          {src.chapters}
-        </span>
-      </SidebarMenuButton>
-      {isOpen && (
-        <div className="ml-3 mt-0.5 border-sidebar-border/60 border-l pl-2">
-          {isLoading && (
-            <div className="flex items-center gap-2 px-2 py-1.5 text-sidebar-foreground/60 text-xs">
-              <Loader2Icon className="size-3.5 animate-spin" /> Loading…
-            </div>
-          )}
-          {list?.map((ch) => (
-            <ChapterBranch
-              key={ch.id}
-              src={src}
-              chapter={ch}
-              detail={chapterDetails[ch.id]}
-              isOpen={expanded.has(chapKey(ch.id))}
-              isLoading={busy.has(chapKey(ch.id)) && !chapterDetails[ch.id]}
-              sel={sel}
-              onToggleChapter={onToggleChapter}
-              onSelectChapter={onSelectChapter}
-              onSelectSection={onSelectSection}
-            />
-          ))}
-        </div>
-      )}
-    </SidebarMenuItem>
-  );
-}
-
-function ChapterBranch({
-  src,
-  chapter,
-  detail,
-  isOpen,
-  isLoading,
-  sel,
-  onToggleChapter,
-  onSelectChapter,
-  onSelectSection,
-}: {
-  src: BrowseSource;
-  chapter: BrowseChapter;
-  detail: ChapterDetail | undefined;
-  isOpen: boolean;
-  isLoading: boolean;
-  sel: Selection;
-  onToggleChapter: (chapterId: number) => void;
-  onSelectChapter: (slug: string, chapterId: number) => void;
-  onSelectSection: (
-    slug: string,
-    chapterId: number | undefined,
-    sectionId: number,
-  ) => void;
-}) {
-  const isActive = sel.chapterId === chapter.id && !sel.sectionId;
-  const hasChildren = !chapter.reserved && chapter.child_count > 0;
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        isActive={isActive}
-        className="h-auto items-start py-1.5"
-        onClick={() => {
-          if (hasChildren) onToggleChapter(chapter.id);
-          onSelectChapter(src.slug, chapter.id);
-        }}
-      >
-        <ChevronRightIcon
-          className={`mt-0.5 size-3.5 shrink-0 transition-transform ${
-            isOpen ? "rotate-90" : ""
-          } ${hasChildren ? "" : "invisible"}`}
-        />
-        <div className="flex min-w-0 flex-col">
-          <span className="text-sm">
-            <span className="font-semibold">{chapter.ordinal}</span>
-            {chapter.heading && (
-              <span
-                className={chapter.reserved ? "text-sidebar-foreground/40" : ""}
-              >
-                {" — "}
-                {chapter.heading}
-              </span>
-            )}
-          </span>
-        </div>
-      </SidebarMenuButton>
-      {isOpen && hasChildren && (
-        <div className="ml-3 mt-0.5 border-sidebar-border/60 border-l pl-2">
-          {isLoading && (
-            <div className="flex items-center gap-2 px-2 py-1.5 text-sidebar-foreground/60 text-xs">
-              <Loader2Icon className="size-3.5 animate-spin" /> Loading…
-            </div>
-          )}
-          {detail?.children.map((c) => (
-            <SectionLink
-              key={c.id}
-              src={src}
-              chapterId={chapter.id}
-              child={c}
-              isActive={sel.sectionId === c.id}
-              onSelectSection={onSelectSection}
-            />
-          ))}
-        </div>
-      )}
-    </SidebarMenuItem>
-  );
-}
-
-function SectionLink({
-  src,
-  chapterId,
-  child,
-  isActive,
-  onSelectSection,
-}: {
-  src: BrowseSource;
-  chapterId: number;
-  child: { id: number; citation: string; heading: string };
-  isActive: boolean;
-  onSelectSection: (
-    slug: string,
-    chapterId: number | undefined,
-    sectionId: number,
-  ) => void;
-}) {
-  return (
-    <SidebarMenuItem
-      data-section-id={child.id}
-      data-active={isActive ? "true" : undefined}
-    >
-      <SidebarMenuButton
-        isActive={isActive}
-        className="h-auto items-start py-1.5"
-        onClick={() => onSelectSection(src.slug, chapterId, child.id)}
-      >
-        <div className="flex min-w-0 flex-col">
-          <span className="font-medium text-sm">{child.citation}</span>
-          {child.heading && (
-            <span className="truncate text-sidebar-foreground/70 text-xs">
-              {child.heading}
-            </span>
-          )}
-        </div>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Reading pane + sidecar
-// ---------------------------------------------------------------------------
-
-function ReadingPane({
-  sel,
-  source,
-  chapter,
-  node,
-  busyChapter,
-  error,
-  onSelectSection,
-}: {
-  sel: Selection;
-  source: BrowseSource | null;
-  chapter: ChapterDetail | null;
-  node: NodeDetail | null;
-  busyChapter: boolean;
-  error: string | null;
-  onSelectSection: (id: number) => void;
-}) {
-  return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden xl:grid-cols-[1fr_280px]">
-      <main className="min-w-0 overflow-y-auto px-6 py-8 md:px-10 lg:px-16">
-        <div className="mx-auto max-w-3xl">
-          {error && (
-            <div className="mb-6 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive text-sm">
-              <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {!sel.slug ? (
-            <EmptyState />
-          ) : sel.sectionId ? (
-            node ? (
-              <NodeView node={node} />
-            ) : (
-              <LoadingBlock label="Loading section…" />
-            )
-          ) : sel.chapterId ? (
-            chapter ? (
-              <ChapterView
-                chapter={chapter}
-                onSelectSection={onSelectSection}
-              />
-            ) : (
-              <LoadingBlock
-                label={busyChapter ? "Loading chapter…" : "Select a section"}
-              />
-            )
-          ) : (
-            <SourceView source={source} />
-          )}
-        </div>
-      </main>
-
-      <Sidecar source={source} chapter={chapter} node={node} />
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="rounded-2xl border border-dashed bg-muted/30 px-6 py-16 text-center">
-      <BookOpenIcon className="mx-auto size-8 text-muted-foreground/70" />
-      <h2 className="mt-4 font-semibold text-lg">Pick a source to start</h2>
-      <p className="mt-1 text-muted-foreground text-sm">
-        Expand a corpus in the left sidebar to browse its chapters and
-        sections.
-      </p>
-    </div>
-  );
-}
-
-function LoadingBlock({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 px-4 py-10 text-muted-foreground text-sm">
-      <Loader2Icon className="size-4 animate-spin" />
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function SourceView({ source }: { source: BrowseSource | null }) {
-  if (!source) return <LoadingBlock label="Loading source…" />;
-  return (
-    <div>
-      <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
-        <span>{source.jurisdiction}</span>
-      </div>
-      <h1 className="mt-2 font-semibold text-3xl tracking-tight">
-        {source.name}
-      </h1>
-      <p className="mt-2 text-muted-foreground text-sm">
-        {source.chapters.toLocaleString()} chapters ·{" "}
-        {source.entries.toLocaleString()} {source.entry_label.toLowerCase()}
-      </p>
-      <div className="mt-6 rounded-xl border bg-muted/30 p-4 text-muted-foreground text-sm">
-        Expand the source in the sidebar and pick a chapter to read.
-      </div>
-    </div>
-  );
-}
-
-function ChapterView({
-  chapter,
-  onSelectSection,
-}: {
-  chapter: ChapterDetail;
-  onSelectSection: (id: number) => void;
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
-        <span>{chapter.ordinal}</span>
-      </div>
-      <h1 className="mt-2 font-semibold text-3xl tracking-tight">
-        {chapter.heading || chapter.ordinal}
-      </h1>
-      {chapter.reserved && (
-        <p className="mt-2 text-muted-foreground italic text-sm">
-          This chapter is reserved.
-        </p>
-      )}
-
-      <ActionToolbar node={null} />
-      <Separator className="my-6" />
-
-      <h2 className="font-semibold text-muted-foreground text-xs uppercase tracking-[0.18em]">
-        Sections in this chapter
-      </h2>
-      {chapter.children.length === 0 ? (
-        <p className="mt-4 text-muted-foreground text-sm">
-          No sections published.
-        </p>
-      ) : (
-        <ul className="mt-3 divide-y border-y">
-          {chapter.children.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => onSelectSection(c.id)}
-                className="group flex w-full items-baseline gap-4 py-2.5 text-left transition-colors hover:bg-muted/40"
-              >
-                <span className="w-20 shrink-0 font-mono font-semibold text-foreground/90 text-sm tabular-nums group-hover:text-primary">
-                  {c.citation.trim().split(/\s+/).pop() || c.ordinal}
-                </span>
-                <span className="flex-1 text-foreground/90 text-sm leading-snug">
-                  {c.heading || c.ordinal}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function NodeView({ node }: { node: NodeDetail }) {
-  return (
-    <div>
-      <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
-        <span>
-          {node.source}
-          {node.chapter ? ` · ${node.chapter.citation}` : ""}
-        </span>
-      </div>
-      <h1 className="mt-2 font-semibold text-3xl tracking-tight">
-        {node.citation}
-        {node.heading ? <> — {node.heading}</> : null}
-      </h1>
-      {node.effective_from && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground text-sm">
-          <span>Effective {fmtEffective(node.effective_from)}</span>
-        </div>
-      )}
-
-      <ActionToolbar node={node} />
-
-      <Separator className="my-6" />
-
-      {node.has_content ? (
-        <BodyText text={node.body_text} crossRefs={node.cross_refs} />
-      ) : (
-        <p className="text-muted-foreground text-sm italic">
-          No body text is published for this section.
-        </p>
-      )}
-    </div>
-  );
-}
-
-// Iowa Code sections are an enumerated hierarchy encoded in the body text:
-// each item is on its own line, prefixed with nbsp padding and a marker —
-// "1." subsection, "a." paragraph, "(1)" subparagraph, "(a)" sub-subparagraph.
-// We infer the depth from the marker style (the Code's fixed nesting order)
-// and render an indented outline with hanging markers instead of one blob.
-type Block = { level: number; marker: string | null; text: string };
-
-const MARKER_RULES: { re: RegExp; level: number }[] = [
-  { re: /^(\d+)\.(?=[\s ])/, level: 1 }, // 1. 2. — subsection
-  { re: /^([a-z]{1,2})\.(?=[\s ])/, level: 2 }, // a. b. — paragraph
-  { re: /^\((\d+)\)(?=[\s ]|$)/, level: 3 }, // (1) — subparagraph
-  { re: /^\(([a-z]{1,3})\)(?=[\s ]|$)/, level: 4 }, // (a) (iv) — sub-sub
-];
-
-function parseBlocks(text: string): Block[] {
-  const blocks: Block[] = [];
-  for (const raw of text.split("\n")) {
-    const line = raw.replace(/^[\s ]+/, "").replace(/[\s ]+$/, "");
-    if (!line) continue;
-    let matched: Block | null = null;
-    for (const { re, level } of MARKER_RULES) {
-      const m = re.exec(line);
-      if (m) {
-        matched = {
-          level,
-          marker: m[0],
-          text: line.slice(m[0].length).replace(/^[\s ]+/, ""),
-        };
-        break;
-      }
-    }
-    blocks.push(matched ?? { level: 0, marker: null, text: line });
-  }
-  return blocks;
-}
-
-// Render the body text as a structured outline. Highlights any literal phrases
-// listed in cross_refs so the in-text citations are visually distinct (we
-// don't make them links yet — that's a Phase 2/3 enhancement).
-function BodyText({
-  text,
-  crossRefs,
-}: {
-  text: string;
-  crossRefs: NodeDetail["cross_refs"];
-}) {
-  const blocks = parseBlocks(text);
-  const hasStructure = blocks.some((b) => b.marker !== null);
-
-  // Build a single regex of all cross-ref literals (longest first so we don't
-  // match a shorter substring inside a longer one).
-  const phrases = [...new Set(crossRefs.map((r) => r.text))]
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length);
-  const re =
-    phrases.length > 0
-      ? new RegExp(
-          "(" +
-            phrases.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") +
-            ")",
-          "g",
-        )
-      : null;
-
-  const renderInline = (s: string): ReactNode[] => {
-    if (!re) return [s];
-    const out: ReactNode[] = [];
-    let last = 0;
-    re.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    let i = 0;
-    while ((m = re.exec(s)) !== null) {
-      if (m.index > last) out.push(s.slice(last, m.index));
-      out.push(
-        <span
-          key={`xr-${i++}`}
-          className="rounded-sm bg-accent/40 px-0.5 font-medium text-foreground"
-          title="In-text citation"
-        >
-          {m[0]}
-        </span>,
-      );
-      last = m.index + m[0].length;
-    }
-    if (last < s.length) out.push(s.slice(last));
-    return out;
-  };
-
-  // No enumerated markers: fall back to plain paragraphs (split on blank lines).
-  if (!hasStructure) {
-    const paragraphs = text
-      .split(/\n{2,}/)
-      .map((p) => p.replace(/\s+/g, " ").trim())
-      .filter(Boolean);
-    return (
-      <article className="space-y-5 text-[15.5px] leading-relaxed">
-        {paragraphs.map((p, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static paragraph list
-          <p key={i}>{renderInline(p)}</p>
-        ))}
-      </article>
-    );
-  }
-
-  return (
-    <article className="space-y-3 text-[15.5px] leading-relaxed">
-      {blocks.map((b, i) =>
-        b.marker === null ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: stable ordered blocks
-          <p key={i} style={{ marginLeft: `${indentRem(b.level)}rem` }}>
-            {renderInline(b.text)}
-          </p>
-        ) : (
-          <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: stable ordered blocks
-            key={i}
-            className="flex gap-2"
-            style={{ marginLeft: `${indentRem(b.level)}rem` }}
-          >
-            <span className="shrink-0 select-none font-medium text-muted-foreground tabular-nums">
-              {b.marker}
-            </span>
-            <div className="flex-1">{renderInline(b.text)}</div>
-          </div>
-        ),
-      )}
-    </article>
-  );
-}
-
-// Indentation per nesting level. Level 0 (chapeau / plain prose) is flush; each
-// deeper enumerated level steps in. Capped so deep nesting can't run off-pane.
-function indentRem(level: number): number {
-  return Math.min(level, 4) * 1.4;
-}
-
-function ActionToolbar({ node }: { node: NodeDetail | null }) {
-  const enabled = !!node?.has_content;
-  // Track which button just fired so we can swap its icon to a check for
-  // ~1.5s — gives the user a confidence ping without needing a toast.
-  const [copied, setCopied] = useState<"share" | "cite" | null>(null);
-  const ping = (which: "share" | "cite") => {
-    setCopied(which);
-    window.setTimeout(() => setCopied((c) => (c === which ? null : c)), 1500);
-  };
-
-  const onShare = async () => {
-    if (!node) return;
-    const bare =
-      (node.path && node.path.trim()) ||
-      node.citation.trim().split(/\s+/).pop() ||
-      "";
-    const url = `${window.location.origin}/browse#/${node.source_slug}/${bare}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      ping("share");
-    } catch {
-      window.prompt("Copy this link:", url);
-    }
-  };
-
-  const onCite = async () => {
-    if (!node) return;
-    try {
-      await navigator.clipboard.writeText(node.citation);
-      ping("cite");
-    } catch {
-      window.prompt("Copy this citation:", node.citation);
-    }
-  };
-
-  return (
-    <div className="mt-3 flex items-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={!enabled}
-        onClick={onShare}
-      >
-        {copied === "share" ? (
-          <CheckIcon className="size-3.5" />
-        ) : (
-          <Share2 className="size-3.5" />
-        )}
-        {copied === "share" ? "Copied" : "Share"}
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled
-        title="Print/Download coming soon"
-      >
-        <Download className="size-3.5" /> Download
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled
-        title="Print/Download coming soon"
-      >
-        <Printer className="size-3.5" /> Print
-      </Button>
-      {enabled && node ? (
-        <Button asChild variant="outline" size="sm">
-          <Link
-            href={`/browse/compare?node=${node.id}&path=${encodeURIComponent(
-              node.path,
-            )}`}
-            title="Compare this section across editions"
-          >
-            <GitCompareArrowsIcon className="size-3.5" /> Compare
-          </Link>
-        </Button>
-      ) : (
-        <Button variant="outline" size="sm" disabled>
-          <GitCompareArrowsIcon className="size-3.5" /> Compare
-        </Button>
-      )}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="ml-auto"
-        disabled={!enabled}
-        onClick={onCite}
-      >
-        {copied === "cite" ? (
-          <CheckIcon className="size-3.5" />
-        ) : (
-          <CircleEllipsisIcon className="size-3.5" />
-        )}
-        {copied === "cite" ? "Copied" : "Cite"}
-      </Button>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Search results pane
-// ---------------------------------------------------------------------------
-
-function SearchResultsPane({
-  query,
-  loading,
-  error,
-  data,
-  scope,
-  scopeSource,
-  onSetScope,
-  onPick,
-  onClose,
-}: {
-  query: string;
-  loading: boolean;
-  error: string | null;
-  data: BrowseSearchResponse | null;
-  scope: string | null;
-  scopeSource: BrowseSource | null;
-  onSetScope: (slug: string | null) => void;
-  onPick: (r: BrowseSearchResult) => void;
-  onClose: () => void;
-}) {
-  return (
-    <main className="min-w-0 flex-1 overflow-y-auto px-6 py-8 md:px-10 lg:px-16">
-      <div className="mx-auto max-w-3xl">
-        <div className="flex items-baseline justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-muted-foreground text-xs uppercase tracking-[0.18em]">
-              Search results
-            </h2>
-            <h1 className="mt-1 font-semibold text-2xl tracking-tight">
-              <span className="text-muted-foreground/70">for</span>{" "}
-              <span className="font-mono">&ldquo;{query}&rdquo;</span>
-            </h1>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <XIcon className="size-3.5" /> Close
-          </Button>
-        </div>
-
-        {/* Scope toggle */}
-        <div className="mt-4 flex flex-wrap items-center gap-1.5 text-sm">
-          <span className="text-muted-foreground">Scope:</span>
-          <ScopeButton
-            label="All sources"
-            active={scope == null}
-            onClick={() => onSetScope(null)}
-          />
-          {scopeSource && (
-            <ScopeButton
-              label={`Just ${scopeSource.name}`}
-              active={scope === scopeSource.slug}
-              onClick={() => onSetScope(scopeSource.slug)}
-            />
-          )}
-        </div>
-
-        <Separator className="my-6" />
-
-        {error ? (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive text-sm">
-            <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        ) : loading ? (
-          <LoadingBlock label="Searching the corpus…" />
-        ) : !data || data.results.length === 0 ? (
-          <div className="rounded-md border border-dashed bg-muted/30 px-4 py-10 text-center text-muted-foreground text-sm">
-            No matches for{" "}
-            <span className="font-mono">&ldquo;{query}&rdquo;</span>
-            {scope ? " in this source." : "."}
-          </div>
-        ) : (
-          <>
-            <p className="text-muted-foreground text-xs">
-              {data.count} {data.count === 1 ? "result" : "results"}
-              {scope ? " in this source" : " across the corpus"}.
-            </p>
-            <ul className="mt-3 divide-y border-y">
-              {data.results.map((r, i) => (
-                <SearchResultRow
-                  key={`${r.node_id}-${i}`}
-                  result={r}
-                  query={query}
-                  onPick={onPick}
-                />
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
-    </main>
-  );
-}
-
-// Sibling sections from the same chapter, anchored around the current node.
-// Hash links so the existing /browse#... resolver handles navigation.
-function RelatedRules({
-  node,
-  chapter,
-}: {
-  node: NodeDetail;
-  chapter: ChapterDetail | null;
-}) {
-  if (!chapter || chapter.children.length <= 1) return null;
-  const idx = chapter.children.findIndex((c) => c.id === node.id);
-  // Show up to 4 neighbors centered on the current section (capped by the
-  // ends of the chapter list). Falls back to the first few if the current
-  // node isn't in the children array (shouldn't happen, but be defensive).
-  const start = idx >= 0 ? Math.max(0, idx - 2) : 0;
-  const end = idx >= 0 ? Math.min(chapter.children.length, start + 5) : 5;
-  const neighbors = chapter.children
-    .slice(start, end)
-    .filter((c) => c.id !== node.id);
-  if (neighbors.length === 0) return null;
-
-  return (
-    <div>
-      <Separator />
-      <h3 className="mt-5 font-semibold text-foreground text-sm">
-        Related rules
-      </h3>
-      <ul className="mt-2 flex flex-col gap-0.5 text-sm">
-        {neighbors.map((c) => {
-          const bare = c.citation.trim().split(/\s+/).pop() || c.ordinal;
-          return (
-            <li key={c.id}>
-              <a
-                href={`#/${node.source_slug}/${bare}`}
-                className="block rounded-md px-2 py-1 hover:bg-muted/50"
-              >
-                <div className="font-mono font-medium text-xs text-foreground">
-                  {bare}
-                </div>
-                {c.heading && (
-                  <div className="truncate text-muted-foreground text-xs">
-                    {c.heading}
-                  </div>
-                )}
-              </a>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-function ScopeButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        active
-          ? "rounded-full bg-primary px-3 py-1 font-medium text-primary-foreground text-xs"
-          : "rounded-full border border-input px-3 py-1 text-xs hover:bg-accent"
-      }
-    >
-      {label}
-    </button>
-  );
-}
-
-// Split the snippet on the query terms and wrap matches in <mark>. The snippet
-// is rendered as plain JSX children, so React auto-escapes every fragment —
-// no raw HTML ever reaches the DOM (the previous dangerouslySetInnerHTML sink
-// is gone). Highlighting is purely cosmetic and term-driven on the client.
-function highlightSnippet(snippet: string, query: string): ReactNode {
-  const terms = [
-    ...new Set(
-      query
-        .toLowerCase()
-        .split(/\s+/)
-        .map((t) => t.trim())
-        .filter((t) => t.length >= 2),
-    ),
-  ].sort((a, b) => b.length - a.length);
-  if (terms.length === 0) return snippet;
-
-  const re = new RegExp(
-    `(${terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
-    "gi",
-  );
-  const parts = snippet.split(re);
-  // String.split with a capturing group interleaves matches at odd indices.
-  return parts.map((part, i) =>
-    i % 2 === 1 ? (
-      <mark
-        key={i}
-        className="rounded-sm bg-primary/15 px-0.5 font-medium text-foreground"
-      >
-        {part}
-      </mark>
-    ) : (
-      part
-    ),
-  );
-}
-
-function SearchResultRow({
-  result,
-  query,
-  onPick,
-}: {
-  result: BrowseSearchResult;
-  query: string;
-  onPick: (r: BrowseSearchResult) => void;
-}) {
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={() => onPick(result)}
-        className="group flex w-full flex-col gap-1 py-3 text-left transition-colors hover:bg-muted/40"
-      >
-        <div className="flex items-baseline gap-3">
-          <span className="font-mono font-semibold text-foreground/90 text-sm tabular-nums group-hover:text-primary">
-            {result.citation.trim().split(/\s+/).pop()}
-          </span>
-          <span className="flex-1 text-foreground/90 text-sm">
-            {result.heading || "(no heading)"}
-          </span>
-          {result.exact && (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary text-xs">
-              Exact
-            </span>
-          )}
-        </div>
-        <div className="text-muted-foreground text-xs">
-          {result.source}
-          {result.chapter ? (
-            <>
-              {" "}· {result.chapter.ordinal}
-              {result.chapter.heading
-                ? ` — ${result.chapter.heading}`
-                : ""}
-            </>
-          ) : null}
-        </div>
-        {result.snippet && (
-          <div className="mt-1 text-foreground/75 text-sm leading-relaxed">
-            {highlightSnippet(result.snippet, query)}
-          </div>
-        )}
-      </button>
-    </li>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Right sidecar
-// ---------------------------------------------------------------------------
-
-function Sidecar({
-  source,
-  chapter,
-  node,
-}: {
-  source: BrowseSource | null;
-  chapter: ChapterDetail | null;
-  node: NodeDetail | null;
-}) {
-  // If nothing is selected, just show a quiet hint so the column doesn't go
-  // entirely blank.
-  if (!source) {
-    return (
-      <aside className="hidden border-l bg-muted/20 px-6 py-8 xl:block">
-        <p className="text-muted-foreground text-xs">
-          Section metadata will appear here once you open a section.
-        </p>
-      </aside>
-    );
-  }
-
-  return (
-    <aside className="hidden border-l bg-muted/20 px-6 py-8 xl:block">
-      <div className="sticky top-0 space-y-5">
-        {node ? (
-          <>
-            <div>
-              <h3 className="font-semibold text-foreground text-sm">
-                Citation
-              </h3>
-              <div className="mt-2 rounded-lg border bg-background px-3 py-2 font-mono text-xs">
-                {node.citation}
-              </div>
-            </div>
-
-            {node.official_url && (
-              <div>
-                <h3 className="font-semibold text-foreground text-sm">
-                  Official source
-                </h3>
-                <a
-                  className="mt-1 inline-flex items-center gap-1.5 text-primary text-sm underline-offset-2 hover:underline"
-                  href={node.official_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  legis.iowa.gov <ExternalLinkIcon className="size-3" />
-                </a>
-              </div>
-            )}
-
-            {node.cross_refs.length > 0 && (
-              <div>
-                <Separator />
-                <h3 className="mt-5 font-semibold text-foreground text-sm">
-                  In-text citations
-                </h3>
-                <ul className="mt-2 flex flex-col gap-1.5 text-sm">
-                  {node.cross_refs.slice(0, 8).map((r, i) => (
-                    <li key={`${r.node_id}-${i}`}>
-                      <a
-                        href={`#/${node.source_slug}/${r.path}`}
-                        className="block rounded-md px-2 py-1 hover:bg-muted/50"
-                      >
-                        <div className="font-mono text-muted-foreground text-xs">
-                          {r.text}
-                        </div>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {node.history.length > 0 && (
-              <div>
-                <Separator />
-                <h3 className="mt-5 font-semibold text-foreground text-sm">
-                  History
-                </h3>
-                <ul className="mt-2 flex flex-col gap-1 text-muted-foreground text-xs">
-                  {node.history.slice(0, 6).map((h, i) => (
-                    <li key={i}>{h}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <RelatedRules node={node} chapter={chapter} />
-          </>
-        ) : chapter ? (
-          <>
-            <div>
-              <h3 className="font-semibold text-foreground text-sm">
-                Chapter
-              </h3>
-              <div className="mt-2 rounded-lg border bg-background px-3 py-2 font-mono text-xs">
-                {chapter.citation}
-              </div>
-            </div>
-            {chapter.official_url && (
-              <div>
-                <h3 className="font-semibold text-foreground text-sm">
-                  Official source
-                </h3>
-                <a
-                  className="mt-1 inline-flex items-center gap-1.5 text-primary text-sm underline-offset-2 hover:underline"
-                  href={chapter.official_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open <ExternalLinkIcon className="size-3" />
-                </a>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div>
-              <h3 className="font-semibold text-foreground text-sm">Source</h3>
-              <p className="mt-2 text-muted-foreground text-sm">
-                {source.name}
-              </p>
-              <p className="mt-1 font-mono text-muted-foreground text-xs">
-                {source.abbreviation}
-              </p>
-            </div>
-          </>
-        )}
-      </div>
-    </aside>
   );
 }
