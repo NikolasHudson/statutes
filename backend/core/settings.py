@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "apps.citations",
     "apps.ingestion_iowa_code",
     "apps.ingestion_iowa_rules",
+    "apps.ingestion_caselaw",
     "apps.mcp_server",
 ]
 

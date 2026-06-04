@@ -25,6 +25,7 @@ from django.db import transaction
 from apps.corpus.models import (
     CrossReference,
     CrossReferenceKind,
+    CrossReferenceSource,
     NodeVersion,
     ReviewStatus,
     Source,
@@ -82,7 +83,8 @@ class Command(BaseCommand):
             if not target_ids:
                 if not dry_run:
                     CrossReference.objects.filter(
-                        from_version=version
+                        from_version=version,
+                        source=CrossReferenceSource.STATUTE,
                     ).delete()
                 continue
 
@@ -103,13 +105,17 @@ class Command(BaseCommand):
                 continue
 
             with transaction.atomic():
-                CrossReference.objects.filter(from_version=version).delete()
+                CrossReference.objects.filter(
+                    from_version=version,
+                    source=CrossReferenceSource.STATUTE,
+                ).delete()
                 CrossReference.objects.bulk_create(
                     [
                         CrossReference(
                             from_version=version,
                             to_node_id=target_id,
                             kind=CrossReferenceKind.INTERNAL,
+                            source=CrossReferenceSource.STATUTE,
                         )
                         for target_id in target_ids
                     ]

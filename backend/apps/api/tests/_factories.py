@@ -16,6 +16,74 @@ from apps.corpus.models import (
 )
 
 
+def make_iowa_caselaw_source() -> tuple[Source, NodeType, NodeType]:
+    """The iowa-caselaw Source plus its decision/opinion NodeTypes, matching the
+    0011 seed. Idempotent so multiple cases can share one source in a test."""
+    j, _ = Jurisdiction.objects.get_or_create(
+        slug="iowa", defaults={"name": "Iowa", "abbreviation": "IA"}
+    )
+    src, _ = Source.objects.get_or_create(
+        jurisdiction=j,
+        slug="iowa-caselaw",
+        defaults={
+            "name": "Iowa Caselaw",
+            "citation_abbreviation": "Iowa",
+            "official_url_template": (
+                "https://www.courtlistener.com/opinion/{cl_cluster_id}/{slug}/"
+            ),
+        },
+    )
+    decision_t, _ = NodeType.objects.get_or_create(
+        source=src, key="decision",
+        defaults={"label_singular": "Decision", "label_plural": "Decisions",
+                  "level": 1},
+    )
+    opinion_t, _ = NodeType.objects.get_or_create(
+        source=src, key="opinion",
+        defaults={"label_singular": "Opinion", "label_plural": "Opinions",
+                  "level": 2},
+    )
+    return src, decision_t, opinion_t
+
+
+def make_caselaw_case(
+    *,
+    cl_cluster_id: int,
+    cl_opinion_id: int,
+    court_id: str = "iowa",
+    precedential_status: str = "Published",
+    body: str = "The opinion body.",
+    with_version: bool = True,
+) -> tuple[Node, Node, NodeVersion | None]:
+    """One decision Node + one opinion child Node (+ its open APPROVED version),
+    mirroring what ``ingest_iowa_caselaw`` writes. Returns
+    (decision_node, opinion_node, opinion_version)."""
+    src, decision_t, opinion_t = make_iowa_caselaw_source()
+    decision = Node.objects.create(
+        source=src, node_type=decision_t, ordinal=str(cl_cluster_id),
+        path=f"cl-cluster-{cl_cluster_id}", heading="State v. Example",
+        source_metadata={
+            "cl_cluster_id": cl_cluster_id,
+            "court_id": court_id,
+            "precedential_status": precedential_status,
+        },
+    )
+    opinion = Node.objects.create(
+        source=src, node_type=opinion_t, parent=decision, ordinal="020",
+        path=f"cl-cluster-{cl_cluster_id}/op-{cl_opinion_id}",
+        heading="Lead Opinion",
+        source_metadata={"cl_opinion_id": cl_opinion_id},
+    )
+    version = None
+    if with_version:
+        version = NodeVersion.objects.create(
+            node=opinion, body_text=body, effective_from=dt.date(2020, 1, 1),
+            content_hash=hashlib.sha256(body.encode()).hexdigest(),
+            review_status=ReviewStatus.APPROVED,
+        )
+    return decision, opinion, version
+
+
 def make_user(email: str = "u@example.com", *, tier: str = Tier.SOLO) -> User:
     return User.objects.create_user(email=email, password="x", tier=tier)
 
