@@ -94,6 +94,54 @@ export type ResolveResult =
       candidates: { node_id: number; path: string; heading: string }[];
     };
 
+export type Edition = {
+  year: number;
+  label: string;
+  as_of_date: string;
+};
+
+export type EditionsResponse = {
+  source: { slug: string; name: string };
+  editions: Edition[];
+  default: { from_year: number; to_year: number } | null;
+};
+
+export type CompareRef = {
+  node_id: number;
+  path: string;
+  citation: string;
+  heading: string;
+  chapter: string;
+};
+
+export type CompareSummary = {
+  source: string;
+  from_year: number;
+  to_year: number;
+  from_as_of: string;
+  to_as_of: string;
+  counts: { added: number; amended: number; repealed: number; unchanged: number };
+  covered_chapters: number;
+  added: CompareRef[];
+  amended: CompareRef[];
+  repealed: CompareRef[];
+  error?: string;
+};
+
+export type DiffSegment = { op: "equal" | "insert" | "delete"; text: string };
+
+export type SectionDiff = {
+  node_id: number;
+  path: string;
+  citation: string;
+  heading: string;
+  from: { year: number; as_of: string; present: boolean; body_text: string };
+  to: { year: number; as_of: string; present: boolean; body_text: string };
+  changed: boolean;
+  diff: DiffSegment[];
+  error?: string;
+};
+
 export class BrowseError extends Error {
   constructor(
     public status: number,
@@ -141,6 +189,30 @@ export const browseSearch = (q: string, source?: string | null) => {
     `/api/browse/search?${params.toString()}`,
   );
 };
+
+// Editions registered for a source, newest first, plus a default compare pair.
+export const browseEditions = (source: string) =>
+  json<EditionsResponse>(
+    `/api/browse/editions?source=${encodeURIComponent(source)}`,
+  );
+
+// Summary of what changed between two editions (no body text — buckets only).
+export const browseCompare = (source: string, fromYear: number, toYear: number) =>
+  json<CompareSummary>(
+    `/api/browse/compare?source=${encodeURIComponent(source)}` +
+      `&from_year=${fromYear}&to_year=${toYear}`,
+  );
+
+// Both bodies + a word-level diff for one section.
+export const browseCompareSection = (
+  nodeId: number,
+  fromYear: number,
+  toYear: number,
+) =>
+  json<SectionDiff>(
+    `/api/browse/compare/section?node_id=${nodeId}` +
+      `&from_year=${fromYear}&to_year=${toYear}`,
+  );
 
 export const browseResolve = (source: string, cite: string) =>
   json<ResolveResult>(

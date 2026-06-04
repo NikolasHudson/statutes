@@ -20,7 +20,8 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from ninja import Router
 
-from apps.corpus.models import Node, Source
+from apps.corpus.models import Edition, Node, Source
+from apps.corpus.services.editions import compare_editions, section_diff
 from apps.corpus.services.lookups import (
     citation_links,
     current_version,
@@ -236,6 +237,78 @@ def node_detail(request, node_id: int):
         "has_content": version is not None,
         "cross_refs": cross_refs,
     })
+
+
+@browse_router.get("/editions", auth=None)
+def list_editions(request, source: str):
+    """Editions registered for a source, newest first, for the diff picker."""
+    src = get_object_or_404(Source, slug=source)
+    editions = list(Edition.objects.filter(source=src).order_by("-as_of_date"))
+    rows = [
+        {"year": e.year, "label": e.label, "as_of_date": e.as_of_date}
+        for e in editions
+    ]
+    # Sensible default comparison: the two most recent editions (older→newer).
+    default = None
+    if len(editions) >= 2:
+        default = {"from_year": editions[1].year, "to_year": editions[0].year}
+    return _cached_json(request, {
+        "source": {"slug": src.slug, "name": src.name},
+        "editions": rows,
+        "default": default,
+    })
+
+
+@browse_router.get("/compare", auth=None)
+def compare(request, source: str, from_year: int, to_year: int):
+    """Summary of what changed between two editions: added / amended / repealed.
+
+    Bodies are not included — the summary is row-identity only (cheap even for
+    the whole corpus). Open one section's diff via ``/compare/section``.
+    """
+    src = get_object_or_404(Source, slug=source)
+    try:
+        summary = compare_editions(src, from_year, to_year)
+    except Edition.DoesNotExist:
+        return _cached_json(request, {"error": "unknown edition", "source": source})
+
+    def serialize(refs):
+        return [
+            {
+                "node_id": r.node_id,
+                "path": r.path,
+                "citation": r.citation,
+                "heading": r.heading,
+                "chapter": r.chapter,
+            }
+            for r in refs
+        ]
+
+    return _cached_json(request, {
+        "source": src.slug,
+        "from_year": summary.from_year,
+        "to_year": summary.to_year,
+        "from_as_of": summary.from_as_of,
+        "to_as_of": summary.to_as_of,
+        "counts": summary.counts,
+        "covered_chapters": summary.covered_chapters,
+        "added": serialize(summary.added),
+        "amended": serialize(summary.amended),
+        "repealed": serialize(summary.repealed),
+    })
+
+
+@browse_router.get("/compare/section", auth=None)
+def compare_section(request, node_id: int, from_year: int, to_year: int):
+    """From/to body text and a word-level diff for a single section."""
+    node = get_object_or_404(
+        Node.objects.select_related("source", "node_type"), pk=node_id
+    )
+    try:
+        payload = section_diff(node, from_year, to_year)
+    except Edition.DoesNotExist:
+        return _cached_json(request, {"error": "unknown edition"})
+    return _cached_json(request, payload)
 
 
 @browse_router.get("/resolve", auth=None)

@@ -15,6 +15,7 @@ import {
   CircleEllipsisIcon,
   Download,
   ExternalLinkIcon,
+  GitCompareArrowsIcon,
   Loader2Icon,
   Printer,
   SearchIcon,
@@ -566,6 +567,13 @@ function BrowseHeader({
           </button>
         )}
       </form>
+
+      <Button asChild variant="outline" size="sm" className="shrink-0">
+        <Link href="/browse/compare">
+          <GitCompareArrowsIcon className="size-4" />
+          <span className="hidden sm:inline">Compare editions</span>
+        </Link>
+      </Button>
     </header>
   );
 }
@@ -1020,7 +1028,43 @@ function NodeView({ node }: { node: NodeDetail }) {
   );
 }
 
-// Render the body text with paragraph breaks. Highlights any literal phrases
+// Iowa Code sections are an enumerated hierarchy encoded in the body text:
+// each item is on its own line, prefixed with nbsp padding and a marker —
+// "1." subsection, "a." paragraph, "(1)" subparagraph, "(a)" sub-subparagraph.
+// We infer the depth from the marker style (the Code's fixed nesting order)
+// and render an indented outline with hanging markers instead of one blob.
+type Block = { level: number; marker: string | null; text: string };
+
+const MARKER_RULES: { re: RegExp; level: number }[] = [
+  { re: /^(\d+)\.(?=[\s ])/, level: 1 }, // 1. 2. — subsection
+  { re: /^([a-z]{1,2})\.(?=[\s ])/, level: 2 }, // a. b. — paragraph
+  { re: /^\((\d+)\)(?=[\s ]|$)/, level: 3 }, // (1) — subparagraph
+  { re: /^\(([a-z]{1,3})\)(?=[\s ]|$)/, level: 4 }, // (a) (iv) — sub-sub
+];
+
+function parseBlocks(text: string): Block[] {
+  const blocks: Block[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.replace(/^[\s ]+/, "").replace(/[\s ]+$/, "");
+    if (!line) continue;
+    let matched: Block | null = null;
+    for (const { re, level } of MARKER_RULES) {
+      const m = re.exec(line);
+      if (m) {
+        matched = {
+          level,
+          marker: m[0],
+          text: line.slice(m[0].length).replace(/^[\s ]+/, ""),
+        };
+        break;
+      }
+    }
+    blocks.push(matched ?? { level: 0, marker: null, text: line });
+  }
+  return blocks;
+}
+
+// Render the body text as a structured outline. Highlights any literal phrases
 // listed in cross_refs so the in-text citations are visually distinct (we
 // don't make them links yet — that's a Phase 2/3 enhancement).
 function BodyText({
@@ -1030,8 +1074,8 @@ function BodyText({
   text: string;
   crossRefs: NodeDetail["cross_refs"];
 }) {
-  // Split into paragraphs on blank lines (the backend preserves them).
-  const paragraphs = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const blocks = parseBlocks(text);
+  const hasStructure = blocks.some((b) => b.marker !== null);
 
   // Build a single regex of all cross-ref literals (longest first so we don't
   // match a shorter substring inside a longer one).
@@ -1072,13 +1116,52 @@ function BodyText({
     return out;
   };
 
+  // No enumerated markers: fall back to plain paragraphs (split on blank lines).
+  if (!hasStructure) {
+    const paragraphs = text
+      .split(/\n{2,}/)
+      .map((p) => p.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    return (
+      <article className="space-y-5 text-[15.5px] leading-relaxed">
+        {paragraphs.map((p, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: static paragraph list
+          <p key={i}>{renderInline(p)}</p>
+        ))}
+      </article>
+    );
+  }
+
   return (
-    <article className="space-y-5 text-[15.5px] leading-relaxed">
-      {paragraphs.map((p, i) => (
-        <p key={i}>{renderInline(p)}</p>
-      ))}
+    <article className="space-y-3 text-[15.5px] leading-relaxed">
+      {blocks.map((b, i) =>
+        b.marker === null ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: stable ordered blocks
+          <p key={i} style={{ marginLeft: `${indentRem(b.level)}rem` }}>
+            {renderInline(b.text)}
+          </p>
+        ) : (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: stable ordered blocks
+            key={i}
+            className="flex gap-2"
+            style={{ marginLeft: `${indentRem(b.level)}rem` }}
+          >
+            <span className="shrink-0 select-none font-medium text-muted-foreground tabular-nums">
+              {b.marker}
+            </span>
+            <div className="flex-1">{renderInline(b.text)}</div>
+          </div>
+        ),
+      )}
     </article>
   );
+}
+
+// Indentation per nesting level. Level 0 (chapeau / plain prose) is flush; each
+// deeper enumerated level steps in. Capped so deep nesting can't run off-pane.
+function indentRem(level: number): number {
+  return Math.min(level, 4) * 1.4;
 }
 
 function ActionToolbar({ node }: { node: NodeDetail | null }) {
@@ -1147,6 +1230,22 @@ function ActionToolbar({ node }: { node: NodeDetail | null }) {
       >
         <Printer className="size-3.5" /> Print
       </Button>
+      {enabled && node ? (
+        <Button asChild variant="outline" size="sm">
+          <Link
+            href={`/browse/compare?node=${node.id}&path=${encodeURIComponent(
+              node.path,
+            )}`}
+            title="Compare this section across editions"
+          >
+            <GitCompareArrowsIcon className="size-3.5" /> Compare
+          </Link>
+        </Button>
+      ) : (
+        <Button variant="outline" size="sm" disabled>
+          <GitCompareArrowsIcon className="size-3.5" /> Compare
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="sm"

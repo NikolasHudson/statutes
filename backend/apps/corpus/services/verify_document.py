@@ -50,6 +50,7 @@ from apps.corpus.services.lookups import (
     _match_quote_against_body,
     validate_citations,
 )
+from apps.corpus.services.provision_slice import slice_provision
 from apps.corpus.services.semantic_support import (
     NO_CLAIM,
     SemanticChecker,
@@ -392,15 +393,25 @@ def _build_findings(
         if best.status == VALIDATION_VALID and best.node is not None:
             source_label = best.node.source.name
             target_path = best.node.path
-            # Section-level grounding only (version present). Chapter-only
-            # citations have no body of their own; matching a quote against
-            # just a chapter heading would false-flag a quote pulled from one
-            # of its sections, so they get no quote checks.
+            # Chapter-only citations have no body of their own; matching a
+            # quote against just a chapter heading would false-flag a quote
+            # pulled from one of its sections, so they get no quote checks.
             if best.version is not None and best.version.body_text:
+                body = best.version.body_text
+                # Narrow grounding to the cited subsection when the citation
+                # carries subdivisions ("§ 714H.5(4)" → just subsection 4),
+                # so a claim about (4) can't be "supported" by text from (2).
+                # Falls back to the full section body when the slice is
+                # ambiguous, so this never grounds against less than today.
+                subs = getattr(cit, "subdivisions", ()) if cit is not None else ()
+                if subs:
+                    sliced = slice_provision(body, subs)
+                    if sliced:
+                        body = sliced
                 parts = []
                 if best.node.heading:
                     parts.append(best.node.heading)
-                parts.append(best.version.body_text)
+                parts.append(body)
                 grounding = "\n".join(parts)
 
         findings.append(
