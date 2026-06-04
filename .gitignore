@@ -35,6 +35,9 @@ media/
 # (use object storage / a release asset to share these).
 *.dump
 
+# Local ingestion data — regenerable bulk caches / raw artifacts (multi-GB)
+backend/data/raw/
+
 # Local-only: prod DB connection string for cloning (never commit)
 .prod_db_url
 
