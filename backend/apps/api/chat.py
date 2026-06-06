@@ -30,8 +30,12 @@ from ninja.errors import HttpError
 from apps.api.accounts import _require_login
 from apps.api.session_auth import session_auth
 from apps.api.trace_capture import record_chat_trace
-from apps.corpus.models import NodeVersion, Source
-from apps.corpus.services.lookups import validate_citations, verify_quotes
+from apps.corpus.models import Node, NodeVersion, ReviewStatus, Source
+from apps.corpus.services.lookups import (
+    current_version,
+    validate_citations,
+    verify_quotes,
+)
 from apps.corpus.services.rerank import default_reranker
 from apps.mcp_server.tools import (
     get_cross_references_tool,
@@ -173,6 +177,11 @@ class ChatRequest(Schema):
     # sources. Forced into every search_statutes call; the model cannot
     # override it.
     source_slug: str | None = None
+    # Optional: pin the conversation to a single document — a statute section /
+    # court rule node, or a caselaw decision node. When set, that document's
+    # current text is injected as authoritative context so the model answers
+    # about it directly, while still free to use the tools for cross-references.
+    node_id: int | None = None
 
 
 class ToolCallTrace(Schema):
@@ -600,6 +609,101 @@ def _scope_preamble(source_slug: str | None) -> str:
     )
 
 
+# Cap on how much of a pinned document we inject verbatim. Statute sections sit
+# comfortably under this; long multi-opinion decisions get truncated and the
+# model is told to fall back to the search tools for the remainder.
+DOC_CONTEXT_MAX_CHARS = 24000
+
+
+def _decision_text(node: Node) -> tuple[str, str]:
+    """``(header, body)`` for a caselaw decision node: a one-line caption plus
+    each child opinion's currently effective, approved text, concatenated.
+    Mirrors how ``apps/api/browse.py`` assembles the case detail."""
+    md = node.source_metadata
+    bits = [f"Case: {node.heading}"]
+    for key in ("court_name", "date_filed"):
+        if md.get(key):
+            bits.append(md[key])
+    cites = md.get("citations") or []
+    if cites:
+        bits.append("; ".join(cites))
+    header = " · ".join(bits)
+
+    opinions = list(
+        Node.objects.filter(parent=node, node_type__key="opinion").order_by(
+            "ordinal", "path"
+        )
+    )
+    versions = {
+        v.node_id: v
+        for v in NodeVersion.objects.filter(
+            node__in=opinions,
+            effective_to__isnull=True,
+            review_status=ReviewStatus.APPROVED,
+        )
+    }
+    parts: list[str] = []
+    for op in opinions:
+        ver = versions.get(op.id)
+        if ver and ver.body_text.strip():
+            label = op.heading or op.source_metadata.get("type") or "Opinion"
+            parts.append(f"--- {label} ---\n{ver.body_text.strip()}")
+    if not parts:
+        # No separate opinions (or none approved) — fall back to the decision's
+        # own head-matter version, which sometimes carries the combined text.
+        head = current_version(node)
+        if head and head.body_text.strip():
+            parts.append(head.body_text.strip())
+    return header, "\n\n".join(parts)
+
+
+def _provision_text(node: Node) -> tuple[str, str]:
+    """``(header, body)`` for a statute section or court-rule node."""
+    citation = f"{node.source.citation_abbreviation} {node.path}".strip()
+    header = f"{citation} — {node.heading}" if node.heading else citation
+    version = current_version(node)
+    return header, (version.body_text if version else "")
+
+
+def _pinned_document(node_id: int | None) -> str | None:
+    """Assemble the verbatim text of a single pinned document for injection as
+    a system message. Returns the message content, or None when there is no
+    ``node_id`` or the node has no current approved content to show."""
+    if not node_id:
+        return None
+    node = (
+        Node.objects.select_related("source", "node_type", "parent")
+        .filter(pk=node_id)
+        .first()
+    )
+    if node is None:
+        return None
+
+    if node.node_type.key == "decision":
+        header, body = _decision_text(node)
+    else:
+        header, body = _provision_text(node)
+    if not body.strip():
+        return None
+
+    if len(body) > DOC_CONTEXT_MAX_CHARS:
+        body = (
+            body[:DOC_CONTEXT_MAX_CHARS].rstrip()
+            + "\n\n[document truncated — use the search tools for the remainder]"
+        )
+
+    return (
+        "PINNED DOCUMENT — the user is reading this document, and their "
+        "questions are about it unless they clearly say otherwise. Treat the "
+        "text below as authoritative, already-retrieved context: answer "
+        "directly from it without searching for it again. You may still use the "
+        "tools to pull cross-referenced authorities, definitions, amendment "
+        "history, or anything this document cites. When you rely on it, quote it "
+        "exactly and cite it.\n\n"
+        f"{header}\n\n{body}"
+    )
+
+
 def _bump(cache_key: str, timeout: int) -> int:
     """Atomically increment a quota counter, initialising it to 1 on first
     use. Mirrors apps/api/auth.py's rate-limit accounting so both quota
@@ -922,6 +1026,7 @@ def run_chat_turn(
     model: str,
     api_key: str,
     trace: list[ToolCallTrace] | None = None,
+    node_id: int | None = None,
 ) -> tuple[str, str]:
     """Drive the OpenAI tool loop against the corpus tools.
 
@@ -955,6 +1060,9 @@ def run_chat_turn(
     convo: list[dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT + _scope_preamble(source_slug)}
     ]
+    pinned = _pinned_document(node_id)
+    if pinned:
+        convo.append({"role": "system", "content": pinned})
     for m in messages:
         role = m.get("role")
         if role not in {"user", "assistant", "system"}:
@@ -1077,6 +1185,7 @@ def run_chat_turn_stream(
     model: str,
     api_key: str,
     trace: list[ToolCallTrace] | None = None,
+    node_id: int | None = None,
 ):
     """Generator variant of :func:`run_chat_turn`.
 
@@ -1113,6 +1222,9 @@ def run_chat_turn_stream(
     convo: list[dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT + _scope_preamble(source_slug)}
     ]
+    pinned = _pinned_document(node_id)
+    if pinned:
+        convo.append({"role": "system", "content": pinned})
     for m in messages:
         role = m.get("role")
         if role not in {"user", "assistant", "system"}:
@@ -1296,6 +1408,7 @@ def _stream_ndjson_events(
             model=payload.model,
             api_key=api_key,
             trace=trace,
+            node_id=payload.node_id,
         )
         for event in gen:
             kind = event[0]
@@ -1422,6 +1535,7 @@ def chat(request, payload: ChatRequest):
             model=payload.model,
             api_key=api_key,
             trace=trace,
+            node_id=payload.node_id,
         )
     except ChatTurnError as exc:
         # A failed turn (and what it had retrieved before dying) is often
