@@ -12,6 +12,9 @@ from .managers import UserManager
 # part of the accounts app.
 from .audit import AuditEvent  # noqa: E402,F401
 
+# Likewise the per-user profile / preferences model lives in profile.py.
+from .profile import UserProfile  # noqa: E402,F401
+
 
 class Tier(models.TextChoices):
     FREE = "free", "Free"
@@ -22,6 +25,11 @@ class Tier(models.TextChoices):
 
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
+    # Structured name is the source of truth; ``full_name`` is derived from it
+    # (kept as a stored column so existing queries / admin / audit are unchanged).
+    # Use ``set_name()`` to write any of the three and keep them consistent.
+    first_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100, blank=True)
     full_name = models.CharField(max_length=200, blank=True)
     tier = models.CharField(max_length=16, choices=Tier.choices, default=Tier.FREE)
 
@@ -44,7 +52,30 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.full_name or self.email
 
     def get_short_name(self):
+        if self.first_name:
+            return self.first_name
         return self.full_name.split()[0] if self.full_name else self.email
+
+    def set_name(self, *, first=None, last=None, full=None):
+        """Keep ``first_name`` / ``last_name`` / ``full_name`` consistent.
+
+        Pass structured ``first`` / ``last`` (from the settings form) and
+        ``full_name`` is recomputed; or pass a single ``full`` (legacy callers)
+        and it is split best-effort into first/last. Does not save — returns the
+        list of fields it touched so the caller can pass ``update_fields``.
+        """
+        if first is not None or last is not None:
+            if first is not None:
+                self.first_name = first.strip()
+            if last is not None:
+                self.last_name = last.strip()
+            self.full_name = f"{self.first_name} {self.last_name}".strip()
+        elif full is not None:
+            self.full_name = full.strip()
+            parts = self.full_name.split()
+            self.first_name = parts[0] if parts else ""
+            self.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+        return ["first_name", "last_name", "full_name"]
 
 
 def generate_key():

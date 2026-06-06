@@ -38,12 +38,19 @@ from ninja import Router, Schema
 from ninja.errors import HttpError
 
 from apps.accounts.audit import AuditEvent, client_ip, record_event
-from apps.accounts.models import APIKey, User, generate_key
+from apps.accounts.models import APIKey, User, UserProfile, generate_key
+from apps.accounts.profile import CitationStyle, Role, SearchScope, Theme
 from apps.api.session_auth import csrf_protect, session_auth
 
 
 auth_router = Router()
 account_router = Router()
+
+
+# The currently published Terms of Service version. The server is the source of
+# truth: onboarding stamps THIS value, regardless of what a (possibly stale)
+# client sends. Bump it when the ToS text changes to force re-acceptance.
+CURRENT_TOS_VERSION = "v2.4"
 
 
 # ---------------------------------------------------------------------------
@@ -77,8 +84,13 @@ class UserOut(Schema):
     id: int
     email: str
     full_name: str
+    first_name: str
+    last_name: str
     tier: str
     date_joined: dt.datetime
+    # Lets the SPA decide on first load whether to route into the onboarding
+    # wizard — without a second round-trip to fetch the full profile.
+    onboarding_completed: bool
 
 
 class CreateKeyRequest(Schema):
@@ -107,9 +119,87 @@ class CreateKeyResponse(Schema):
     created_at: dt.datetime
 
 
+class SettingsOut(Schema):
+    """The full /api/account/settings bundle: structured name (from User),
+    contact/professional profile, app preferences, and onboarding state."""
+
+    # identity — echoed from User; editable here so the wizard saves in one call
+    first_name: str
+    last_name: str
+    email: str  # read-only here; the login email changes via PATCH /auth/me
+    # contact / PII
+    phone: str
+    address_line1: str
+    address_line2: str
+    city: str
+    region: str
+    postal_code: str
+    country: str
+    # professional
+    organization: str
+    role: str
+    bar_number: str
+    primary_jurisdiction: str
+    timezone: str
+    # preferences
+    theme: str
+    default_search_scope: str
+    citation_style: str
+    verify_citations: bool
+    weekly_digest: bool
+    product_news: bool
+    # onboarding / legal — read-only here; written via /onboarding/complete
+    onboarding_completed: bool
+    tos_version: str
+    tos_accepted_at: dt.datetime | None
+    current_tos_version: str
+
+
+class UpdateSettingsRequest(Schema):
+    """Every field optional — the client sends only what it wants to change
+    (``exclude_unset`` distinguishes "omitted" from "set to empty/false")."""
+
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    region: str | None = None
+    postal_code: str | None = None
+    country: str | None = None
+    organization: str | None = None
+    role: str | None = None
+    bar_number: str | None = None
+    primary_jurisdiction: str | None = None
+    timezone: str | None = None
+    theme: str | None = None
+    default_search_scope: str | None = None
+    citation_style: str | None = None
+    verify_citations: bool | None = None
+    weekly_digest: bool | None = None
+    product_news: bool | None = None
+
+
+class CompleteOnboardingRequest(Schema):
+    # Optional: if present it must match the published version (a stale client
+    # accepting old terms is rejected). The server always stamps its own
+    # CURRENT_TOS_VERSION regardless.
+    tos_version: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _get_profile(user: User) -> UserProfile:
+    """The user's profile row. A post_save signal creates one for every new
+    user and migration 0004 backfills pre-existing accounts, so it should
+    always exist — get_or_create is the defensive fallback (e.g. a user made in
+    a shell before the signal was wired)."""
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    return profile
 
 
 def _user_out(user: User) -> UserOut:
@@ -117,9 +207,67 @@ def _user_out(user: User) -> UserOut:
         id=user.id,
         email=user.email,
         full_name=user.full_name,
+        first_name=user.first_name,
+        last_name=user.last_name,
         tier=user.tier,
         date_joined=user.date_joined,
+        onboarding_completed=_get_profile(user).onboarding_completed,
     )
+
+
+def _settings_out(user: User, profile: UserProfile) -> SettingsOut:
+    return SettingsOut(
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email=user.email,
+        phone=profile.phone,
+        address_line1=profile.address_line1,
+        address_line2=profile.address_line2,
+        city=profile.city,
+        region=profile.region,
+        postal_code=profile.postal_code,
+        country=profile.country,
+        organization=profile.organization,
+        role=profile.role,
+        bar_number=profile.bar_number,
+        primary_jurisdiction=profile.primary_jurisdiction,
+        timezone=profile.timezone,
+        theme=profile.theme,
+        default_search_scope=profile.default_search_scope,
+        citation_style=profile.citation_style,
+        verify_citations=profile.verify_citations,
+        weekly_digest=profile.weekly_digest,
+        product_news=profile.product_news,
+        onboarding_completed=profile.onboarding_completed,
+        tos_version=profile.tos_version,
+        tos_accepted_at=profile.tos_accepted_at,
+        current_tos_version=CURRENT_TOS_VERSION,
+    )
+
+
+# Field-validation metadata for PATCH /settings, kept declarative so the handler
+# stays a simple loop. Free-text CharFields → max length; enum-backed CharFields
+# → the TextChoices they must belong to; plus the boolean toggles.
+_SETTINGS_TEXT_FIELDS = {
+    "phone": 32,
+    "address_line1": 200,
+    "address_line2": 200,
+    "city": 120,
+    "region": 64,
+    "postal_code": 16,
+    "country": 2,
+    "organization": 200,
+    "bar_number": 64,
+    "primary_jurisdiction": 64,
+    "timezone": 64,
+}
+_SETTINGS_CHOICE_FIELDS = {
+    "role": Role,  # blank "" allowed (clears the field); see handler
+    "theme": Theme,
+    "default_search_scope": SearchScope,
+    "citation_style": CitationStyle,
+}
+_SETTINGS_BOOL_FIELDS = ("verify_citations", "weekly_digest", "product_news")
 
 
 def _key_out(api_key: APIKey) -> APIKeyOut:
@@ -298,8 +446,9 @@ def update_me(request, payload: UpdateProfileRequest):
         name = payload.full_name.strip()
         if len(name) > 200:
             raise HttpError(400, "name must be 200 characters or fewer")
-        user.full_name = name
-        update_fields.append("full_name")
+        # set_name keeps first_name/last_name in sync with the single field so
+        # the structured columns don't drift when the account page edits here.
+        update_fields.extend(user.set_name(full=name))
 
     if payload.email is not None:
         email = payload.email.strip().lower()
@@ -415,3 +564,136 @@ def revoke_key(request, key_id: int):
         detail={"key_id": key_id, "prefix": key.prefix},
     )
     return {"status": "revoked", "id": key_id}
+
+
+# ---------------------------------------------------------------------------
+# Settings — profile + preferences + onboarding
+#
+# One resource because the data shares a lifecycle (read on load, written by the
+# onboarding wizard / settings page in one PATCH). Structured name writes through
+# to User; everything else lives on UserProfile. ToS acceptance is deliberately
+# NOT a PATCHable field here — it's a legal action with its own audit trail, so
+# it has its own endpoint below. Login email also stays out (change via /auth/me).
+# ---------------------------------------------------------------------------
+
+
+@account_router.get(
+    "/settings", response={200: SettingsOut, 401: dict}, auth=session_auth
+)
+def get_settings(request):
+    user = _require_login(request)
+    return _settings_out(user, _get_profile(user))
+
+
+@account_router.patch(
+    "/settings", response={200: SettingsOut, 400: dict, 401: dict}, auth=session_auth
+)
+def update_settings(request, payload: UpdateSettingsRequest):
+    user = _require_login(request)
+    profile = _get_profile(user)
+    # exclude_unset → only fields the client actually sent, so we can clear a
+    # field to "" / False without an omitted field looking like a clear.
+    data = payload.model_dump(exclude_unset=True)
+
+    user_fields: list[str] = []
+    profile_fields: list[str] = []
+
+    # Structured name → User (set_name keeps full_name in sync).
+    if "first_name" in data or "last_name" in data:
+        first = data.get("first_name")
+        last = data.get("last_name")
+        for val, label in ((first, "first"), (last, "last")):
+            if val is not None and len(val.strip()) > 100:
+                raise HttpError(400, f"{label} name must be 100 characters or fewer")
+        user_fields.extend(user.set_name(first=first, last=last))
+
+    # Free-text profile fields: strip + length-check.
+    for name, max_len in _SETTINGS_TEXT_FIELDS.items():
+        if name in data:
+            val = (data[name] or "").strip()
+            if len(val) > max_len:
+                raise HttpError(400, f"{name.replace('_', ' ')} is too long")
+            setattr(profile, name, val)
+            profile_fields.append(name)
+
+    # Enum-constrained fields: must be a known choice (role may be cleared).
+    for name, enum in _SETTINGS_CHOICE_FIELDS.items():
+        if name in data:
+            val = (data[name] or "").strip()
+            if not (val in set(enum.values) or (val == "" and name == "role")):
+                raise HttpError(400, f"invalid {name.replace('_', ' ')}: {val!r}")
+            setattr(profile, name, val)
+            profile_fields.append(name)
+
+    # Boolean toggles.
+    for name in _SETTINGS_BOOL_FIELDS:
+        if name in data:
+            setattr(profile, name, bool(data[name]))
+            profile_fields.append(name)
+
+    if user_fields:
+        user.save(update_fields=sorted(set(user_fields)))
+    if profile_fields:
+        profile.save(update_fields=sorted(set(profile_fields)) + ["updated_at"])
+
+    if user_fields or profile_fields:
+        record_event(
+            event_type=AuditEvent.Event.SETTINGS_CHANGE,
+            request=request,
+            actor=user,
+            outcome=AuditEvent.Outcome.SUCCESS,
+            detail={"fields": sorted(set(user_fields + profile_fields))},
+        )
+    return _settings_out(user, profile)
+
+
+@account_router.post(
+    "/onboarding/complete",
+    response={200: SettingsOut, 400: dict, 401: dict},
+    auth=session_auth,
+)
+def complete_onboarding(request, payload: CompleteOnboardingRequest):
+    """Accept the Terms of Service and mark onboarding done.
+
+    The server is authoritative on the ToS version: it stamps its own
+    CURRENT_TOS_VERSION and writes an append-only TOS_ACCEPTED audit row (which
+    version, when) plus an ONBOARDING_COMPLETED row — the defensible legal
+    trail. The denormalized columns on the profile are just the convenient
+    current-state copy."""
+    user = _require_login(request)
+    profile = _get_profile(user)
+
+    if payload.tos_version and payload.tos_version != CURRENT_TOS_VERSION:
+        raise HttpError(
+            400, "terms have been updated; please review the current version"
+        )
+
+    now = timezone.now()
+    profile.tos_version = CURRENT_TOS_VERSION
+    profile.tos_accepted_at = now
+    profile.onboarding_completed = True
+    profile.onboarding_completed_at = now
+    profile.save(
+        update_fields=[
+            "tos_version",
+            "tos_accepted_at",
+            "onboarding_completed",
+            "onboarding_completed_at",
+            "updated_at",
+        ]
+    )
+
+    record_event(
+        event_type=AuditEvent.Event.TOS_ACCEPTED,
+        request=request,
+        actor=user,
+        outcome=AuditEvent.Outcome.SUCCESS,
+        detail={"tos_version": CURRENT_TOS_VERSION},
+    )
+    record_event(
+        event_type=AuditEvent.Event.ONBOARDING_COMPLETED,
+        request=request,
+        actor=user,
+        outcome=AuditEvent.Outcome.SUCCESS,
+    )
+    return _settings_out(user, profile)

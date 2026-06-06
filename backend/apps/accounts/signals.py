@@ -19,9 +19,12 @@ from django.contrib.auth.signals import (
     user_logged_out,
     user_login_failed,
 )
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from .audit import AuditEvent, record_event
+from .models import User
+from .profile import UserProfile
 
 
 @receiver(user_logged_in)
@@ -60,3 +63,12 @@ def _on_logged_out(sender, request, user, **kwargs):
         actor=user,
         outcome=AuditEvent.Outcome.SUCCESS,
     )
+
+
+@receiver(post_save, sender=User)
+def _ensure_profile(sender, instance, created, **kwargs):
+    """Give every new user a UserProfile row so the settings endpoints always
+    have one to read. get_or_create keeps this idempotent (and harmless if a
+    fixture/migration created the profile first)."""
+    if created:
+        UserProfile.objects.get_or_create(user=instance)

@@ -51,6 +51,9 @@ class AuditEvent(models.Model):
         REGISTER_BLOCKED = "register_blocked", "Registration blocked (throttled)"
         PASSWORD_CHANGE = "password_change", "Password change"
         PROFILE_CHANGE = "profile_change", "Profile / email change"
+        SETTINGS_CHANGE = "settings_change", "Settings / preferences change"
+        TOS_ACCEPTED = "tos_accepted", "Terms of Service accepted"
+        ONBOARDING_COMPLETED = "onboarding_completed", "Onboarding completed"
         API_KEY_CREATE = "api_key_create", "API key created"
         API_KEY_REVOKE = "api_key_revoke", "API key revoked"
 
