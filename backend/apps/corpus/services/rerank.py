@@ -20,12 +20,23 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 log = logging.getLogger(__name__)
 
 VOYAGE_RERANK_2 = "rerank-2"
+VOYAGE_RERANK_2_5 = "rerank-2.5"
+
+
+# Unlike the embedding model, the reranker holds no stored state — it scores
+# (query, document) text live at request time — so switching it is safe to flip
+# in any environment with no re-embed. Default is rerank-2.5 (the current Voyage
+# rerank model; benchmarks/embeddings/ shows it is the single biggest retrieval
+# lever); still overridable via VOYAGE_RERANK_MODEL. Prod picks this up on the
+# next deploy_on_push — no app-spec/secret change needed.
+def _configured_rerank_model() -> str:
+    return os.environ.get("VOYAGE_RERANK_MODEL", VOYAGE_RERANK_2_5)
 
 
 class Reranker(Protocol):
@@ -56,7 +67,7 @@ class VoyageReranker:
     Never lets a rerank failure block search — on any error we fall back to
     the original RRF order (truncated), exactly like NoopReranker."""
 
-    model: str = VOYAGE_RERANK_2
+    model: str = field(default_factory=_configured_rerank_model)
     api_key: str | None = None
     max_retries: int = 3
 

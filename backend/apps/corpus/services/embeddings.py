@@ -38,9 +38,18 @@ class EmbeddingRunResult:
     failed: int
 
 
-def pending_versions() -> QuerySet[NodeVersion]:
-    """NodeVersions whose embedding is missing or stale."""
-    return NodeVersion.objects.exclude(content_hash=F("embedding_source_hash"))
+def pending_versions(
+    source_slugs: list[str] | None = None,
+) -> QuerySet[NodeVersion]:
+    """NodeVersions whose embedding is missing or stale.
+
+    ``source_slugs`` scopes to one or more ``Source.slug`` values — e.g.
+    ``["iowa-code", "iowa-court-rules"]`` to embed the statute/rules corpora
+    without sweeping in the (much larger) caselaw corpus."""
+    qs = NodeVersion.objects.exclude(content_hash=F("embedding_source_hash"))
+    if source_slugs:
+        qs = qs.filter(node__source__slug__in=source_slugs)
+    return qs
 
 
 def run_embedding_job(
@@ -48,12 +57,16 @@ def run_embedding_job(
     client: EmbeddingClient | None = None,
     batch_size: int = 64,
     limit: int | None = None,
+    source_slugs: list[str] | None = None,
 ) -> EmbeddingRunResult:
     """Embed every pending NodeVersion. Idempotent: re-running picks up only
-    rows whose content has changed since the last run."""
+    rows whose content has changed since the last run.
+
+    ``source_slugs`` restricts the job to the given sources (see
+    ``pending_versions``)."""
 
     client = client or default_client()
-    qs = pending_versions().order_by("id")
+    qs = pending_versions(source_slugs).order_by("id")
     if limit is not None:
         qs = qs[:limit]
 

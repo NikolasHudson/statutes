@@ -12,14 +12,26 @@ dimension; we hard-code 1024 to match the ``NodeVersion.embedding`` column.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 
 VOYAGE_LAW_2 = "voyage-law-2"
+VOYAGE_4_LARGE = "voyage-4-large"
 EMBEDDING_DIM = 1024
 INPUT_TYPE_DOCUMENT = "document"
 INPUT_TYPE_QUERY = "query"
+
+# The embedding model is env-driven so document and query embeddings always
+# agree (cosine across two different models is meaningless) and so we never
+# silently break an environment whose stored vectors are from another model.
+# Default stays voyage-law-2: switching a deployment to a new model requires
+# BOTH setting VOYAGE_EMBED_MODEL *and* re-embedding the corpus with it. Both
+# voyage-law-2 and voyage-4-large default to 1024 dims, matching the
+# NodeVersion.embedding column; a model that returns another dimension fails
+# loudly on write rather than corrupting the index.
+def _configured_model() -> str:
+    return os.environ.get("VOYAGE_EMBED_MODEL", VOYAGE_LAW_2)
 
 
 class EmbeddingClient(Protocol):
@@ -45,7 +57,7 @@ class VoyageClient:
     Timeout. The default of 0 means a single 429 propagates — for bulk jobs
     against published rate limits, set this to something like 5."""
 
-    model: str = VOYAGE_LAW_2
+    model: str = field(default_factory=_configured_model)
     api_key: str | None = None
     max_retries: int = 5
 
