@@ -23,6 +23,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { DocChat } from "@/components/doc-chat";
 import {
   fmtEffective,
   type BrowseChapter,
@@ -74,6 +75,7 @@ export function ReadingPane({
   onSelectSection: (id: number) => void;
 }) {
   return (
+    <>
     <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden xl:grid-cols-[1fr_280px]">
       <main className="min-w-0 overflow-y-auto px-6 py-8 md:px-10 lg:px-16">
         <div className="mx-auto max-w-3xl">
@@ -111,6 +113,19 @@ export function ReadingPane({
 
       <Sidecar source={source} chapter={chapter} node={node} />
     </div>
+
+      {/* Press "/" to chat about the open section. Keyed by node id so a new
+          section starts a fresh conversation. */}
+      {sel.sectionId && node ? (
+        <DocChat
+          key={node.id}
+          nodeId={node.id}
+          title={node.heading || node.citation}
+          citation={node.citation}
+          kind="statute"
+        />
+      ) : null}
+    </>
   );
 }
 

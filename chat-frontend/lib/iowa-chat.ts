@@ -221,6 +221,10 @@ export async function* streamChat(
     model: string;
     messages: { role: "user" | "assistant" | "system"; content: string }[];
     source_slug: string | null;
+    // Pin the turn to one document (statute section / rule / case decision
+    // node). The backend injects that document's text as context. Omitted for
+    // ordinary corpus-wide chat.
+    node_id?: number | null;
   },
   signal: AbortSignal,
 ): AsyncGenerator<StreamEvent, void, void> {

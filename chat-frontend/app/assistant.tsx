@@ -12,7 +12,6 @@ import { ModelSelector } from "@/components/assistant-ui/model-selector";
 import { Select } from "@/components/assistant-ui/select";
 import { type ComposerTool, Thread } from "@/components/assistant-ui/thread";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
-import type { ProgressStep } from "@/components/tool-ui/progress-tracker";
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -26,13 +25,8 @@ import {
 	SidebarProvider,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
-import {
-	type BrowseSource,
-	citationsMarkdown,
-	fetchSources,
-	streamChat,
-	toolLabel,
-} from "@/lib/iowa-chat";
+import { runChatTurnParts } from "@/lib/chat-run";
+import { type BrowseSource, fetchSources } from "@/lib/iowa-chat";
 import {
 	type CitationFinding,
 	streamVerify,
@@ -83,27 +77,6 @@ const DEFAULT_SCOPE = "iowa-court-rules";
 // the cleared/placeholder state). Use a sentinel and translate at the API
 // boundary instead.
 const SCOPE_ALL = "all";
-
-function flattenMessages(
-	messages: readonly Parameters<
-		ChatModelAdapter["run"]
-	>[0]["messages"][number][],
-) {
-	return messages
-		.filter(
-			(m) => m.role === "user" || m.role === "assistant" || m.role === "system",
-		)
-		.map((m) => ({
-			role: m.role as "user" | "assistant" | "system",
-			content:
-				typeof m.content === "string"
-					? m.content
-					: (m.content ?? [])
-							.filter((p) => p.type === "text")
-							.map((p) => (p as { type: "text"; text: string }).text)
-							.join("\n"),
-		}));
-}
 
 // File types the document verifier can ingest. PDFs/DOCX are parsed
 // server-side by the docling microservice; text/markdown are read directly.
@@ -193,17 +166,11 @@ function lastUserText(
 	return "";
 }
 
-// Stable tool-call id for the progress tracker so re-emitting on each event
+// Stable tool-call id for the verify checklist so re-emitting on each event
 // updates the SAME tool part (assistant-ui dedupes by toolCallId) rather than
-// stacking new cards in the message.
-const PROGRESS_TOOL_CALL_ID = "iowa-progress";
+// stacking new cards in the message. The chat progress tracker's equivalent id
+// lives in lib/chat-run.ts alongside the shared turn logic.
 const VERIFY_TOOL_CALL_ID = "iowa-verify";
-
-type ProgressOutcome =
-	| { kind: "running" }
-	| { kind: "success" }
-	| { kind: "failed"; reason: string }
-	| { kind: "cancelled" };
 
 // Verify-mode turn: run the document through the verifier and yield a single
 // `verifyDocument` tool part that updates as findings stream in. The Thread
@@ -314,131 +281,14 @@ function makeAdapter(
 				if (scope.mode === "verify") scope.onVerifyDone();
 				return;
 			}
-			const startedAt = Date.now();
-			const steps: ProgressStep[] = [];
-			let answer = "";
-			let synthesisStarted = false;
-
-			const elapsed = () => Date.now() - startedAt;
-
-			const completeInProgress = () => {
-				for (const s of steps) {
-					if (s.status === "in-progress") s.status = "completed";
-				}
-			};
-
-			const trackerPart = (outcome: ProgressOutcome) => ({
-				type: "tool-call" as const,
-				toolCallId: PROGRESS_TOOL_CALL_ID,
-				toolName: "trackProgress",
-				args: {},
-				argsText: "{}",
-				result: {
-					id: "iowa-progress",
-					steps: steps.map((s) => ({ ...s })),
-					elapsedTime: elapsed(),
-					...(outcome.kind === "success"
-						? {
-								choice: {
-									outcome: "success" as const,
-									summary: "Done — answer below.",
-									at: new Date().toISOString(),
-								},
-							}
-						: outcome.kind === "failed"
-							? {
-									choice: {
-										outcome: "failed" as const,
-										summary: outcome.reason,
-										at: new Date().toISOString(),
-									},
-								}
-							: outcome.kind === "cancelled"
-								? {
-										choice: {
-											outcome: "cancelled" as const,
-											summary: "Cancelled.",
-											at: new Date().toISOString(),
-										},
-									}
-								: {}),
-				},
-			});
-
-			const yieldState = (outcome: ProgressOutcome = { kind: "running" }) => {
-				const parts: Array<
-					ReturnType<typeof trackerPart> | { type: "text"; text: string }
-				> = [];
-				if (steps.length > 0) parts.push(trackerPart(outcome));
-				if (answer) parts.push({ type: "text" as const, text: answer });
-				return { content: parts };
-			};
-
-			try {
-				for await (const event of streamChat(
-					{
-						model: scope.model,
-						messages: flattenMessages(messages),
-						source_slug: scope.sourceSlug,
-					},
-					abortSignal,
-				)) {
-					if (abortSignal.aborted) return;
-
-					if (event.type === "tool_start") {
-						completeInProgress();
-						const { label, description } = toolLabel(
-							event.name,
-							event.arguments,
-						);
-						steps.push({
-							id: `step-${steps.length}`,
-							label,
-							...(description ? { description } : {}),
-							status: "in-progress",
-						});
-						yield yieldState();
-					} else if (event.type === "delta") {
-						// First delta = synthesis began. Mark any in-progress tool step
-						// as complete; the streaming text below the tracker is its own
-						// visual cue that drafting is underway — no need for a step.
-						if (!synthesisStarted) {
-							synthesisStarted = true;
-							completeInProgress();
-						}
-						answer += event.text;
-						yield yieldState();
-					} else if (event.type === "done") {
-						for (const s of steps) {
-							if (s.status === "in-progress" || s.status === "pending") {
-								s.status = "completed";
-							}
-						}
-						answer =
-							(answer || "(no answer returned)") +
-							citationsMarkdown(event.tool_calls ?? [], answer);
-						yield yieldState({ kind: "success" });
-						return;
-					} else if (event.type === "error") {
-						for (const s of steps) {
-							if (s.status === "in-progress") s.status = "failed";
-						}
-						answer = `The request failed: ${event.message}`;
-						yield yieldState({ kind: "failed", reason: event.message });
-						return;
-					}
-				}
-			} catch (e) {
-				if ((e as Error).name === "AbortError") return;
-				for (const s of steps) {
-					if (s.status === "in-progress") s.status = "failed";
-				}
-				answer = `The request failed: ${(e as Error).message ?? String(e)}`;
-				yield yieldState({
-					kind: "failed",
-					reason: (e as Error).message ?? String(e),
-				});
-			}
+			// Ordinary corpus-wide chat. The full-page assistant never pins a
+			// document, so nodeId stays null here; the per-document panel
+			// (components/doc-chat.tsx) passes one through the same helper.
+			yield* runChatTurnParts(
+				{ model: scope.model, sourceSlug: scope.sourceSlug },
+				messages,
+				abortSignal,
+			);
 		},
 	};
 }
