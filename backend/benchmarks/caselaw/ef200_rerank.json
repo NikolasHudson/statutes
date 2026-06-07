@@ -1,0 +1,2825 @@
+{
+  "meta": {
+    "kind": "caselaw-retrieval-eval",
+    "embedder": "voyage-law-2",
+    "embedding_dim": 1024,
+    "reranker": "rerank-2.5",
+    "scope": "caselaw",
+    "scope_source": "iowa-caselaw",
+    "hnsw_ef_search": 200,
+    "configs": [
+      "vector",
+      "fts",
+      "hybrid",
+      "vector_rr",
+      "hybrid_rr"
+    ],
+    "deep_candidates": 100,
+    "k_values": [
+      1,
+      3,
+      5,
+      10
+    ],
+    "n_queries": 20,
+    "git_commit": "3f83057",
+    "generated_at": "2026-06-07T17:22:36.325961+00:00"
+  },
+  "results": {
+    "overall": {
+      "vector": {
+        "mrr": 0.7333,
+        "hit": {
+          "1": 0.55,
+          "3": 0.9,
+          "5": 0.9,
+          "10": 1.0
+        },
+        "ndcg": {
+          "1": 0.55,
+          "3": 0.7643,
+          "5": 0.7643,
+          "10": 0.7999
+        },
+        "recovered_rate": 1.0,
+        "unrecovered": 0,
+        "rank": {
+          "p50": 1.0,
+          "mean": 1.9,
+          "max": 6
+        }
+      },
+      "fts": {
+        "mrr": 0.1464,
+        "hit": {
+          "1": 0.1,
+          "3": 0.15,
+          "5": 0.2,
+          "10": 0.25
+        },
+        "ndcg": {
+          "1": 0.1,
+          "3": 0.1315,
+          "5": 0.1509,
+          "10": 0.1659
+        },
+        "recovered_rate": 0.35,
+        "unrecovered": 13,
+        "rank": {
+          "p50": 5,
+          "mean": 9.57,
+          "max": 38
+        }
+      },
+      "hybrid": {
+        "mrr": 0.4793,
+        "hit": {
+          "1": 0.2,
+          "3": 0.65,
+          "5": 0.85,
+          "10": 0.95
+        },
+        "ndcg": {
+          "1": 0.2,
+          "3": 0.4774,
+          "5": 0.5591,
+          "10": 0.5925
+        },
+        "recovered_rate": 1.0,
+        "unrecovered": 0,
+        "rank": {
+          "p50": 2.0,
+          "mean": 3.5,
+          "max": 15
+        }
+      },
+      "vector_rr": {
+        "mrr": 0.8035,
+        "hit": {
+          "1": 0.7,
+          "3": 0.9,
+          "5": 0.9,
+          "10": 1.0
+        },
+        "ndcg": {
+          "1": 0.7,
+          "3": 0.8196,
+          "5": 0.8196,
+          "10": 0.8505
+        },
+        "recovered_rate": 1.0,
+        "unrecovered": 0,
+        "rank": {
+          "p50": 1.0,
+          "mean": 2,
+          "max": 9
+        }
+      },
+      "hybrid_rr": {
+        "mrr": 0.8421,
+        "hit": {
+          "1": 0.75,
+          "3": 0.9,
+          "5": 0.95,
+          "10": 1.0
+        },
+        "ndcg": {
+          "1": 0.75,
+          "3": 0.8446,
+          "5": 0.864,
+          "10": 0.8806
+        },
+        "recovered_rate": 1.0,
+        "unrecovered": 0,
+        "rank": {
+          "p50": 1.0,
+          "mean": 1.65,
+          "max": 7
+        }
+      }
+    },
+    "by_area": {
+      "Civil Torts / Sovereign Immunity": {
+        "n": 1,
+        "vector": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.333
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Constitutional / Civil Rights": {
+        "n": 1,
+        "vector": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "fts": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Constitutional / Election": {
+        "n": 1,
+        "vector": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Contract / Construction": {
+        "n": 1,
+        "vector": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "fts": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Corporate / Shareholder Rights": {
+        "n": 1,
+        "vector": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.2
+        },
+        "hybrid": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "vector_rr": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "hybrid_rr": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        }
+      },
+      "Criminal / Constitutional Law": {
+        "n": 2,
+        "vector": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.5,
+          "mrr": 0.306
+        },
+        "hybrid": {
+          "hit@1": 0.5,
+          "hit@5": 1.0,
+          "mrr": 0.6
+        },
+        "vector_rr": {
+          "hit@1": 0.5,
+          "hit@5": 1.0,
+          "mrr": 0.667
+        },
+        "hybrid_rr": {
+          "hit@1": 0.5,
+          "hit@5": 1.0,
+          "mrr": 0.75
+        }
+      },
+      "Criminal / Search & Seizure": {
+        "n": 2,
+        "vector": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.417
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.013
+        },
+        "hybrid": {
+          "hit@1": 0.5,
+          "hit@5": 1.0,
+          "mrr": 0.6
+        },
+        "vector_rr": {
+          "hit@1": 0.5,
+          "hit@5": 1.0,
+          "mrr": 0.75
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Criminal / Sentencing": {
+        "n": 1,
+        "vector": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.167
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.091
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.143
+        },
+        "vector_rr": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "hybrid_rr": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        }
+      },
+      "Employment / Civil Rights": {
+        "n": 1,
+        "vector": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Family Law / Custody": {
+        "n": 1,
+        "vector": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.25
+        },
+        "vector_rr": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.125
+        },
+        "hybrid_rr": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.2
+        }
+      },
+      "Family Law / Torts": {
+        "n": 1,
+        "vector": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Historical / Property": {
+        "n": 1,
+        "vector": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Property / Eminent Domain": {
+        "n": 1,
+        "vector": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Torts / Assumption of Risk": {
+        "n": 1,
+        "vector": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.25
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Torts / Constitutional Law": {
+        "n": 1,
+        "vector": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.143
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Torts / Family Law": {
+        "n": 1,
+        "vector": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "Torts / Negligence": {
+        "n": 1,
+        "vector": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.167
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.067
+        },
+        "vector_rr": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.111
+        },
+        "hybrid_rr": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.143
+        }
+      },
+      "Torts / Sports Liability": {
+        "n": 1,
+        "vector": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.0,
+          "hit@5": 1.0,
+          "mrr": 0.5
+        },
+        "vector_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        },
+        "hybrid_rr": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      }
+    },
+    "vector_analytics": {
+      "top1_sim": {
+        "n": 20,
+        "min": 0.4661,
+        "p25": 0.5808,
+        "p50": 0.6067,
+        "mean": 0.6086,
+        "p75": 0.6629,
+        "p90": 0.6808,
+        "max": 0.7162
+      },
+      "target_sim": {
+        "n": 20,
+        "min": 0.4554,
+        "p25": 0.5506,
+        "p50": 0.6051,
+        "mean": 0.5971,
+        "p75": 0.6442,
+        "p90": 0.6687,
+        "max": 0.69
+      }
+    }
+  },
+  "latency_ms": {
+    "embed": {
+      "n": 20,
+      "min": 160.8587,
+      "p25": 175.5508,
+      "p50": 178.084,
+      "mean": 191.5696,
+      "p75": 183.5024,
+      "p90": 224.4368,
+      "max": 372.2126
+    },
+    "vector": {
+      "n": 20,
+      "min": 72.1496,
+      "p25": 168.3398,
+      "p50": 248.2381,
+      "mean": 248.9905,
+      "p75": 322.4429,
+      "p90": 354.6332,
+      "max": 530.1476
+    },
+    "fts": {
+      "n": 20,
+      "min": 3.6096,
+      "p25": 4.5956,
+      "p50": 8.0449,
+      "mean": 16.0313,
+      "p75": 18.3006,
+      "p90": 31.5441,
+      "max": 87.8341
+    },
+    "hybrid": {
+      "n": 20,
+      "min": 736.1832,
+      "p25": 921.2949,
+      "p50": 1240.2937,
+      "mean": 1765.8297,
+      "p75": 2682.7361,
+      "p90": 2902.1326,
+      "max": 3265.9397
+    },
+    "rerank": {
+      "n": 40,
+      "min": 232.845,
+      "p25": 256.6977,
+      "p50": 276.6815,
+      "mean": 299.2025,
+      "p75": 300.3517,
+      "p90": 319.3846,
+      "max": 735.1148
+    }
+  },
+  "per_query": [
+    {
+      "id": 1,
+      "case_name": "Varnum v. Brien",
+      "citation": "763 N.W.2d 862 (Iowa 2009)",
+      "area": "Constitutional / Civil Rights",
+      "query": "Equal protection clause challenge to the statutory definition of marriage restricting it to opposite-sex couples.",
+      "target": "cl-cluster-1870141",
+      "configs": {
+        "vector": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-4472673"
+          ],
+          "top1_sim": 0.6089,
+          "target_sim": 0.58
+        },
+        "fts": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-4472673"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 2,
+      "case_name": "Thompson v. Kaczinski",
+      "citation": "774 N.W.2d 829 (Iowa 2009)",
+      "area": "Torts / Negligence",
+      "query": "Adoption of the Restatement (Third) of Torts; explicitly uncouples foreseeability from the determination of legal duty.",
+      "target": "cl-cluster-1666221",
+      "configs": {
+        "vector": {
+          "first_rank": 6,
+          "reciprocal_rank": 0.16666666666666666,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3562071871080222
+          },
+          "outranked_by": [
+            "cl-cluster-4878959",
+            "cl-cluster-4472216",
+            "cl-cluster-4472250",
+            "cl-cluster-4879383",
+            "cl-cluster-4881107"
+          ],
+          "top1_sim": 0.5973,
+          "target_sim": 0.5528
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": [
+            "cl-cluster-4403030",
+            "cl-cluster-4471920"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 15,
+          "reciprocal_rank": 0.06666666666666667,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": [
+            "cl-cluster-7196878",
+            "cl-cluster-4403030",
+            "cl-cluster-4878959",
+            "cl-cluster-7209993",
+            "cl-cluster-4472216"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 9,
+          "reciprocal_rank": 0.1111111111111111,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3010299956639812
+          },
+          "outranked_by": [
+            "cl-cluster-4472250",
+            "cl-cluster-8280318",
+            "cl-cluster-4758948",
+            "cl-cluster-4472216",
+            "cl-cluster-2687562"
+          ]
+        },
+        "hybrid_rr": {
+          "first_rank": 7,
+          "reciprocal_rank": 0.14285714285714285,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3333333333333333
+          },
+          "outranked_by": [
+            "cl-cluster-4472250",
+            "cl-cluster-4472216",
+            "cl-cluster-2687562",
+            "cl-cluster-4879383",
+            "cl-cluster-4881107"
+          ]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "case_name": "Puntenney v. Iowa Utilities Board",
+      "citation": "928 N.W.2d 829 (Iowa 2019)",
+      "area": "Property / Eminent Domain",
+      "query": "Determines whether a private crude oil pipeline crossing the state without offloading facilities satisfies the public use requirement.",
+      "target": "cl-cluster-4625156",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.5238,
+          "target_sim": 0.5238
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-7187081"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 4,
+      "case_name": "Chiodo v. Section 43.24 Panel",
+      "citation": "846 N.W.2d 845 (Iowa 2014)",
+      "area": "Constitutional / Election",
+      "query": "Evaluates whether a second-offense Operating While Intoxicated (OWI) constitutes an infamous crime that strips voter and candidate eligibility.",
+      "target": "cl-cluster-4472170",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6648,
+          "target_sim": 0.6648
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-7199267"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 5,
+      "case_name": "State v. Ochoa",
+      "citation": "792 N.W.2d 260 (Iowa 2010)",
+      "area": "Criminal / Search & Seizure",
+      "query": "Rejects federal Fourth Amendment parity; holds that general law enforcement cannot conduct suspicionless searches of parolees under the Iowa Constitution.",
+      "target": "cl-cluster-4472474",
+      "configs": {
+        "vector": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-4472150"
+          ],
+          "top1_sim": 0.681,
+          "target_sim": 0.6781
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": [
+            "cl-cluster-4472245"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 5,
+          "reciprocal_rank": 0.2,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.38685280723454163,
+            "10": 0.38685280723454163
+          },
+          "outranked_by": [
+            "cl-cluster-4472245",
+            "cl-cluster-7205357",
+            "cl-cluster-4472150",
+            "cl-cluster-7199267"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 6,
+      "case_name": "Turner v. Turner",
+      "citation": "304 N.W.2d 786 (Iowa 1981)",
+      "area": "Family Law / Torts",
+      "query": "Partially abrogates the traditional parental immunity doctrine, allowing minor children to sue parents for negligence outside of core parental authority.",
+      "target": "cl-cluster-2062763",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6072,
+          "target_sim": 0.6072
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-7202218"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 7,
+      "case_name": "In re Marriage of Hansen",
+      "citation": "733 N.W.2d 683 (Iowa 2007)",
+      "area": "Family Law / Custody",
+      "query": "Establishes the definitive multi-factor framework for evaluating joint physical care, emphasizing historical caregiving patterns.",
+      "target": "cl-cluster-1832878",
+      "configs": {
+        "vector": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-4472908"
+          ],
+          "top1_sim": 0.5012,
+          "target_sim": 0.4777
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 4,
+          "reciprocal_rank": 0.25,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.43067655807339306,
+            "10": 0.43067655807339306
+          },
+          "outranked_by": [
+            "cl-cluster-7193671",
+            "cl-cluster-4472908",
+            "cl-cluster-7202574"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 8,
+          "reciprocal_rank": 0.125,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.31546487678572877
+          },
+          "outranked_by": [
+            "cl-cluster-10358030",
+            "cl-cluster-4337672",
+            "cl-cluster-10807263",
+            "cl-cluster-10639587",
+            "cl-cluster-2778626"
+          ]
+        },
+        "hybrid_rr": {
+          "first_rank": 5,
+          "reciprocal_rank": 0.2,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.38685280723454163,
+            "10": 0.38685280723454163
+          },
+          "outranked_by": [
+            "cl-cluster-10358030",
+            "cl-cluster-4337672",
+            "cl-cluster-2157022",
+            "cl-cluster-2687842"
+          ]
+        }
+      }
+    },
+    {
+      "id": 8,
+      "case_name": "Gacke v. Pork Xtra, L.L.C.",
+      "citation": "684 N.W.2d 168 (Iowa 2004)",
+      "area": "Torts / Constitutional Law",
+      "query": "Examines the Right-to-Farm statute; holds that granting absolute immunity to agricultural nuisances violates the state's inalienable rights clause.",
+      "target": "cl-cluster-2107625",
+      "configs": {
+        "vector": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-4510003"
+          ],
+          "top1_sim": 0.6808,
+          "target_sim": 0.63
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": [
+            "cl-cluster-4510003",
+            "cl-cluster-8248971",
+            "cl-cluster-6620314",
+            "cl-cluster-6905813"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 7,
+          "reciprocal_rank": 0.14285714285714285,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3333333333333333
+          },
+          "outranked_by": [
+            "cl-cluster-4510003",
+            "cl-cluster-8248971",
+            "cl-cluster-6620314",
+            "cl-cluster-6905813",
+            "cl-cluster-7195117"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 9,
+      "case_name": "Nelson v. Knight",
+      "citation": "834 N.W.2d 64 (Iowa 2013) [question set cited the withdrawn 825 N.W.2d 4]",
+      "area": "Employment / Civil Rights",
+      "query": "Decides that firing an employee because they are an irresistible attraction that threatens the employer's marriage does not constitute gender discrimination.",
+      "target": "cl-cluster-4472209",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6062,
+          "target_sim": 0.6062
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-7185515"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 10,
+      "case_name": "State v. Sweet",
+      "citation": "879 N.W.2d 811 (Iowa 2016)",
+      "area": "Criminal / Sentencing",
+      "query": "Imposes a categorical ban on sentencing juvenile offenders to life without the possibility of parole under the Iowa Constitution.",
+      "target": "cl-cluster-8281538",
+      "configs": {
+        "vector": {
+          "first_rank": 6,
+          "reciprocal_rank": 0.16666666666666666,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3562071871080222
+          },
+          "outranked_by": [
+            "cl-cluster-3207570",
+            "cl-cluster-2687555",
+            "cl-cluster-4472016",
+            "cl-cluster-4472149",
+            "cl-cluster-2812180"
+          ],
+          "top1_sim": 0.7162,
+          "target_sim": 0.69
+        },
+        "fts": {
+          "first_rank": 11,
+          "reciprocal_rank": 0.09090909090909091,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": [
+            "cl-cluster-4472016",
+            "cl-cluster-3207570",
+            "cl-cluster-2812908",
+            "cl-cluster-2812180",
+            "cl-cluster-4472149"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 7,
+          "reciprocal_rank": 0.14285714285714285,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3333333333333333
+          },
+          "outranked_by": [
+            "cl-cluster-3207570",
+            "cl-cluster-4472016",
+            "cl-cluster-4472149",
+            "cl-cluster-2687555",
+            "cl-cluster-2812908"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-4400906"
+          ]
+        },
+        "hybrid_rr": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-2812180"
+          ]
+        }
+      }
+    },
+    {
+      "id": 11,
+      "case_name": "Baldwin v. City of Estherville",
+      "citation": "915 N.W.2d 259 (Iowa 2018)",
+      "area": "Civil Torts / Sovereign Immunity",
+      "query": "Clarifies whether monetary damages are available for direct state constitutional violations, establishing a good faith qualified immunity standard.",
+      "target": "cl-cluster-4512940",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.5808,
+          "target_sim": 0.5808
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": [
+            "cl-cluster-6476611",
+            "cl-cluster-9394462"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 3,
+          "reciprocal_rank": 0.3333333333333333,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.5,
+            "5": 0.5,
+            "10": 0.5
+          },
+          "outranked_by": [
+            "cl-cluster-6476611",
+            "cl-cluster-7199353"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 12,
+      "case_name": "State v. Baldon",
+      "citation": "829 N.W.2d 785 (Iowa 2013)",
+      "area": "Criminal / Constitutional Law",
+      "query": "Holds that a signature on a standard parole agreement does not constitute valid, voluntary prospective consent to search an individual's vehicle.",
+      "target": "cl-cluster-4472245",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.5978,
+          "target_sim": 0.5978
+        },
+        "fts": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-4883113"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 13,
+      "case_name": "Feld v. Borkowski",
+      "citation": "790 N.W.2d 72 (Iowa 2010)",
+      "area": "Torts / Sports Liability",
+      "query": "Establishes that a co-participant in a recreational sports activity (softball game) can only be held liable if their conduct rises to recklessness.",
+      "target": "cl-cluster-4472505",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6687,
+          "target_sim": 0.6687
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-7199267"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 14,
+      "case_name": "State v. Ingram",
+      "citation": "914 N.W.2d 794 (Iowa 2018) [question set cited 914 N.W.2d 894, a typo]",
+      "area": "Criminal / Search & Seizure",
+      "query": "Departs from federal law to hold that police cannot search closed or zipped containers during an inventory search of an impounded vehicle.",
+      "target": "cl-cluster-4512774",
+      "configs": {
+        "vector": {
+          "first_rank": 3,
+          "reciprocal_rank": 0.3333333333333333,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.5,
+            "5": 0.5,
+            "10": 0.5
+          },
+          "outranked_by": [
+            "cl-cluster-1865343",
+            "cl-cluster-2226927"
+          ],
+          "top1_sim": 0.5847,
+          "target_sim": 0.5485
+        },
+        "fts": {
+          "first_rank": 38,
+          "reciprocal_rank": 0.02631578947368421,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": [
+            "cl-cluster-4894883",
+            "cl-cluster-4893114",
+            "cl-cluster-6461978",
+            "cl-cluster-5290145",
+            "cl-cluster-4472206"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "vector_rr": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-2226927"
+          ]
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 15,
+      "case_name": "Luana Savings Bank v. Pro-Build Holdings, Inc.",
+      "citation": "856 N.W.2d 892 (Iowa 2014)",
+      "area": "Contract / Construction",
+      "query": "Determines whether the implied warranty of workmanlike construction protects commercial entities purchasing multi-family investment real estate.",
+      "target": "cl-cluster-2760234",
+      "configs": {
+        "vector": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-4472138"
+          ],
+          "top1_sim": 0.6253,
+          "target_sim": 0.6186
+        },
+        "fts": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-4472138"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 16,
+      "case_name": "In the Matter of Ralph",
+      "citation": "1 Morris 1 (Iowa 1839)",
+      "area": "Historical / Property",
+      "query": "First Iowa territorial decision; holds that a slave becomes a free man when he steps onto free soil with his master's consent.",
+      "target": "cl-cluster-7179769",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6442,
+          "target_sim": 0.6442
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 17,
+      "case_name": "Dier v. Peters",
+      "citation": "815 N.W.2d 1 (Iowa 2012)",
+      "area": "Torts / Family Law",
+      "query": "Recognizes a common-law cause of action for paternity fraud, allowing a man to sue to recover child support paid for a non-biological child.",
+      "target": "cl-cluster-4472325",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6629,
+          "target_sim": 0.6629
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-7194195"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 18,
+      "case_name": "State v. Short",
+      "citation": "851 N.W.2d 474 (Iowa 2014)",
+      "area": "Criminal / Constitutional Law",
+      "query": "Detailed defense of independent state constitutionalism regarding residential search warrants and rejection of federal exceptions.",
+      "target": "cl-cluster-2687558",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.5506,
+          "target_sim": 0.5506
+        },
+        "fts": {
+          "first_rank": 9,
+          "reciprocal_rank": 0.1111111111111111,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3010299956639812
+          },
+          "outranked_by": [
+            "cl-cluster-5290145",
+            "cl-cluster-4894883",
+            "cl-cluster-4893114",
+            "cl-cluster-4472344",
+            "cl-cluster-4584706"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 5,
+          "reciprocal_rank": 0.2,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.38685280723454163,
+            "10": 0.38685280723454163
+          },
+          "outranked_by": [
+            "cl-cluster-5290145",
+            "cl-cluster-4894883",
+            "cl-cluster-4893114",
+            "cl-cluster-4472150"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 3,
+          "reciprocal_rank": 0.3333333333333333,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.5,
+            "5": 0.5,
+            "10": 0.5
+          },
+          "outranked_by": [
+            "cl-cluster-4472245",
+            "cl-cluster-2812179"
+          ]
+        },
+        "hybrid_rr": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-4472245"
+          ]
+        }
+      }
+    },
+    {
+      "id": 19,
+      "case_name": "Huber v. Hovey",
+      "citation": "501 N.W.2d 53 (Iowa 1993)",
+      "area": "Torts / Assumption of Risk",
+      "query": "Analyzes the scope and enforceability of exculpatory liability waivers signed by spectators entering a racetrack pit area.",
+      "target": "cl-cluster-1309491",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": [],
+          "top1_sim": 0.604,
+          "target_sim": 0.604
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "outranked_by": [
+            "cl-cluster-1919060",
+            "cl-cluster-4472677"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 4,
+          "reciprocal_rank": 0.25,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.43067655807339306,
+            "10": 0.43067655807339306
+          },
+          "outranked_by": [
+            "cl-cluster-1919060",
+            "cl-cluster-4472677",
+            "cl-cluster-7200521"
+          ]
+        },
+        "vector_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "hybrid_rr": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        }
+      }
+    },
+    {
+      "id": 20,
+      "case_name": "Berger v. Amana Society",
+      "citation": "253 Iowa 378, 111 N.W.2d 753 (1961)",
+      "area": "Corporate / Shareholder Rights",
+      "query": "Investigates whether corporate directors can unilaterally amend articles of incorporation to dilute the economic or voting rights of class stockholders.",
+      "target": "cl-cluster-2050852",
+      "configs": {
+        "vector": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-1890728"
+          ],
+          "top1_sim": 0.4661,
+          "target_sim": 0.4554
+        },
+        "fts": {
+          "first_rank": 5,
+          "reciprocal_rank": 0.2,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.38685280723454163,
+            "10": 0.38685280723454163
+          },
+          "outranked_by": [
+            "cl-cluster-3434476",
+            "cl-cluster-1866541",
+            "cl-cluster-7205233",
+            "cl-cluster-1917856"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "outranked_by": []
+        },
+        "vector_rr": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-1240769"
+          ]
+        },
+        "hybrid_rr": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "outranked_by": [
+            "cl-cluster-1240769"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -32,18 +32,32 @@ opinion-head excerpts that miss the holding, and no abstain path.
 
 ## Phased plan & status
 
-- [ ] **PR1 — Behavior-preserving extraction (NO quality change).** ← IN PROGRESS
-  - New `apps/corpus/services/retrieval.py` (`retrieve_context()` reproducing today's
-    chat enrichment exactly: pool 50, top 6, 9000/2000 excerpt budgets, `effective_from`,
-    current weighted RRF) + `apps/corpus/services/corpus_tools.py` (direct-lookup
-    wrappers, no MCP coupling).
-  - Repoint `chat.py._enriched_search` and `mcp_server/tools.search_statutes_tool` at
-    `retrieve_context`; repoint both surfaces' lookup tools at `corpus_tools`.
-  - **Delete the `apps.api → apps.mcp_server` import.**
-  - Trap: two rerank doc-char budgets and the dict key shape (`node["id"]` vs
-    `node_version_id`). Mitigate with golden-output tests.
-  - Proves: `eval_caselaw` byte-identical metrics before/after; `test_tools.py`,
-    `test_search.py`, chat tests green. **No metric should move.**
+- [x] **PR1 — Behavior-preserving extraction (NO quality change).** ✅ DONE (uncommitted)
+  - New `apps/corpus/services/retrieval.py` — `retrieve_context()` (shared
+    retrieve→rerank→assemble) + `RetrievedContext`/`RetrievedPassage`/`TreatmentFlag`
+    dataclasses (forward-compat; PR2–4 populate the empty fields).
+  - New `apps/corpus/services/corpus_tools.py` — the direct-lookup/verify/audit tools
+    + serializers, corpus-owned (no MCP coupling).
+  - `mcp_server/tools.py` → thin MCP adapter (re-exports + repointed
+    `search_statutes_tool`); `chat.py._enriched_search` → thin chat adapter.
+  - **`apps.api → apps.mcp_server` import deleted.**
+  - Resolution of the two rerank divergences: doc-char budget preserved per surface
+    (chat none / MCP 8000) via `rerank_doc_chars`; keyed on `node_version_id` for both
+    (equivalent — one open version per node, so node_id is unique among hits). One
+    **deliberate, documented unification**: the rerank candidate text now uses the raw
+    node heading for both surfaces (chat previously reranked caselaw on the annotated
+    "Court, Year" display heading). Invisible to tests (NoopReranker ignores candidate
+    text) and to `eval_caselaw` (bypasses chat); strictly more correct.
+  - Verified: baseline 360 green + 1 known-red → after PR1, identical (361 tests,
+    same single pre-existing red `lookup_citation` fuzzy-suggest). **No metric moved.**
+  - Adversarial review (3-dimension workflow) cleared it. Two real findings fixed:
+    `cluster_id` now source-gated (== node_id for statutes, was wrongly the chapter id;
+    latent PR2-dedup trap); chat empty-query `error` key restored. One "regression"
+    was a false alarm (reviewer baselined caselaw annotation against HEAD, but it was
+    pre-existing uncommitted working-tree code, copied faithfully).
+  - NOTE: PR1's edits to `chat.py`/`tools.py` are entangled with the uncommitted
+    prior-session foundation (chunking/eval/judge/`search.py`) in the same files, so a
+    clean PR1-only commit isn't separable. Commit strategy is the user's call.
 - [ ] **PR2 — Decision-cluster dedup + MMR + chunk-aware offsets.**
 - [ ] **PR3 — Treatment graph + deterministic v1 good-law flag.**
 - [ ] **PR4 — Verify+abstain extraction and stale-use gate.**
@@ -64,6 +78,10 @@ opinion-head excerpts that miss the holding, and no abstain path.
 
 ## Resume notes
 
-- 2026-06-07: design doc written; branch cut; baseline green confirmed; **PR1 not
-  yet coded**. Next action: extract `retrieve_context` + `corpus_tools`, repoint both
-  surfaces, prove no metric moved.
+- 2026-06-07: design doc written; branch cut; baseline green confirmed.
+- 2026-06-07: **PR1 coded, verified, and adversarially reviewed** (uncommitted in the
+  working tree). Tests green-for-green vs baseline; `api→mcp_server` import removed.
+  Next action: PR2 — decision-cluster dedup + MMR + chunk-aware offsets (answer §8 Q1/Q7
+  first: caselaw-only chunk excerpts? citation lane bypasses reranker?). `cluster_id` is
+  already correctly populated for dedup. Commit strategy for the working tree is pending
+  the user's decision.

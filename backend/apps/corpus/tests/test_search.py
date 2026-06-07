@@ -12,13 +12,19 @@ from django.test import TestCase, tag
 from apps.corpus.models import (
     Jurisdiction,
     Node,
+    NodeChunk,
     NodeType,
     NodeVersion,
     ReviewStatus,
     Source,
 )
-from apps.corpus.services.embeddings import run_embedding_job
+from apps.corpus.services.embeddings import run_chunk_embedding_job, run_embedding_job
 from apps.corpus.services.search import (
+    RETRIEVER_WEIGHTS,
+    case_name_search,
+    citation_search,
+    extract_case_names,
+    extract_citations,
     fts_search,
     hybrid_search,
     reciprocal_rank_fusion,
@@ -127,16 +133,18 @@ class SearchRetrieverTests(TestCase):
             self.assertGreaterEqual(score, -1.0)
 
     def test_hybrid_search_combines_retrievers(self):
-        run_embedding_job(client=FakeEmbeddingClient())
-        # FakeEmbeddingClient produces hash vectors with no semantic meaning,
-        # so the vector retriever is pure noise here. Use a query the two
-        # meaningful retrievers agree on (heading "Consumer fraud" → both FTS
-        # weight-A and heading trigram point at 714.16) so the assertion tests
-        # RRF fusion, not which doc the fake vectors happened to hash near.
+        # FakeEmbeddingClient produces hash vectors with no semantic meaning, so
+        # the vector retriever is pure noise. Under weighted RRF the dense vote is
+        # weighted 1.0 (it's the trusted signal in production), so that noise would
+        # now dominate the down-weighted lexical retrievers and make this test
+        # about which doc the fake vectors hashed near — exactly what it must not
+        # test. Drop the fake vector (use_vector=False) so the assertion exercises
+        # the fts+trigram fusion it intends: heading "Consumer fraud" → both FTS
+        # weight-A and heading trigram point at 714.16.
         hits = hybrid_search(
             "consumer fraud",
-            client=FakeEmbeddingClient(),
             limit=5,
+            use_vector=False,
         )
         self.assertGreater(len(hits), 0)
         top = hits[0]
@@ -150,6 +158,259 @@ class SearchRetrieverTests(TestCase):
         self.assertEqual(hits[0].path, "562A.21")
         for hit in hits:
             self.assertNotIn("vector", hit.component_scores)
+
+
+class ExtractCitationsTests(TestCase):
+    """The reporter-citation extractor must fire on real cites and stay quiet on
+    prose / statute refs (a false positive would inject a citation retriever on
+    an ordinary query)."""
+
+    def test_extracts_standard_and_parallel_cites(self):
+        self.assertEqual(extract_citations("763 N.W.2d 862"), ["763 N.W.2d 862"])
+        self.assertEqual(extract_citations("1 Morris 1"), ["1 Morris 1"])
+        self.assertEqual(
+            extract_citations("253 Iowa 378, 111 N.W.2d 753"),
+            ["253 Iowa 378", "111 N.W.2d 753"],
+        )
+        self.assertEqual(extract_citations("see 815 N.W.2d 1 (Iowa 2012)"), ["815 N.W.2d 1"])
+
+    def test_ignores_prose_and_statute_refs(self):
+        self.assertEqual(extract_citations("Article I Section 17"), [])
+        self.assertEqual(extract_citations("joint physical care 598.41"), [])
+        self.assertEqual(extract_citations("Baldwin qualified immunity Iowa"), [])
+
+
+@tag("postgres")
+class CitationSearchTests(TestCase):
+    """Exact citation lookup against ``source_metadata.citations`` — the path the
+    body-text retrievers structurally cannot serve, since the reporter cite lives
+    in metadata on the decision, not in the opinion text."""
+
+    def setUp(self):
+        j = Jurisdiction.objects.create(slug="jc", name="JC", abbreviation="JC")
+        self.source = Source.objects.create(
+            jurisdiction=j, slug="cases", name="Cases", citation_abbreviation="C"
+        )
+        self.nt = NodeType.objects.create(
+            source=self.source, key="case", label_singular="Case", level=1
+        )
+        # Decision cluster carries the citation; the embedded/returned unit is the
+        # child opinion, whose body deliberately does NOT contain the cite string.
+        self.cluster = Node.objects.create(
+            source=self.source, node_type=self.nt, ordinal="1", path="cl-1",
+            heading="Varnum v. Brien",
+            source_metadata={"citations": ["763 N.W.2d 862", "2009 WL 874044"]},
+        )
+        self.opinion = Node.objects.create(
+            source=self.source, node_type=self.nt, ordinal="1", path="cl-1/op-1",
+            heading="Varnum v. Brien", parent=self.cluster,
+        )
+        self.op_v = NodeVersion.objects.create(
+            node=self.opinion,
+            body_text="CADY, Justice. We hold the marriage statute violates equal protection.",
+            effective_from=dt.date(2026, 1, 1), content_hash="h-op1",
+            review_status=ReviewStatus.APPROVED,
+        )
+        # A decoy whose body merely mentions the number 763 — must not be matched.
+        self.decoy = Node.objects.create(
+            source=self.source, node_type=self.nt, ordinal="2", path="cl-2/op-2",
+            heading="Other v. Other",
+        )
+        self.decoy_v = NodeVersion.objects.create(
+            node=self.decoy, body_text="There were 763 widgets at 862 Main Street.",
+            effective_from=dt.date(2026, 1, 1), content_hash="h-op2",
+            review_status=ReviewStatus.APPROVED,
+        )
+
+    def test_citation_search_matches_parent_metadata_returns_opinion(self):
+        hits = citation_search("763 N.W.2d 862", source_slug="cases")
+        ids = [i for i, _ in hits]
+        self.assertEqual(ids, [self.op_v.id])  # opinion of the matched cluster only
+
+    def test_citation_search_noop_without_citation(self):
+        self.assertEqual(citation_search("equal protection marriage"), [])
+
+    def test_hybrid_prepends_exact_citation_over_fts_noise(self):
+        # FTS surfaces the decoy (it contains "763" and "862"); the exact-cite
+        # case must still land at rank 1 via the prepend, not be diluted by RRF.
+        hits = hybrid_search("763 N.W.2d 862", limit=5, use_vector=False)
+        self.assertEqual(hits[0].path, "cl-1/op-1")
+        self.assertIn("citation", hits[0].component_scores)
+
+
+class ExtractCaseNamesTests(TestCase):
+    """The name extractor is a permissive *candidate* generator — capitalized,
+    non-stoplisted, citation-stripped tokens. The heading-frequency screen in
+    ``case_name_search`` is what culls non-party candidates (Iowa, Abrogation)."""
+
+    def test_extracts_capitalized_party_tokens(self):
+        self.assertEqual(
+            extract_case_names("Hansen joint physical care factors 598.41"), ["Hansen"]
+        )
+        self.assertEqual(
+            extract_case_names("Puntenney oil pipeline eminent domain public use"),
+            ["Puntenney"],
+        )
+        # "Constitution" is stoplisted; "Iowa" is left for the DF screen, not here.
+        self.assertEqual(
+            extract_case_names("Baldwin good faith standard Iowa Constitution"),
+            ["Baldwin", "Iowa"],
+        )
+
+    def test_drops_stoplist_and_citation_tokens(self):
+        self.assertEqual(extract_case_names("Whether Article I Section 17 applies"), [])
+        self.assertEqual(extract_case_names("763 N.W.2d 862"), [])
+
+
+@tag("postgres")
+class CaseNameSearchTests(TestCase):
+    """Party-name + concept intersection: the case whose NAME and CONCEPT both
+    match wins; a same-name/wrong-concept or wrong-name/same-concept case must
+    not be returned."""
+
+    def setUp(self):
+        j = Jurisdiction.objects.create(slug="jn", name="JN", abbreviation="JN")
+        self.source = Source.objects.create(
+            jurisdiction=j, slug="cn", name="CN", citation_abbreviation="CN"
+        )
+        self.nt = NodeType.objects.create(
+            source=self.source, key="case", label_singular="Case", level=1
+        )
+
+    def _case(self, n, heading, body):
+        cl = Node.objects.create(
+            source=self.source, node_type=self.nt, ordinal=str(n),
+            path=f"c{n}", heading=heading,
+        )
+        op = Node.objects.create(
+            source=self.source, node_type=self.nt, ordinal=str(n),
+            path=f"c{n}/op", heading="Opinion", parent=cl,
+        )
+        v = NodeVersion.objects.create(
+            node=op, body_text=body, effective_from=dt.date(2026, 1, 1),
+            content_hash=f"h{n}", review_status=ReviewStatus.APPROVED,
+        )
+        return op, v
+
+    def test_intersects_name_on_cluster_with_concept_in_body(self):
+        target, tv = self._case(
+            1, "In re Marriage of Hansen",
+            "We adopt a framework of factors for joint physical care under "
+            "section 598.41, emphasizing historical caregiving.",
+        )
+        # same surname, wrong concept
+        self._case(2, "State v. Hansen",
+                   "The defendant carried a concealed dangerous weapon.")
+        # right concept, wrong surname
+        self._case(3, "In re Marriage of Smith",
+                   "Joint physical care factors under section 598.41 are weighed.")
+
+        hits = case_name_search(
+            "Hansen joint physical care factors 598.41", source_slug="cn"
+        )
+        ids = [i for i, _ in hits]
+        self.assertEqual(ids, [tv.id])  # only the Hansen marriage opinion
+
+    def test_screens_zero_heading_frequency_candidate(self):
+        # "Abrogation" is a capitalized non-stoplisted candidate but appears in no
+        # heading (DF=0), so it is screened out -> no retriever firing.
+        self._case(1, "Turner v. Turner", "abrogation of parental immunity doctrine")
+        self.assertEqual(
+            case_name_search("Abrogation of parental immunity", source_slug="cn"), []
+        )
+
+    def test_noop_without_a_name(self):
+        self._case(1, "In re Marriage of Hansen", "joint physical care factors")
+        self.assertEqual(case_name_search("joint physical care factors"), [])
+
+    def test_hybrid_exposes_case_name_component(self):
+        target, _ = self._case(
+            1, "In re Marriage of Hansen",
+            "framework of factors for joint physical care under section 598.41",
+        )
+        self._case(3, "In re Marriage of Smith",
+                   "joint physical care factors under section 598.41")
+        hits = hybrid_search(
+            "Hansen joint physical care factors 598.41",
+            limit=5, use_vector=False, source_slug="cn",
+        )
+        self.assertEqual(hits[0].path, "c1/op")
+        self.assertIn("case_name", hits[0].component_scores)
+
+
+@tag("postgres")
+class ChunkVectorSearchTests(TestCase):
+    """vector_search must surface caselaw versions through their NodeChunk
+    embeddings (the version itself has no embedding) and roll multiple chunks up
+    to a single version row, while still honoring source/metadata scope."""
+
+    def setUp(self):
+        j = Jurisdiction.objects.create(slug="ia", name="Iowa", abbreviation="IA")
+        self.caselaw = Source.objects.create(
+            jurisdiction=j, slug="iowa-caselaw", name="Iowa Caselaw",
+            citation_abbreviation="IA",
+        )
+        dt_t = NodeType.objects.create(
+            source=self.caselaw, key="decision", label_singular="Decision", level=1
+        )
+        op_t = NodeType.objects.create(
+            source=self.caselaw, key="opinion", label_singular="Opinion", level=2
+        )
+        # Court/status live on the decision; the opinion is its child.
+        decision = Node.objects.create(
+            source=self.caselaw, node_type=dt_t, ordinal="1", path="cl-1",
+            heading="State v. X",
+            source_metadata={"court_id": "iowa", "precedential_status": "Published"},
+        )
+        opinion = Node.objects.create(
+            source=self.caselaw, node_type=op_t, parent=decision, ordinal="020",
+            path="cl-1/op-1", heading="Lead Opinion",
+        )
+        self.version = NodeVersion.objects.create(
+            node=opinion, body_text="full opinion text", effective_from=dt.date(2026, 1, 1),
+            content_hash="v", review_status=ReviewStatus.APPROVED,
+        )  # note: no version-level embedding — retrieval must come from chunks
+        for i in range(3):
+            NodeChunk.objects.create(
+                version=self.version, ordinal=i, body_text=f"chunk {i}",
+                context_header="State v. X (Iowa) — Lead Opinion",
+                char_start=0, char_end=7, token_count=2, content_hash=f"c{i}",
+            )
+        run_chunk_embedding_job(client=FakeEmbeddingClient())
+
+    def test_chunked_version_is_retrievable(self):
+        ids = [r[0] for r in vector_search("anything", client=FakeEmbeddingClient(), limit=5)]
+        self.assertIn(self.version.id, ids)
+        # Confirm it really had no version-level embedding.
+        self.assertIsNone(NodeVersion.objects.get(id=self.version.id).embedding)
+
+    def test_chunks_roll_up_to_one_row_per_version(self):
+        ids = [r[0] for r in vector_search("anything", client=FakeEmbeddingClient(), limit=5)]
+        self.assertEqual(ids.count(self.version.id), 1)  # 3 chunks → 1 version
+
+    def test_chunk_vector_scoped_to_source(self):
+        hit = vector_search(
+            "anything", client=FakeEmbeddingClient(), source_slug="iowa-caselaw"
+        )
+        self.assertEqual([r[0] for r in hit], [self.version.id])
+        miss = vector_search(
+            "anything", client=FakeEmbeddingClient(), source_slug="iowa-code"
+        )
+        self.assertEqual(miss, [])
+
+    def test_chunk_metadata_facet_filter_uses_parent_decision(self):
+        # court_id lives on the parent decision; the parent-aware filter must
+        # still scope the chunk-backed opinion version.
+        hit = vector_search(
+            "anything", client=FakeEmbeddingClient(),
+            source_slug="iowa-caselaw", metadata_contains={"court_id": "iowa"},
+        )
+        self.assertEqual([r[0] for r in hit], [self.version.id])
+        miss = vector_search(
+            "anything", client=FakeEmbeddingClient(),
+            source_slug="iowa-caselaw", metadata_contains={"court_id": "nope"},
+        )
+        self.assertEqual(miss, [])
 
 
 @tag("postgres")
@@ -339,3 +600,21 @@ class RRFTests(TestCase):
         b = [(2, 9999.0)]
         fused = dict((row[0], row[1]) for row in reciprocal_rank_fusion({"a": a, "b": b}))
         self.assertAlmostEqual(fused[1], fused[2])
+
+    def test_weighted_rrf_keeps_dense_rank1_over_weak_agreement(self):
+        # The headline regression this guards: two weak lexical retrievers (fts,
+        # trigram) agree on a decoy (200) at rank 1 while the trusted dense
+        # retriever alone has the right answer (100) at rank 1. Equal-weight RRF
+        # gives the decoy two votes vs one and it wins — which is exactly why
+        # 'hybrid' scored worse than 'vector'. The production weights must keep
+        # the dense hit on top.
+        rankings = {
+            "vector": [(100, 0.80)],
+            "fts": [(200, 0.50)],
+            "trigram": [(200, 0.40)],
+        }
+        weighted = reciprocal_rank_fusion(rankings, weights=RETRIEVER_WEIGHTS)
+        self.assertEqual(weighted[0][0], 100)
+        # And prove the weighting is what flipped it: equal weight elects the decoy.
+        equal = reciprocal_rank_fusion(rankings, weights={})
+        self.assertEqual(equal[0][0], 200)

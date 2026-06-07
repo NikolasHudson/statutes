@@ -36,16 +36,16 @@ from apps.corpus.services.lookups import (
     validate_citations,
     verify_quotes,
 )
-from apps.corpus.services.rerank import default_reranker
-from apps.mcp_server.tools import (
+from apps.corpus.services.corpus_tools import (
+    _today,
     get_cross_references_tool,
     get_definitions_tool,
     get_section_at_date_tool,
     get_version_history_tool,
     list_recent_amendments_tool,
     lookup_citation_tool,
-    search_statutes_tool,
 )
+from apps.corpus.services.retrieval import _excerpt, retrieve_context
 
 
 # Max body text returned per search hit, in chars. The MCP tool caps at 280
@@ -65,89 +65,70 @@ SEARCH_BODY_MAX_CHARS_TOP = 9000
 TOP_HITS_FULL = 2
 
 
-def _excerpt(text: str, max_chars: int) -> str:
-    """Trim ``text`` to ``max_chars``, breaking on a word boundary and
-    flagging the cut with an ellipsis so the model (per the system prompt)
-    knows to call lookup_citation for the complete section."""
-    text = text.rstrip()
-    if len(text) <= max_chars:
-        return text
-    cut = text[: max_chars - 1]
-    last_space = cut.rfind(" ")
-    if last_space > max_chars // 2:
-        cut = cut[:last_space]
-    return cut.rstrip() + "…"
-
 # Retrieve a wide candidate pool from hybrid search, then let the reranker
 # pick the few that actually answer the question. Returning 18 loosely-related
 # sections (the old behaviour) buried the on-point rule in noise; a tight,
 # reranked set is what makes the answer — and its source list — trustworthy.
-CHAT_CANDIDATE_POOL = 20
+#
+# Pool size 50 (was 20): a cross-encoder reranker only helps if the on-point
+# answer is in the pool it sees, and at 20 a holding that the bi-encoder ranked
+# 21st-50th is unreachable. Reported reranker sweet spots land at ~50-75
+# candidates; 50 is the low end of that band and the cap ``search_statutes_tool``
+# already enforces (``min(limit, 50)``) — raise that cap too before trying 75.
+CHAT_CANDIDATE_POOL = 50
 CHAT_DISPLAY_LIMIT = 6
 
 
 def _enriched_search(args: dict) -> dict:
-    """Wrap search_statutes_tool, then rerank the candidates against the
-    query and keep only the most relevant few, each with a body excerpt long
-    enough for the model to summarize.
+    """Chat's search tool: delegate to the shared ``retrieve_context`` pipeline,
+    then serialize the passages into the chat hit shape.
 
     ``source_slug`` is injected by the chat endpoint from the request-level
     source picker, not chosen by the model — scoping is a user decision. The
     model's ``limit`` is intentionally ignored: chat noise is a precision
-    problem, not a recall one."""
-    result = search_statutes_tool(
-        args["query"],
-        limit=CHAT_CANDIDATE_POOL,
-        use_vector=args.get("use_vector", True),
+    problem, not a recall one.
+
+    Reranks the full candidate pool down to the display set, then attaches a
+    long ``body_excerpt`` (from the current version) and the section's
+    ``effective_from`` so the model can quote the real effective date instead
+    of fabricating one (today's date written as "Effective from …" was a
+    common hallucination tell)."""
+    query = args["query"]
+    if not query or not query.strip():
+        return {
+            "query": query,
+            "hits": [],
+            "as_of_date": _today(),
+            "error": "query must not be empty",
+        }
+    ctx = retrieve_context(
+        query,
         source_slug=args.get("source_slug"),
+        use_vector=args.get("use_vector", True),
+        candidate_pool=CHAT_CANDIDATE_POOL,
+        display_limit=CHAT_DISPLAY_LIMIT,
+        rerank=True,
+        rerank_doc_chars=None,
+        enrich_bodies=True,
+        excerpt_budget_top=SEARCH_BODY_MAX_CHARS_TOP,
+        excerpt_budget_rest=SEARCH_BODY_MAX_CHARS,
+        top_hits_full=TOP_HITS_FULL,
     )
-    hits = result.get("hits") or []
-    if not hits:
-        return result
-
-    node_ids = [h["node"]["id"] for h in hits]
-    # Get the current body + effective_from for each node (effective_to IS NULL).
-    # effective_from goes onto the hit so the model can quote the section's
-    # real effective date instead of fabricating one (today's date written as
-    # "Effective from …" was a common hallucination tell).
-    bodies: dict[int, str] = {}
-    effective_from: dict[int, str] = {}
-    for nv in NodeVersion.objects.filter(
-        node_id__in=node_ids, effective_to__isnull=True
-    ).only("node_id", "body_text", "effective_from"):
-        bodies.setdefault(nv.node_id, nv.body_text)
-        if nv.effective_from and nv.node_id not in effective_from:
-            effective_from[nv.node_id] = nv.effective_from.isoformat()
-
-    # Rerank on heading + body so the cross-encoder sees what the section is
-    # actually about, not just its first sentence.
-    by_node = {h["node"]["id"]: h for h in hits}
-    candidates: list[tuple[int, str]] = [
-        (
-            nid,
-            f"{by_node[nid]['node'].get('heading', '')}\n"
-            f"{bodies.get(nid, by_node[nid].get('snippet', ''))}",
-        )
-        for nid in node_ids
-    ]
-    ranked_ids = default_reranker().rerank(
-        args["query"], candidates, top_k=CHAT_DISPLAY_LIMIT
-    )
-
-    ordered: list[dict] = []
-    for rank, nid in enumerate(ranked_ids):
-        h = by_node[nid]
-        budget = (
-            SEARCH_BODY_MAX_CHARS_TOP
-            if rank < TOP_HITS_FULL
-            else SEARCH_BODY_MAX_CHARS
-        )
-        h["body_excerpt"] = _excerpt(bodies.get(nid, ""), budget)
-        h["effective_from"] = effective_from.get(nid)
-        ordered.append(h)
-
-    result["hits"] = ordered
-    return result
+    return {
+        "query": ctx.query,
+        "hits": [
+            {
+                "node": p.node_dict,
+                "snippet": p.snippet,
+                "score": p.score,
+                "component_scores": p.component_scores,
+                "body_excerpt": p.excerpt,
+                "effective_from": p.effective_from,
+            }
+            for p in ctx.passages
+        ],
+        "as_of_date": ctx.as_of_date,
+    }
 
 
 chat_router = Router()
@@ -428,6 +409,18 @@ SYSTEM_PROMPT = (
     "Do NOT split the path across words (``Chapter 1, Rule 981`` is wrong; "
     "``Iowa Ct. R. 1.981`` is right). The first time you cite a section, use "
     "the full form so the reader can verify it.\n\n"
+    "CASELAW: the corpus also includes Iowa court decisions (opinions), not "
+    "only statutes and rules. search_statutes returns these too — it matches "
+    "by reporter citation (e.g. '763 N.W.2d 862') and party name as well as "
+    "by topic. (lookup_citation is for statute/rule citations only; to pull a "
+    "specific case, search_statutes with its citation or name.) When a result "
+    "is a case, the same grounding rules apply: state a holding only where the "
+    "retrieved opinion text supports it, quote short load-bearing phrases, and "
+    "cite the case by its name and reporter citation EXACTLY as they appear in "
+    "the result (the heading / case_name and any ``citations``) — never invent "
+    "a reporter, volume, page, or year. Use cases to illustrate or interpret a "
+    "statute/rule, but the governing authority for a statutory question is "
+    "still the statute or rule itself.\n\n"
     "When the tool result for a section includes a non-empty "
     "``official_url`` and / or ``effective_from``, copy them into your "
     "answer verbatim alongside that section's citation. When either field "

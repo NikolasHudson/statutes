@@ -6,3 +6,7 @@ class CorpusConfig(AppConfig):
     name = "apps.corpus"
     label = "corpus"
     verbose_name = "Corpus"
+
+    def ready(self):
+        # Registers the connection_created receiver that widens hnsw.ef_search.
+        from . import signals  # noqa: F401

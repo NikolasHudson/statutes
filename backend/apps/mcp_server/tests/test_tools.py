@@ -74,6 +74,18 @@ class ToolFunctionTests(TestCase):
         self.assertTrue(out["hits"])
         self.assertEqual(out["hits"][0]["node"]["path"], "714.16")
 
+    def test_search_statutes_rerank_path_returns_results(self):
+        # The MCP server calls the tool with rerank=True for external agents.
+        # Without a VOYAGE_API_KEY the reranker is the Noop (preserves RRF order),
+        # so this asserts the rerank plumbing returns the same on-point hit rather
+        # than dropping results — a guard on the pool/map-back logic.
+        out = tools.search_statutes_tool(
+            "consumer fraud", use_vector=False, rerank=True, limit=5
+        )
+        self.assertTrue(out["hits"])
+        self.assertEqual(out["hits"][0]["node"]["path"], "714.16")
+        self.assertLessEqual(len(out["hits"]), 5)
+
     def test_validate_citations_marks_known_section_valid(self):
         text = "See Iowa Code § 714.16 (consumer fraud)."
         out = tools.validate_citations_tool(text)

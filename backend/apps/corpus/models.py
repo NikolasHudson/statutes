@@ -191,6 +191,56 @@ class NodeVersion(models.Model):
         return f"{self.node} @ {self.effective_from}"
 
 
+class NodeChunk(models.Model):
+    """A passage-level slice of a NodeVersion body, carrying its own embedding.
+
+    Why this exists: ``NodeVersion.embedding`` is one vector for the whole
+    provision/opinion. That is fine for short statute sections but poor for
+    caselaw — a multi-thousand-token opinion averages every distinct holding
+    into one blurry vector and (over voyage-law-2's 16k-token cap) silently
+    truncates its tail. Chunks give the vector index passage granularity.
+
+    A NodeChunk is a *retrieval-index artifact*, deliberately NOT part of the
+    citable Node hierarchy: the citable unit stays the NodeVersion, and chunks
+    hang off it. So statutes can keep embedding whole (no chunks) while caselaw
+    is chunked, without polluting ``corpus_node`` with non-citable fragments.
+
+    ``body_text`` is the raw span — ``version.body_text[char_start:char_end]`` —
+    so the offsets anchor highlighting and the chat quote-verifier exactly.
+    ``context_header`` (case name / citation / court / year / opinion type) is
+    prepended *only at embed time* (``context_header + "\n\n" + body_text``); a
+    bare paragraph 7 of an opinion otherwise carries no signal about which case
+    it came from. ``content_hash`` covers that embedded text, so changing either
+    the body or the header re-embeds; idempotency mirrors NodeVersion exactly
+    (re-embed when ``content_hash != embedding_source_hash``).
+    """
+
+    version = models.ForeignKey(
+        NodeVersion, on_delete=models.CASCADE, related_name="chunks"
+    )
+    ordinal = models.PositiveIntegerField()  # 0-based position within the version
+    body_text = models.TextField()  # raw span == version.body_text[char_start:char_end]
+    context_header = models.TextField(blank=True)  # case-meta prefix, prepended at embed time
+    char_start = models.PositiveIntegerField()
+    char_end = models.PositiveIntegerField()
+    token_count = models.PositiveIntegerField()  # tokens of the embedded text (header + body)
+    content_hash = models.CharField(max_length=64)  # sha256 of the embedded text
+    embedding_source_hash = models.CharField(max_length=64, blank=True)
+    embedding = VectorField(dimensions=1024, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("version", "ordinal")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("version", "ordinal"), name="uniq_chunk_ordinal_per_version"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.version} #{self.ordinal}"
+
+
 class Edition(models.Model):
     """A published edition of a Source — e.g. "Iowa Code 2026".
 

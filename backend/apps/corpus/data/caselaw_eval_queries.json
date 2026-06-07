@@ -1,0 +1,183 @@
+{
+  "_": [
+    "Caselaw retrieval eval set — 20 landmark Iowa Supreme Court / territorial cases.",
+    "",
+    "Each entry pairs a natural-language description of a case's core legal & factual",
+    "holding (the 'query', as an attorney might describe what they're looking for",
+    "WITHOUT naming the case) with the decision it should retrieve. The target is a",
+    "decision *cluster* path (cl-cluster-<id>); a hit on ANY opinion node under that",
+    "cluster (cl-cluster-<id>/op-<id>) counts as finding the case, since the case is",
+    "the relevant unit, not the individual opinion.",
+    "",
+    "target_cluster was resolved from the DB by the reporter citation. Two notes:",
+    "  - Nelson v. Knight: the question set's 825 N.W.2d 4 was the original opinion,",
+    "    WITHDRAWN on rehearing; the corpus holds the final 834 N.W.2d 64 (2013).",
+    "  - State v. Ingram: stored as 914 N.W.2d 794 (the question set's 914 N.W.2d 894",
+    "    is a transposition typo); same 2018 inventory-search case (Bion Blake Ingram).",
+    "",
+    "run: python manage.py eval_caselaw           (scoped to iowa-caselaw by default)"
+  ],
+  "scope_source": "iowa-caselaw",
+  "queries": [
+    {
+      "id": 1,
+      "case_name": "Varnum v. Brien",
+      "citation": "763 N.W.2d 862 (Iowa 2009)",
+      "area": "Constitutional / Civil Rights",
+      "target_cluster": "cl-cluster-1870141",
+      "query": "Equal protection clause challenge to the statutory definition of marriage restricting it to opposite-sex couples."
+    },
+    {
+      "id": 2,
+      "case_name": "Thompson v. Kaczinski",
+      "citation": "774 N.W.2d 829 (Iowa 2009)",
+      "area": "Torts / Negligence",
+      "target_cluster": "cl-cluster-1666221",
+      "query": "Adoption of the Restatement (Third) of Torts; explicitly uncouples foreseeability from the determination of legal duty."
+    },
+    {
+      "id": 3,
+      "case_name": "Puntenney v. Iowa Utilities Board",
+      "citation": "928 N.W.2d 829 (Iowa 2019)",
+      "area": "Property / Eminent Domain",
+      "target_cluster": "cl-cluster-4625156",
+      "query": "Determines whether a private crude oil pipeline crossing the state without offloading facilities satisfies the public use requirement."
+    },
+    {
+      "id": 4,
+      "case_name": "Chiodo v. Section 43.24 Panel",
+      "citation": "846 N.W.2d 845 (Iowa 2014)",
+      "area": "Constitutional / Election",
+      "target_cluster": "cl-cluster-4472170",
+      "query": "Evaluates whether a second-offense Operating While Intoxicated (OWI) constitutes an infamous crime that strips voter and candidate eligibility."
+    },
+    {
+      "id": 5,
+      "case_name": "State v. Ochoa",
+      "citation": "792 N.W.2d 260 (Iowa 2010)",
+      "area": "Criminal / Search & Seizure",
+      "target_cluster": "cl-cluster-4472474",
+      "query": "Rejects federal Fourth Amendment parity; holds that general law enforcement cannot conduct suspicionless searches of parolees under the Iowa Constitution."
+    },
+    {
+      "id": 6,
+      "case_name": "Turner v. Turner",
+      "citation": "304 N.W.2d 786 (Iowa 1981)",
+      "area": "Family Law / Torts",
+      "target_cluster": "cl-cluster-2062763",
+      "query": "Partially abrogates the traditional parental immunity doctrine, allowing minor children to sue parents for negligence outside of core parental authority."
+    },
+    {
+      "id": 7,
+      "case_name": "In re Marriage of Hansen",
+      "citation": "733 N.W.2d 683 (Iowa 2007)",
+      "area": "Family Law / Custody",
+      "target_cluster": "cl-cluster-1832878",
+      "query": "Establishes the definitive multi-factor framework for evaluating joint physical care, emphasizing historical caregiving patterns."
+    },
+    {
+      "id": 8,
+      "case_name": "Gacke v. Pork Xtra, L.L.C.",
+      "citation": "684 N.W.2d 168 (Iowa 2004)",
+      "area": "Torts / Constitutional Law",
+      "target_cluster": "cl-cluster-2107625",
+      "query": "Examines the Right-to-Farm statute; holds that granting absolute immunity to agricultural nuisances violates the state's inalienable rights clause."
+    },
+    {
+      "id": 9,
+      "case_name": "Nelson v. Knight",
+      "citation": "834 N.W.2d 64 (Iowa 2013) [question set cited the withdrawn 825 N.W.2d 4]",
+      "area": "Employment / Civil Rights",
+      "target_cluster": "cl-cluster-4472209",
+      "query": "Decides that firing an employee because they are an irresistible attraction that threatens the employer's marriage does not constitute gender discrimination."
+    },
+    {
+      "id": 10,
+      "case_name": "State v. Sweet",
+      "citation": "879 N.W.2d 811 (Iowa 2016)",
+      "area": "Criminal / Sentencing",
+      "target_cluster": "cl-cluster-8281538",
+      "query": "Imposes a categorical ban on sentencing juvenile offenders to life without the possibility of parole under the Iowa Constitution."
+    },
+    {
+      "id": 11,
+      "case_name": "Baldwin v. City of Estherville",
+      "citation": "915 N.W.2d 259 (Iowa 2018)",
+      "area": "Civil Torts / Sovereign Immunity",
+      "target_cluster": "cl-cluster-4512940",
+      "query": "Clarifies whether monetary damages are available for direct state constitutional violations, establishing a good faith qualified immunity standard."
+    },
+    {
+      "id": 12,
+      "case_name": "State v. Baldon",
+      "citation": "829 N.W.2d 785 (Iowa 2013)",
+      "area": "Criminal / Constitutional Law",
+      "target_cluster": "cl-cluster-4472245",
+      "query": "Holds that a signature on a standard parole agreement does not constitute valid, voluntary prospective consent to search an individual's vehicle."
+    },
+    {
+      "id": 13,
+      "case_name": "Feld v. Borkowski",
+      "citation": "790 N.W.2d 72 (Iowa 2010)",
+      "area": "Torts / Sports Liability",
+      "target_cluster": "cl-cluster-4472505",
+      "query": "Establishes that a co-participant in a recreational sports activity (softball game) can only be held liable if their conduct rises to recklessness."
+    },
+    {
+      "id": 14,
+      "case_name": "State v. Ingram",
+      "citation": "914 N.W.2d 794 (Iowa 2018) [question set cited 914 N.W.2d 894, a typo]",
+      "area": "Criminal / Search & Seizure",
+      "target_cluster": "cl-cluster-4512774",
+      "query": "Departs from federal law to hold that police cannot search closed or zipped containers during an inventory search of an impounded vehicle."
+    },
+    {
+      "id": 15,
+      "case_name": "Luana Savings Bank v. Pro-Build Holdings, Inc.",
+      "citation": "856 N.W.2d 892 (Iowa 2014)",
+      "area": "Contract / Construction",
+      "target_cluster": "cl-cluster-2760234",
+      "query": "Determines whether the implied warranty of workmanlike construction protects commercial entities purchasing multi-family investment real estate."
+    },
+    {
+      "id": 16,
+      "case_name": "In the Matter of Ralph",
+      "citation": "1 Morris 1 (Iowa 1839)",
+      "area": "Historical / Property",
+      "target_cluster": "cl-cluster-7179769",
+      "query": "First Iowa territorial decision; holds that a slave becomes a free man when he steps onto free soil with his master's consent."
+    },
+    {
+      "id": 17,
+      "case_name": "Dier v. Peters",
+      "citation": "815 N.W.2d 1 (Iowa 2012)",
+      "area": "Torts / Family Law",
+      "target_cluster": "cl-cluster-4472325",
+      "query": "Recognizes a common-law cause of action for paternity fraud, allowing a man to sue to recover child support paid for a non-biological child."
+    },
+    {
+      "id": 18,
+      "case_name": "State v. Short",
+      "citation": "851 N.W.2d 474 (Iowa 2014)",
+      "area": "Criminal / Constitutional Law",
+      "target_cluster": "cl-cluster-2687558",
+      "query": "Detailed defense of independent state constitutionalism regarding residential search warrants and rejection of federal exceptions."
+    },
+    {
+      "id": 19,
+      "case_name": "Huber v. Hovey",
+      "citation": "501 N.W.2d 53 (Iowa 1993)",
+      "area": "Torts / Assumption of Risk",
+      "target_cluster": "cl-cluster-1309491",
+      "query": "Analyzes the scope and enforceability of exculpatory liability waivers signed by spectators entering a racetrack pit area."
+    },
+    {
+      "id": 20,
+      "case_name": "Berger v. Amana Society",
+      "citation": "253 Iowa 378, 111 N.W.2d 753 (1961)",
+      "area": "Corporate / Shareholder Rights",
+      "target_cluster": "cl-cluster-2050852",
+      "query": "Investigates whether corporate directors can unilaterally amend articles of incorporation to dilute the economic or voting rights of class stockholders."
+    }
+  ]
+}

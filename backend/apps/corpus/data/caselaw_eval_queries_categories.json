@@ -1,0 +1,230 @@
+{
+  "_": [
+    "Category-based semantic-search eval — 20 queries over the 20 landmark Iowa",
+    "cases in caselaw_eval_queries.json, supplied to test the production retrieval",
+    "pipeline (bi-encoder recall -> cross-encoder rerank) under four query styles:",
+    "  A  Pure fact-pattern / narrative  (messy real-world scenario -> holding)",
+    "  B  Abstract legal concept         (formal jargon, no narrative overlap)",
+    "  C  Fragmentary / citation / name  (short token distributions)",
+    "  D  Adversarial / hard-rerank      (shared keywords, different rule)",
+    "",
+    "'area' carries the testing CATEGORY so the eval_caselaw by-area report becomes",
+    "a per-category breakdown. 'legal_area', 'category', and 'distractor' are extra",
+    "fields the harness ignores; 'distractor' names the case that MUST be outranked.",
+    "target_cluster values were verified against the DB (case_name + reporter",
+    "citations in source_metadata) on 2026-06-07 — all 20 loaded, chunked, embedded.",
+    "",
+    "run: python manage.py eval_caselaw --rerank --verbose \\",
+    "       --queries apps/corpus/data/caselaw_eval_queries_categories.json \\",
+    "       --out benchmarks/caselaw/caselaw_categories.json"
+  ],
+  "scope_source": "iowa-caselaw",
+  "queries": [
+    {
+      "id": 1,
+      "category": "A",
+      "area": "A: Fact-Pattern",
+      "case_name": "Thompson v. Kaczinski",
+      "citation": "774 N.W.2d 829 (Iowa 2009)",
+      "legal_area": "Torts / Negligence",
+      "target_cluster": "cl-cluster-1666221",
+      "query": "A heavy wind gust blew a trampoline over a fence and into the middle of a county highway causing a car crash."
+    },
+    {
+      "id": 2,
+      "category": "A",
+      "area": "A: Fact-Pattern",
+      "case_name": "Gacke v. Pork Xtra, L.L.C.",
+      "citation": "684 N.W.2d 168 (Iowa 2004)",
+      "legal_area": "Torts / Constitutional Law",
+      "target_cluster": "cl-cluster-2107625",
+      "query": "An angry neighbor sues an industrial hog confinement facility because of the horrible odors and swarms of flies coming from the manure pit."
+    },
+    {
+      "id": 3,
+      "category": "A",
+      "area": "A: Fact-Pattern",
+      "case_name": "Nelson v. Knight",
+      "citation": "834 N.W.2d 64 (Iowa 2013)",
+      "legal_area": "Employment / Civil Rights",
+      "target_cluster": "cl-cluster-4472209",
+      "query": "A dentist fired his female assistant because his wife was jealous and felt the assistant was too attractive for the office."
+    },
+    {
+      "id": 4,
+      "category": "A",
+      "area": "A: Fact-Pattern",
+      "case_name": "Feld v. Borkowski",
+      "citation": "790 N.W.2d 72 (Iowa 2010)",
+      "legal_area": "Torts / Sports Liability",
+      "target_cluster": "cl-cluster-4472505",
+      "query": "A person playing in an informal, local softball tournament gets hit in the head by a bat that flew out of the batter's hands during a swing."
+    },
+    {
+      "id": 5,
+      "category": "A",
+      "area": "A: Fact-Pattern",
+      "case_name": "Dier v. Peters",
+      "citation": "815 N.W.2d 1 (Iowa 2012)",
+      "legal_area": "Torts / Family Law",
+      "target_cluster": "cl-cluster-4472325",
+      "query": "A man who paid child support for years runs a DNA test and realizes the kid isn't his, so he sues his ex-girlfriend for lying to him."
+    },
+    {
+      "id": 6,
+      "category": "B",
+      "area": "B: Abstract Concept",
+      "case_name": "Turner v. Turner",
+      "citation": "304 N.W.2d 786 (Iowa 1981)",
+      "legal_area": "Family Law / Torts",
+      "target_cluster": "cl-cluster-2062763",
+      "query": "Abrogation of the parental immunity doctrine in state tort actions involving minor children."
+    },
+    {
+      "id": 7,
+      "category": "B",
+      "area": "B: Abstract Concept",
+      "case_name": "State v. Sweet",
+      "citation": "879 N.W.2d 811 (Iowa 2016)",
+      "legal_area": "Criminal / Sentencing",
+      "target_cluster": "cl-cluster-8281538",
+      "query": "Categorical constitutional bar under Article I Section 17 on life imprisonment without parole for individuals under eighteen."
+    },
+    {
+      "id": 8,
+      "category": "B",
+      "area": "B: Abstract Concept",
+      "case_name": "Luana Savings Bank v. Pro-Build Holdings, Inc.",
+      "citation": "856 N.W.2d 892 (Iowa 2014)",
+      "legal_area": "Contract / Construction",
+      "target_cluster": "cl-cluster-2760234",
+      "query": "Whether the implied warranty of workmanlike construction extends beyond residential homeowners to sophisticated commercial entities and real estate investors."
+    },
+    {
+      "id": 9,
+      "category": "B",
+      "area": "B: Abstract Concept",
+      "case_name": "State v. Short",
+      "citation": "851 N.W.2d 474 (Iowa 2014)",
+      "legal_area": "Criminal / Constitutional Law",
+      "target_cluster": "cl-cluster-2687558",
+      "query": "Application of the independent state constitutionalism doctrine to reject federal Fourth Amendment relaxation of the warrant requirement."
+    },
+    {
+      "id": 10,
+      "category": "B",
+      "area": "B: Abstract Concept",
+      "case_name": "Berger v. Amana Society",
+      "citation": "253 Iowa 378, 111 N.W.2d 753 (1961)",
+      "legal_area": "Corporate / Shareholder Rights",
+      "target_cluster": "cl-cluster-2050852",
+      "query": "Fiduciary duties of corporate directors regarding amendments to the articles of incorporation that impair or dilute historical stockholder rights."
+    },
+    {
+      "id": 11,
+      "category": "C",
+      "area": "C: Fragmentary/Citation",
+      "case_name": "Varnum v. Brien",
+      "citation": "763 N.W.2d 862 (Iowa 2009)",
+      "legal_area": "Constitutional / Civil Rights",
+      "target_cluster": "cl-cluster-1870141",
+      "query": "763 N.W.2d 862"
+    },
+    {
+      "id": 12,
+      "category": "C",
+      "area": "C: Fragmentary/Citation",
+      "case_name": "Puntenney v. Iowa Utilities Board",
+      "citation": "928 N.W.2d 829 (Iowa 2019)",
+      "legal_area": "Property / Eminent Domain",
+      "target_cluster": "cl-cluster-4625156",
+      "query": "Puntenney oil pipeline eminent domain public use"
+    },
+    {
+      "id": 13,
+      "category": "C",
+      "area": "C: Fragmentary/Citation",
+      "case_name": "In the Matter of Ralph",
+      "citation": "1 Morris 1 (Iowa 1839)",
+      "legal_area": "Historical / Property",
+      "target_cluster": "cl-cluster-7179769",
+      "query": "Matter of Ralph 1839 Dubuque lead mines"
+    },
+    {
+      "id": 14,
+      "category": "C",
+      "area": "C: Fragmentary/Citation",
+      "case_name": "In re Marriage of Hansen",
+      "citation": "733 N.W.2d 683 (Iowa 2007)",
+      "legal_area": "Family Law / Custody",
+      "target_cluster": "cl-cluster-1832878",
+      "query": "Hansen joint physical care factors 598.41"
+    },
+    {
+      "id": 15,
+      "category": "C",
+      "area": "C: Fragmentary/Citation",
+      "case_name": "Baldwin v. City of Estherville",
+      "citation": "915 N.W.2d 259 (Iowa 2018)",
+      "legal_area": "Civil Torts / Sovereign Immunity",
+      "target_cluster": "cl-cluster-4512940",
+      "query": "Baldwin qualified immunity good faith standard Iowa Constitution"
+    },
+    {
+      "id": 16,
+      "category": "D",
+      "area": "D: Adversarial",
+      "case_name": "State v. Baldon",
+      "citation": "829 N.W.2d 785 (Iowa 2013)",
+      "legal_area": "Criminal / Constitutional Law",
+      "target_cluster": "cl-cluster-4472245",
+      "distractor": "cl-cluster-4472474",
+      "distractor_name": "State v. Ochoa",
+      "query": "Does signing a parole release form count as voluntary consent to let an officer search your car trunk?"
+    },
+    {
+      "id": 17,
+      "category": "D",
+      "area": "D: Adversarial",
+      "case_name": "State v. Ochoa",
+      "citation": "792 N.W.2d 260 (Iowa 2010)",
+      "legal_area": "Criminal / Search & Seizure",
+      "target_cluster": "cl-cluster-4472474",
+      "distractor": "cl-cluster-4472245",
+      "distractor_name": "State v. Baldon",
+      "query": "Warrantless suspicionless search of a parolee's home by general police officers under the state constitution."
+    },
+    {
+      "id": 18,
+      "category": "D",
+      "area": "D: Adversarial",
+      "case_name": "Chiodo v. Section 43.24 Panel",
+      "citation": "846 N.W.2d 845 (Iowa 2014)",
+      "legal_area": "Constitutional / Election",
+      "target_cluster": "cl-cluster-4472170",
+      "query": "Is a second conviction for driving drunk under the influence considered an infamous crime for voting eligibility?"
+    },
+    {
+      "id": 19,
+      "category": "D",
+      "area": "D: Adversarial",
+      "case_name": "State v. Ingram",
+      "citation": "914 N.W.2d 794 (Iowa 2018)",
+      "legal_area": "Criminal / Search & Seizure",
+      "target_cluster": "cl-cluster-4512774",
+      "query": "Can a police officer search a zipped backpack found inside a car trunk during a routine vehicle impoundment inventory?"
+    },
+    {
+      "id": 20,
+      "category": "D",
+      "area": "D: Adversarial",
+      "case_name": "Huber v. Hovey",
+      "citation": "501 N.W.2d 53 (Iowa 1993)",
+      "legal_area": "Torts / Assumption of Risk",
+      "target_cluster": "cl-cluster-1309491",
+      "distractor": "cl-cluster-4472505",
+      "distractor_name": "Feld v. Borkowski",
+      "query": "Spectator liability waiver signed at the entrance gate of a dirt racetrack pit area."
+    }
+  ]
+}
