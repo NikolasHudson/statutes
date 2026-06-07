@@ -119,6 +119,20 @@ envs:
 # would reach Django as /auth/login).
 ingress:
   rules:
+  # Remote MCP server (streamable HTTP). Path-based routing was a deliberate
+  # decision (see MCP_PRODUCTION_PLAN.md §2a): App Platform supports both path
+  # and subdomain routing; path reuses this proven pattern with zero new DNS.
+  # preserve_path_prefix is REQUIRED — FastMCP's streamable_http_path defaults to
+  # /mcp, so the component must see /mcp (not a stripped /). Public endpoint:
+  # https://corpus.nick.law/mcp. NOTE: when OAuth lands, add a rule routing
+  # /.well-known/oauth-protected-resource* to this component too (it would
+  # otherwise fall into the / catch-all → chat-frontend).
+  - match:
+      path:
+        prefix: /mcp
+    component:
+      name: mcp
+      preserve_path_prefix: true
   - match:
       path:
         prefix: /api
@@ -201,6 +215,47 @@ services:
   # process is pulled from rotation rather than relying on a bare TCP probe.
   health_check:
     http_path: /
+    timeout_seconds: 5
+    failure_threshold: 3
+# Remote MCP server: the same Django image (mcp[cli] is in requirements.txt;
+# PyTorch is deliberately NOT — it lives only in docling — so this image is
+# small) served as a streamable-HTTP ASGI app instead of the WSGI API. We
+# override the Dockerfile CMD with run_command (same mechanism as the
+# trace-purge worker) rather than maintaining a second Dockerfile.
+#   VERIFY ON FIRST DEPLOY: that run_command overrides the Dockerfile CMD on a
+#   *service* (the trace-purge precedent is a *worker*). If it does not, add a
+#   dedicated /Dockerfile.mcp with the gunicorn CMD baked in and point
+#   dockerfile_path at it.
+# Stateless + JSON mode (apps/mcp_server/server.py) makes multi-worker /
+# multi-instance safe — App Platform has no session affinity. Inherits the
+# app-level envs it needs (SECRET_KEY, DATABASE_URL, DATABASE_SSLMODE,
+# VOYAGE_API_KEY, ALLOWED_HOSTS, DEBUG). Transport-security allowed_hosts/origins
+# default from ALLOWED_HOSTS/CORS_ALLOWED_ORIGINS; override with
+# MCP_ALLOWED_HOSTS / MCP_ALLOWED_ORIGINS, or set
+# MCP_DNS_REBINDING_PROTECTION=false as an escape hatch if the edge forwards an
+# unexpected Host and 421s every call (auth still gates every request).
+# Auth today is X-API-Key only (no rate-limit/audit yet — see plan P1).
+# NOTE: deploy_on_push couples MCP redeploys to every main commit (whole-app
+# deploy); that is accepted, not independent rollout.
+- name: mcp
+  dockerfile_path: /Dockerfile
+  source_dir: /
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    deploy_on_push: true
+  run_command: gunicorn apps.mcp_server.asgi:app -k uvicorn.workers.UvicornWorker --workers 2 --bind 0.0.0.0:8080 --timeout 120 --graceful-timeout 120 --access-logfile - --error-logfile -
+  http_port: 8080
+  instance_count: 1
+  # Shared 1vcpu/1gb matches the Django API: rerank is an outbound Voyage HTTP
+  # call (no local CPU/torch), so the profile is light. Bump only if observed
+  # CPU/latency warrants. Keep instance_count: 1 until a shared store (Valkey)
+  # backs cross-instance rate limiting (plan P1).
+  instance_size_slug: apps-s-1vcpu-1gb
+  # HTTP health check on the auth-exempt, non-streaming GET /healthz (NEVER /mcp,
+  # which is POST-only JSON-RPC). Answered before auth in the ASGI wrapper.
+  health_check:
+    http_path: /healthz
     timeout_seconds: 5
     failure_threshold: 3
 # Retention worker: DO App Platform has no native cron, so a long-lived worker

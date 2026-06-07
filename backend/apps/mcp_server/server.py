@@ -57,7 +57,26 @@ def build_server():
 
     from . import tools
 
-    mcp = FastMCP("iowa-legal-corpus")
+    # stateless_http + json_response are what make this safe to run behind App
+    # Platform's load balancer, which has NO session affinity:
+    #   * stateless_http=True  — a fresh transport per request, so no per-session
+    #     state lives in one worker/instance's memory. (Stateful mode keys session
+    #     state by Mcp-Session-Id in-process; a follow-up POST landing on a
+    #     different worker would 404 "Session not found".) Every tool here is a
+    #     self-contained request/response DB lookup, so we lose nothing — except
+    #     the per-session credential binding stateful mode gives up, which the
+    #     per-request X-API-Key check in auth.py fully compensates for.
+    #   * json_response=True   — a single application/json body instead of an open
+    #     SSE stream, which sidesteps the DO/Cloudflare edge streaming timeout.
+    # transport_security is passed explicitly because the SDK only auto-enables
+    # DNS-rebinding / Host / Origin validation for localhost binds; in prod we
+    # bind 0.0.0.0, so we must supply it ourselves (an MCP-spec SHOULD).
+    mcp = FastMCP(
+        "iowa-legal-corpus",
+        stateless_http=True,
+        json_response=True,
+        transport_security=_transport_security(),
+    )
 
     @mcp.tool(
         description=(
@@ -77,18 +96,22 @@ def build_server():
     @mcp.tool(
         description=(
             "Hybrid search across the Iowa Code (FTS + trigram fuzzy + "
-            "vector semantic, RRF-fused). Returns ranked hits with "
-            "snippets, official URLs, and an as_of_date stamp. Use this "
-            "for natural-language queries; use lookup_citation when you "
-            "have a precise citation."
+            "vector semantic, RRF-fused, then cross-encoder reranked for "
+            "relevance). Returns ranked hits with snippets, official URLs, "
+            "and an as_of_date stamp. Use this for natural-language queries; "
+            "use lookup_citation when you have a precise citation."
         )
     )
     async def search_statutes(
         query: str, limit: int = 20, use_vector: bool = True
     ) -> dict:
+        # rerank=True: external agents act on the top hit, so they get the
+        # cross-encoder pass (recall -> precision), not raw RRF order. The chat
+        # endpoint calls search_statutes_tool directly with rerank off because it
+        # runs its own reranker with body enrichment.
         return await sync_to_async(
             tools.search_statutes_tool, thread_sensitive=True
-        )(query, limit=limit, use_vector=use_vector)
+        )(query, limit=limit, use_vector=use_vector, rerank=True)
 
     @mcp.tool(
         description=(
@@ -231,6 +254,127 @@ def build_server():
     return mcp
 
 
+def _transport_security():
+    """Build DNS-rebinding / Host / Origin validation for the HTTP transport.
+
+    The SDK only auto-configures this for localhost binds; a container binds
+    0.0.0.0, so we set it explicitly (an MCP-spec SHOULD for any networked
+    server). Defaults derive from Django's own ``ALLOWED_HOSTS`` /
+    ``CORS_ALLOWED_ORIGINS`` — the hosts already proven correct behind the DO
+    edge — and can be overridden per-environment with ``MCP_ALLOWED_HOSTS`` /
+    ``MCP_ALLOWED_ORIGINS`` (comma lists).
+
+    Two deliberate behaviors keep this from breaking real traffic:
+      * Origin is validated only when *present*, so server-to-server clients
+        (mcp-remote, the claude.ai cloud broker, ChatGPT) — which send no Origin
+        — always pass; the allowlist matters only once a browser client exists.
+      * ``MCP_DNS_REBINDING_PROTECTION=false`` is an escape hatch if the platform
+        forwards an unexpected Host header and starts returning 421 on every
+        call. Auth still gates every request regardless, so this only relaxes
+        the defense-in-depth layer, never the access control.
+    """
+    import os
+
+    from django.conf import settings as dj
+    from mcp.server.transport_security import TransportSecuritySettings
+
+    def _split(raw: str) -> list[str]:
+        return [p.strip() for p in raw.split(",") if p.strip()]
+
+    raw_hosts = os.environ.get("MCP_ALLOWED_HOSTS")
+    hosts = _split(raw_hosts) if raw_hosts else list(dj.ALLOWED_HOSTS)
+
+    enabled = os.environ.get(
+        "MCP_DNS_REBINDING_PROTECTION", "true"
+    ).strip().lower() not in ("0", "false", "no", "off")
+
+    # Django's allow-any "*" has no equivalent in the SDK's exact-match host
+    # check, so treat its presence as "host validation intentionally off".
+    if "*" in hosts:
+        enabled = False
+        hosts = [h for h in hosts if h != "*"]
+
+    # Accept each host with or without an explicit port: dev is "localhost:8765",
+    # but behind the edge it's the bare host on 443. The SDK supports a ":*"
+    # port wildcard but not a bare-host fallback, so we add both forms.
+    expanded: list[str] = []
+    for h in hosts:
+        expanded.append(h)
+        if ":" not in h:
+            expanded.append(f"{h}:*")
+
+    raw_origins = os.environ.get("MCP_ALLOWED_ORIGINS")
+    origins = (
+        _split(raw_origins)
+        if raw_origins
+        else list(getattr(dj, "CORS_ALLOWED_ORIGINS", []))
+    )
+
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=enabled,
+        allowed_hosts=expanded,
+        allowed_origins=origins,
+    )
+
+
+def _with_healthz(app):
+    """Wrap an ASGI app so an exact ``GET /healthz`` returns 200 without auth.
+
+    App Platform's HTTP health probe hits the component directly and carries no
+    X-API-Key, and FastMCP's ``/mcp`` endpoint is POST-only JSON-RPC — neither is
+    a clean liveness signal. We answer the probe here, OUTSIDE api_key_middleware
+    and the MCP app. The match is exact (method GET + path ``/healthz``) on
+    purpose: a ``startswith`` prefix placed ahead of auth would be an auth-bypass
+    surface (e.g. ``/healthz/../mcp`` or anything else sharing the prefix)."""
+
+    async def wrapper(scope, receive, send):
+        if (
+            scope.get("type") == "http"
+            and scope.get("method") == "GET"
+            and scope.get("path") == "/healthz"
+        ):
+            body = b'{"status": "ok"}'
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [
+                        (b"content-type", b"application/json"),
+                        (b"content-length", str(len(body)).encode("ascii")),
+                    ],
+                }
+            )
+            await send(
+                {"type": "http.response.body", "body": body, "more_body": False}
+            )
+            return
+        await app(scope, receive, send)
+
+    return wrapper
+
+
+def build_http_app():
+    """Construct the production ASGI app: Django-bootstrapped, streamable-HTTP MCP
+    wrapped in X-API-Key auth and an auth-exempt health endpoint.
+
+    This is the import target for gunicorn / uvicorn (see
+    ``apps/mcp_server/asgi.py``)::
+
+        gunicorn apps.mcp_server.asgi:app -k uvicorn.workers.UvicornWorker
+
+    Stateless + JSON mode (set in ``build_server``) means every worker process
+    and every instance can serve any request, so multi-worker / multi-instance
+    serving is safe. Layering, outermost first: ``/healthz`` short-circuit →
+    ``X-API-Key`` auth → FastMCP streamable-HTTP app (which itself applies the
+    transport-security Host/Origin/Content-Type checks)."""
+    _bootstrap_django()
+    server = build_server()
+
+    from .auth import api_key_middleware
+
+    return _with_healthz(api_key_middleware(server.streamable_http_app()))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="apps.mcp_server")
     parser.add_argument(
@@ -242,21 +386,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args(argv)
 
-    _bootstrap_django()
-    server = build_server()
-
     if args.http:
-        # FastMCP exposes a streamable_http_app() for ASGI deployment;
-        # for a quick local run we use uvicorn directly. Wrap it in the
-        # X-API-Key middleware so attorneys' Claude Desktop installs can
-        # authenticate against the same key model as the REST API.
+        # Build the exact same ASGI app the gunicorn entrypoint serves
+        # (apps.mcp_server.asgi:app), so a local --http run exercises auth,
+        # /healthz, and transport security identically to prod. uvicorn.run is
+        # the dev convenience path; prod uses gunicorn with uvicorn workers
+        # (see the run_command in .do/app.yaml).
         import uvicorn
 
-        from .auth import api_key_middleware
-
-        app = api_key_middleware(server.streamable_http_app())
+        app = build_http_app()
         uvicorn.run(app, host=args.host, port=args.port)
     else:
+        # stdio: a local, trusted subprocess (Claude Desktop's default). No
+        # auth/health wrapper — those are HTTP-transport concerns.
+        _bootstrap_django()
+        server = build_server()
         server.run("stdio")
     return 0
 
