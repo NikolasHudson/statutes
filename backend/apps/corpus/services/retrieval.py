@@ -265,6 +265,39 @@ def _mmr_select(hits: list, *, k: int, lambda_: float) -> list:
     return [window[i] for i in chosen]
 
 
+_TREATMENT_FIELDS = {
+    "status", "severity", "label", "by_citation", "excerpt", "source", "confidence",
+}
+
+
+def treatment_payload(flag: TreatmentFlag) -> dict:
+    """Serialize a :class:`TreatmentFlag` for a surface hit (additive). Surfaces
+    show this so a downstream agent / the chat model can see whether a cited case
+    is still good law and the verbatim evidence sentence."""
+    return {
+        "status": flag.status,
+        "severity": flag.severity,
+        "label": flag.label,
+        "by_citation": flag.by_citation,
+        "excerpt": flag.excerpt,
+        "source": flag.source,
+        "confidence": flag.confidence,
+    }
+
+
+def _treatment_for(node: Node) -> TreatmentFlag:
+    """Read the cached good-law flag off the node's DECISION (caselaw) and build a
+    :class:`TreatmentFlag`. ``annotate_treatment`` (PR3) writes it onto the cited
+    decision's ``source_metadata["treatment"]``; absence means no negative
+    treatment was found → the behavior-preserving "unknown" default. Statutes have
+    no decision/treatment, so they also get the default."""
+    decision = _caselaw_decision(node)
+    td = (decision.source_metadata or {}).get("treatment")
+    if not td:
+        return TreatmentFlag()
+    return TreatmentFlag(**{k: v for k, v in td.items() if k in _TREATMENT_FIELDS})
+
+
 def _u_order(items: list) -> list:
     """Reorder a relevance-ranked list (best first) into a U-curve so the two
     strongest land at the ends and the weakest in the middle — the "lost in the
@@ -497,7 +530,7 @@ def retrieve_context(
                 is_repealed=node_dict["is_repealed"],
                 score=h.score,
                 component_scores=h.component_scores,
-                treatment=TreatmentFlag(),
+                treatment=_treatment_for(node),
                 node_dict=node_dict,
             )
         )

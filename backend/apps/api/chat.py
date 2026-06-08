@@ -45,7 +45,11 @@ from apps.corpus.services.corpus_tools import (
     list_recent_amendments_tool,
     lookup_citation_tool,
 )
-from apps.corpus.services.retrieval import _excerpt, retrieve_context
+from apps.corpus.services.retrieval import (
+    _excerpt,
+    retrieve_context,
+    treatment_payload,
+)
 
 
 # Max body text returned per search hit, in chars. The MCP tool caps at 280
@@ -126,6 +130,9 @@ def _enriched_search(args: dict) -> dict:
                 # (None for statutes) — lets a UI highlight the exact span.
                 "char_start": p.char_start,
                 "char_end": p.char_end,
+                # PR3: good-law / treatment flag (advisory). status "negative"
+                # means a citing case overruled/abrogated/superseded it.
+                "treatment": treatment_payload(p.treatment),
             }
             for p in ctx.passages
         ],
@@ -423,6 +430,17 @@ SYSTEM_PROMPT = (
     "a reporter, volume, page, or year. Use cases to illustrate or interpret a "
     "statute/rule, but the governing authority for a statutory question is "
     "still the statute or rule itself.\n\n"
+    "GOOD LAW: each search hit carries a ``treatment`` flag. When its "
+    "``status`` is ``negative`` (a later Iowa case ``overruled`` / "
+    "``abrogated`` / ``superseded`` it — see ``treatment.label``, "
+    "``by_citation``, and the verbatim ``treatment.excerpt``), do NOT rely on "
+    "that case as good law: say plainly that it was treated negatively, name "
+    "the case that did so, and find current authority instead. A ``status`` of "
+    "``caution`` (e.g. ``overruled-on-other-grounds``) means the case survives "
+    "for the point you are citing but was qualified on another — note the "
+    "limitation if it bears on the question. The flag is advisory and "
+    "phrase-derived; if it conflicts with the opinion text you retrieved, say "
+    "so rather than asserting a conclusion.\n\n"
     "When the tool result for a section includes a non-empty "
     "``official_url`` and / or ``effective_from``, copy them into your "
     "answer verbatim alongside that section's citation. When either field "

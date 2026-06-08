@@ -37,12 +37,14 @@ from apps.corpus.models import (
 from apps.corpus.services.embeddings import run_chunk_embedding_job, run_embedding_job
 from apps.corpus.services.rerank import NoopReranker
 from apps.corpus.services.retrieval import (
+    TreatmentFlag,
     _chunk_excerpt,
     _jaccard,
     _mmr_select,
     _token_set,
     _u_order,
     retrieve_context,
+    treatment_payload,
 )
 from apps.corpus.services.voyage import FakeEmbeddingClient
 
@@ -329,6 +331,37 @@ class RetrievePipelineTests(TestCase):
         lead = next(p for p in ctx.passages if p.node_id == self.op_lead.id)
         self.assertIsNone(lead.char_start)
         self.assertIn("PROCEDURAL HISTORY", lead.snippet)  # opinion-head prefix
+
+    # -- PR3: treatment flag flows from the decision's cached metadata -----
+
+    def test_treatment_flag_flows_to_caselaw_passage(self):
+        self.decision.source_metadata["treatment"] = {
+            "status": "negative", "severity": 5, "label": "overruled",
+            "by_citation": "State v. Later", "excerpt": "We overrule Holder.",
+            "source": "graph_phrase", "confidence": 0.65,
+        }
+        self.decision.save(update_fields=["source_metadata"])
+        ctx = retrieve_context(
+            "warrantless blood draw holding", source_slug="iowa-caselaw",
+            reranker=NoopReranker(), dedup_clusters=False,
+        )
+        p = next(p for p in ctx.passages if p.cluster_id == self.decision.id)
+        self.assertEqual(p.treatment.status, "negative")
+        self.assertEqual(p.treatment.severity, 5)
+        self.assertEqual(p.treatment.by_citation, "State v. Later")
+        # serializer payload carries every field
+        self.assertEqual(treatment_payload(p.treatment)["label"], "overruled")
+
+    def test_unflagged_caselaw_and_statute_get_unknown_default(self):
+        ctx = retrieve_context(
+            "warrantless blood draw holding", source_slug="iowa-caselaw",
+            reranker=NoopReranker(),
+        )
+        self.assertTrue(all(p.treatment.status == "unknown" for p in ctx.passages))
+        sctx = retrieve_context(
+            "merchant consumer fraud", source_slug="iowa-code", reranker=NoopReranker()
+        )
+        self.assertTrue(all(p.treatment.status == "unknown" for p in sctx.passages))
 
     # -- citation lane bypasses the reranker -------------------------------
 

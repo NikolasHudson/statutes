@@ -177,7 +177,43 @@ opinion-head excerpts that miss the holding, and no abstain path.
     `build_caselaw_citation_graph` mirroring `backfill_caselaw_cross_references`
     (#1); idempotent (delete CASELAW_GRAPH edges, rebuild). Never decompress to
     disk. Resolves §8 Q3.
-- [ ] **PR3 — Treatment graph + deterministic v1 good-law flag.**
+- [x] **PR3 — Treatment graph + deterministic v1 good-law flag.** ✅ DONE
+  (2026-06-08, uncommitted). The headline legal-grade gap from the design — an
+  overruled case surfaced as good law — now has a deterministic v1 flag.
+  - **`treatment.py`** — phrase-scan classifier. For a target decision, scan the
+    citing opinions' sentences (incoming CASELAW_GRAPH edges) for negative stems
+    (overruled / abrogated / superseded / repudiated / disapproved /
+    no-longer-good-law / declined-to-follow) IN THE SAME SENTENCE as the target's
+    reporter cite, within ~70 chars. Calibrated on real Iowa opinions; the
+    dominant false positives are all guarded: "overruled **the/our/counsel's
+    objection**" (trial ruling), "overruled **by** [target]" (target is the
+    *overruler*), "[target] (**overruling** X)" (gerund-after = agent), negation
+    ("decline / did not / not at liberty / asked to overrule"), "on (the) other
+    grounds" → downgraded to caution, "supersedeas", and distinguish/limit are
+    dropped (too noisy). Severity 0–5; status good/caution/negative/unknown.
+  - **`annotate_treatment`** — inverted scan: only opinions whose body matches the
+    stem prefilter (22,244 of them), classified against the targets they cite,
+    aggregated max-severity, written to the cited decision's
+    `source_metadata["treatment"]`. Idempotent (clear-then-write); the prefilter is
+    a proven superset of the classifier stems so a re-run can't drop a real flag.
+    **Run: 470 decisions flagged** — 323 negative (overruled/abrogated/superseded),
+    147 caution. Spot-checks correct (Godfrey→Burnett flagged negative; clean cases
+    unflagged). ~17 min, streamed.
+  - **Wired** into `retrieve_context` (`_treatment_for` reads the cached flag →
+    `RetrievedPassage.treatment`), serialized to MCP + chat (`treatment_payload`,
+    additive), and a chat system-prompt good-law rule ("never rely on a `negative`
+    case; name what treated it; note `caution`").
+  - **Tests:** `test_treatment.py` (31 — every guard + the prefilter-superset
+    invariant) + treatment-flow tests in `test_retrieval.py`. Adversarially
+    reviewed; two real fixes applied (possessive ruling-noun guard; prefilter
+    superset to prevent stale-flag loss on re-run).
+  - **Known v1 limits (advisory by design):** phrase-only ⇒ moderate recall (misses
+    subtle/implicit treatment) and max-aggregation can let one mis-attributed
+    sentence flag a good case — mitigated by shipping the verbatim evidence
+    sentence with every flag and keeping it advisory (no ranking change yet).
+    Enforcement (down-rank/abstain) is PR4; the LLM classifier + a multi-opinion
+    support count are PR5. §8 Q4 (cite-sentence sourcing = re-scan body_text) and
+    Q5 (cache on `source_metadata`, no table) resolved.
 - [ ] **PR4 — Verify+abstain extraction and stale-use gate.**
 - [ ] **PR5 — LLM-assisted treatment v2 + (optional) claim-level NLI + query rewrite.**
 
@@ -211,9 +247,14 @@ opinion-head excerpts that miss the holding, and no abstain path.
   finding: CL publishes the citation **graph+depth** but **not treatment** for state
   courts (their citator is SCOTUS-only PoC), so we build the Iowa treatment classifier
   ourselves. §8 Q3 resolved. Command + 5 tests adversarially reviewed (uncommitted).
-  Next action: **PR3** — treatment graph + deterministic v1 good-law flag. Substrate is
-  now ready (incoming CASELAW_GRAPH edges + depth). Answer §8 Q4/Q5 first (citing-sentence
-  re-scan vs re-ingest? `source_metadata["treatment"]` cache vs `Treatment` table?). The
-  `TreatmentFlag` dataclass + per-passage `treatment` field already exist (PR1
-  forward-compat), emitting the "unknown" default — PR3's `annotate_treatment` populates
-  them by walking each target's incoming CASELAW_GRAPH edges (depth-prioritized).
+- 2026-06-08: **PR3 done** — deterministic v1 good-law flag. `treatment.py` classifier
+  (calibrated on real Iowa opinions, 31 tests, adversarially reviewed) + `annotate_treatment`
+  (470 decisions flagged: 323 negative / 147 caution) + wired into `retrieve_context`,
+  MCP/chat serializers, and the chat system prompt. §8 Q4/Q5 resolved (re-scan body_text;
+  `source_metadata` cache). Advisory (no ranking change); evidence sentence shipped with
+  every flag. Uncommitted.
+  Next action: **PR4** — verify+abstain extraction and the stale-use gate. Move
+  `_verify_answer` → `answer.py`; add `stale_used` (cross-ref answer's cited cases against
+  passage `treatment`) + `should_abstain`; wire the abstain path + a flag to BLOCK
+  severity>=5 (answer §8 Q2: hard-block vs advisory + threshold first). The treatment flags
+  PR4 enforces are now in place.

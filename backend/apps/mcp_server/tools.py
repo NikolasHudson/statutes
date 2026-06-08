@@ -44,7 +44,7 @@ from apps.corpus.services.corpus_tools import (  # noqa: F401
     validate_citations_tool,
     verify_quote_tool,
 )
-from apps.corpus.services.retrieval import retrieve_context
+from apps.corpus.services.retrieval import retrieve_context, treatment_payload
 
 
 # Candidate pool pulled from hybrid search before the shared pipeline narrows it.
@@ -110,6 +110,7 @@ def search_statutes_tool(
                 "char_start": p.char_start,
                 "char_end": p.char_end,
                 "chunk_id": p.chunk_id,
+                "treatment": treatment_payload(p.treatment),
             }
             for p in ctx.passages
         ],
