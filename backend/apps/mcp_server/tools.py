@@ -47,18 +47,11 @@ from apps.corpus.services.corpus_tools import (  # noqa: F401
 from apps.corpus.services.retrieval import retrieve_context
 
 
-# Candidate pool pulled from hybrid search before reranking. A cross-encoder can
-# only promote an on-point hit that is *in* the pool it sees, so the reranked
-# tool over-fetches well past the handful it will return. 50 is the low end of the
-# reported reranker sweet spot (and the cap hybrid_search hits here).
-SEARCH_RERANK_POOL = 50
-
-# Per-document char cap when reranking. A caselaw hit's body is a whole opinion
-# (100k+ chars); feeding 50 of those to the reranker would blow its per-request
-# token budget. The reranker truncates anyway, and an opinion's holding/syllabus
-# sits near the top, so a prefix carries the conceptual signal. Mirrors the
-# eval harness (RERANK_DOC_CHARS).
-SEARCH_RERANK_DOC_CHARS = 8000
+# Candidate pool pulled from hybrid search before the shared pipeline narrows it.
+# A cross-encoder can only promote an on-point hit that is *in* the pool it sees,
+# and decision-cluster dedup + MMR need headroom below the display cut, so the
+# tool over-fetches well past the handful it returns (PR2 widened 50→100).
+SEARCH_POOL = 100
 
 
 def search_statutes_tool(
@@ -74,17 +67,21 @@ def search_statutes_tool(
     ``source_slug`` (e.g. ``"iowa-court-rules"``) scopes the search to a
     single corpus; ``None`` searches everything.
 
-    ``rerank`` adds a Voyage cross-encoder pass: pull a wider candidate pool
-    (``SEARCH_RERANK_POOL``) from hybrid search, re-score each against the query,
-    and keep the top ``limit``. RRF fusion is a *recall* mechanism — its fused
-    score doesn't measure how well a hit answers the query — so for an agent that
-    will act on the top result, the reranker is what turns recall into precision.
-    Off by default so the chat endpoint (which reranks itself, with body
-    enrichment) doesn't double-rerank; the MCP server turns it on so external
-    agents get reranked results.
+    ``rerank`` adds a Voyage cross-encoder pass: re-score the wide candidate pool
+    against the query and keep the most relevant. RRF fusion is a *recall*
+    mechanism — its fused score doesn't measure how well a hit answers the query —
+    so for an agent that will act on the top result, the reranker is what turns
+    recall into precision. Off by default so the chat endpoint (which reranks
+    itself, with body enrichment) doesn't double-rerank; the MCP server turns it
+    on so external agents get reranked results.
 
-    Delegates to ``retrieve_context`` (the shared pipeline) and serializes the
-    passages into the MCP hit shape: ``{node, snippet, score, component_scores}``.
+    Delegates to ``retrieve_context`` (the shared pipeline: retrieve → rerank →
+    decision-cluster dedup → MMR → chunk-aware assembly → U-order) and serializes
+    the passages into the MCP hit shape. Backward-compatible: existing keys
+    (``node``, ``snippet``, ``score``, ``component_scores``) are unchanged; PR2
+    adds ``char_start``/``char_end``/``chunk_id`` (the matched caselaw passage's
+    offsets into the opinion body, ``None`` for statutes) so a downstream agent
+    can pin a verbatim span.
     """
     if not query or not query.strip():
         return {
@@ -93,15 +90,13 @@ def search_statutes_tool(
             "as_of_date": _today(),
             "error": "query must not be empty",
         }
-    pool = SEARCH_RERANK_POOL if rerank else min(limit, 50)
     ctx = retrieve_context(
         query,
         source_slug=source_slug,
         use_vector=use_vector,
-        candidate_pool=min(pool, 50),
+        candidate_pool=SEARCH_POOL,
         display_limit=limit,
         rerank=rerank,
-        rerank_doc_chars=SEARCH_RERANK_DOC_CHARS,
         enrich_bodies=False,
     )
     return {
@@ -112,6 +107,9 @@ def search_statutes_tool(
                 "snippet": p.snippet,
                 "score": p.score,
                 "component_scores": p.component_scores,
+                "char_start": p.char_start,
+                "char_end": p.char_end,
+                "chunk_id": p.chunk_id,
             }
             for p in ctx.passages
         ],

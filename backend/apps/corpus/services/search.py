@@ -107,6 +107,13 @@ class SearchHit:
     score: float
     # Per-retriever scores for debugging / explain endpoints.
     component_scores: dict[str, float] = field(default_factory=dict)
+    # The NodeChunk that won this version in the dense retriever, if any. Set
+    # only for caselaw hits the vector retriever surfaced (a statute embeds
+    # whole, so it has no chunk; a caselaw hit that reached the top only via
+    # FTS/citation has no *winning* chunk either). ``retrieve_context`` uses it
+    # to excerpt the matched passage instead of the opinion head. Default None
+    # keeps every other caller — which never reads it — untouched.
+    chunk_id: int | None = None
 
 
 def _approved_filter_clause(include_pending: bool) -> tuple[str, list]:
@@ -477,6 +484,45 @@ def case_name_search(
         return [(int(row[0]), float(row[1])) for row in cur.fetchall()]
 
 
+def _merge_version_chunk_hits(
+    version_hits: list[tuple[int, float]],
+    chunk_hits: list[tuple[int, float, int]],
+    limit: int,
+) -> tuple[list[tuple[int, float]], dict[int, int]]:
+    """Union whole-version and chunk-rolled-up vector hits, keeping the higher
+    score per version. Returns ``(merged 2-tuples sorted desc, {version_id:
+    winning_chunk_id})`` where the chunk map only carries versions whose kept
+    score came from a chunk.
+
+    The returned 2-tuple list is byte-identical to the pre-PR2 ``vector_search``
+    output (same early-returns, same merge, same tiebreak) so every 2-tuple
+    caller is unaffected; the chunk map is additive context for callers that ask
+    for it via ``with_chunks=True``."""
+    chunk_pairs = [(vid, score) for vid, score, _ in chunk_hits]
+    chunk_by_vid = {vid: cid for vid, _, cid in chunk_hits}
+    # In practice version- and chunk-embedded corpora are disjoint, so one side
+    # is empty: preserve the exact pre-PR2 early-return behaviour.
+    if not chunk_hits:
+        return version_hits, {}
+    if not version_hits:
+        return chunk_pairs, dict(chunk_by_vid)
+
+    best: dict[int, float] = {}
+    prov: dict[int, int | None] = {}
+    for vid, score in version_hits:
+        if vid not in best or score > best[vid]:
+            best[vid] = score
+            prov[vid] = None
+    for vid, score in chunk_pairs:
+        if vid not in best or score > best[vid]:
+            best[vid] = score
+            prov[vid] = chunk_by_vid[vid]
+    ranked = sorted(best.items(), key=lambda r: (r[1], -r[0]), reverse=True)[:limit]
+    merged = [(vid, score) for vid, score in ranked]
+    chunk_map = {vid: prov[vid] for vid, _ in ranked if prov.get(vid) is not None}
+    return merged, chunk_map
+
+
 def vector_search(
     query: str,
     *,
@@ -485,7 +531,8 @@ def vector_search(
     client: EmbeddingClient | None = None,
     source_slug: str | None = None,
     metadata_contains: dict | None = None,
-) -> list[tuple[int, float]]:
+    with_chunks: bool = False,
+) -> list[tuple[int, float]] | tuple[list[tuple[int, float]], dict[int, int]]:
     """Semantic search via pgvector cosine distance, returning
     ``[(node_version_id, similarity), ...]`` (similarity = 1 - cosine_distance,
     larger == closer, matching the other retrievers).
@@ -497,10 +544,16 @@ def vector_search(
     version-level hits keeping the higher score per version. In practice the two
     are disjoint — a caselaw version has chunks and a NULL version embedding; a
     statute has a version embedding and no chunks — so the merge just routes by
-    whatever was embedded, with no double counting."""
+    whatever was embedded, with no double counting.
+
+    ``with_chunks=True`` additionally returns the ``{version_id:
+    winning_chunk_id}`` map (as ``(hits, chunk_map)``) so ``hybrid_search`` can
+    record which passage won a caselaw version. The default (``False``) returns
+    the bare 2-tuple list exactly as before — every existing caller relies on
+    that shape."""
 
     if not query.strip():
-        return []
+        return ([], {}) if with_chunks else []
     client = client or default_client()
     [vector] = client.embed_texts([query], input_type=INPUT_TYPE_QUERY)
     vector_literal = "[" + ",".join(f"{x:.7f}" for x in vector) + "]"
@@ -519,16 +572,10 @@ def vector_search(
         source_slug=source_slug,
         metadata_contains=metadata_contains,
     )
-    if not chunk_hits:
-        return version_hits
-    if not version_hits:
-        return chunk_hits
-
-    best: dict[int, float] = {}
-    for vid, score in (*version_hits, *chunk_hits):
-        if vid not in best or score > best[vid]:
-            best[vid] = score
-    return sorted(best.items(), key=lambda r: (r[1], -r[0]), reverse=True)[:limit]
+    merged, chunk_map = _merge_version_chunk_hits(version_hits, chunk_hits, limit)
+    if with_chunks:
+        return merged, chunk_map
+    return merged
 
 
 def _vector_search_versions(
@@ -570,8 +617,13 @@ def _vector_search_chunks(
     include_pending: bool,
     source_slug: str | None,
     metadata_contains: dict | None,
-) -> list[tuple[int, float]]:
+) -> list[tuple[int, float, int]]:
     """Passage-level NodeChunk embeddings (caselaw), rolled up to the version.
+
+    Returns ``[(version_id, best_score, winning_chunk_id), ...]`` — the chunk id
+    is the passage whose embedding gave the version its best score, which
+    ``retrieve_context`` later excerpts so the model reads the matched holding
+    rather than the opinion head.
 
     The HNSW index serves ``ORDER BY embedding <=> q LIMIT k``; we over-fetch
     (``CHUNK_OVERFETCH × limit``) because many chunks collapse onto one version,
@@ -590,7 +642,8 @@ def _vector_search_chunks(
     )
     sql = f"""
         SELECT nv.id,
-               1 - (c.embedding <=> %s::vector) AS score
+               1 - (c.embedding <=> %s::vector) AS score,
+               c.id AS chunk_id
         FROM corpus_nodechunk c
         JOIN corpus_nodeversion nv ON nv.id = c.version_id
         {src_join}
@@ -608,12 +661,19 @@ def _vector_search_chunks(
         )
         rows = cur.fetchall()
 
-    best: dict[int, float] = {}
-    for vid, score in rows:
-        vid, score = int(vid), float(score)
-        if vid not in best or score > best[vid]:
-            best[vid] = score
-    return sorted(best.items(), key=lambda r: (r[1], -r[0]), reverse=True)[:limit]
+    # Keep the best-scoring chunk per version (the rollup) AND remember which
+    # chunk it was. Iteration order is best-distance-first from the index, so the
+    # strict ``>`` keeps the first (closest) chunk on ties — deterministic.
+    best: dict[int, tuple[float, int]] = {}
+    for vid, score, chunk_id in rows:
+        vid, score, chunk_id = int(vid), float(score), int(chunk_id)
+        if vid not in best or score > best[vid][0]:
+            best[vid] = (score, chunk_id)
+    return sorted(
+        ((vid, sc, cid) for vid, (sc, cid) in best.items()),
+        key=lambda r: (r[1], -r[0]),
+        reverse=True,
+    )[:limit]
 
 
 def reciprocal_rank_fusion(
@@ -751,14 +811,16 @@ def hybrid_search(
         )
         if name_hits:
             rankings["case_name"] = name_hits
+    vector_chunk_map: dict[int, int] = {}
     if use_vector:
-        rankings["vector"] = vector_search(
+        rankings["vector"], vector_chunk_map = vector_search(
             query,
             limit=per_retriever,
             include_pending=include_pending,
             client=client,
             source_slug=source_slug,
             metadata_contains=metadata_contains,
+            with_chunks=True,
         )
 
     fused = reciprocal_rank_fusion(
@@ -800,6 +862,9 @@ def hybrid_search(
                 body_text=nv.body_text,
                 score=score,
                 component_scores=components,
+                # The winning chunk only exists when the dense retriever
+                # surfaced this version; a cite/FTS-only hit keeps None.
+                chunk_id=vector_chunk_map.get(nv.id),
             )
         )
     return hits

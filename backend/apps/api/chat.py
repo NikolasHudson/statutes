@@ -70,12 +70,11 @@ TOP_HITS_FULL = 2
 # sections (the old behaviour) buried the on-point rule in noise; a tight,
 # reranked set is what makes the answer — and its source list — trustworthy.
 #
-# Pool size 50 (was 20): a cross-encoder reranker only helps if the on-point
-# answer is in the pool it sees, and at 20 a holding that the bi-encoder ranked
-# 21st-50th is unreachable. Reported reranker sweet spots land at ~50-75
-# candidates; 50 is the low end of that band and the cap ``search_statutes_tool``
-# already enforces (``min(limit, 50)``) — raise that cap too before trying 75.
-CHAT_CANDIDATE_POOL = 50
+# Pool size 100 (PR2, was 50): a cross-encoder reranker only helps if the
+# on-point answer is in the pool it sees, and decision-cluster dedup + MMR need
+# headroom below the display cut. The shared pipeline caps each candidate's
+# rerank text at 8000 chars, so a 100-opinion caselaw pool stays affordable.
+CHAT_CANDIDATE_POOL = 100
 CHAT_DISPLAY_LIMIT = 6
 
 
@@ -108,7 +107,6 @@ def _enriched_search(args: dict) -> dict:
         candidate_pool=CHAT_CANDIDATE_POOL,
         display_limit=CHAT_DISPLAY_LIMIT,
         rerank=True,
-        rerank_doc_chars=None,
         enrich_bodies=True,
         excerpt_budget_top=SEARCH_BODY_MAX_CHARS_TOP,
         excerpt_budget_rest=SEARCH_BODY_MAX_CHARS,
@@ -124,6 +122,10 @@ def _enriched_search(args: dict) -> dict:
                 "component_scores": p.component_scores,
                 "body_excerpt": p.excerpt,
                 "effective_from": p.effective_from,
+                # PR2: matched caselaw passage offsets into the opinion body
+                # (None for statutes) — lets a UI highlight the exact span.
+                "char_start": p.char_start,
+                "char_end": p.char_end,
             }
             for p in ctx.passages
         ],

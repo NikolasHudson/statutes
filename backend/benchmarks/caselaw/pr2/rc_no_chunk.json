@@ -1,0 +1,3598 @@
+{
+  "meta": {
+    "kind": "caselaw-retrieval-eval",
+    "embedder": "voyage-law-2",
+    "embedding_dim": 1024,
+    "reranker": "none",
+    "judge": "gpt-4o",
+    "judge_config": "rc",
+    "scope": "caselaw",
+    "scope_source": "iowa-caselaw",
+    "hnsw_ef_search": "200",
+    "configs": [
+      "vector",
+      "fts",
+      "hybrid",
+      "rc"
+    ],
+    "deep_candidates": 100,
+    "k_values": [
+      1,
+      3,
+      5,
+      10
+    ],
+    "n_queries": 20,
+    "git_commit": "5ca5243",
+    "generated_at": "2026-06-08T01:50:06.276393+00:00"
+  },
+  "results": {
+    "overall": {
+      "vector": {
+        "mrr": 0.6746,
+        "hit": {
+          "1": 0.55,
+          "3": 0.8,
+          "5": 0.8,
+          "10": 0.9
+        },
+        "hit_ci": {
+          "1": [
+            0.3421,
+            0.7418
+          ],
+          "3": [
+            0.584,
+            0.9193
+          ],
+          "5": [
+            0.584,
+            0.9193
+          ],
+          "10": [
+            0.699,
+            0.9721
+          ]
+        },
+        "ndcg": {
+          "1": 0.55,
+          "3": 0.6946,
+          "5": 0.6946,
+          "10": 0.7264
+        },
+        "distinct_clusters": {
+          "1": 1,
+          "3": 3,
+          "5": 5,
+          "10": 10
+        },
+        "recovered_rate": 1.0,
+        "recovered_ci": [
+          0.8389,
+          1.0
+        ],
+        "unrecovered": 0,
+        "rank": {
+          "p50": 1.0,
+          "mean": 4.95,
+          "max": 38
+        }
+      },
+      "fts": {
+        "mrr": 0.1853,
+        "hit": {
+          "1": 0.15,
+          "3": 0.2,
+          "5": 0.2,
+          "10": 0.25
+        },
+        "hit_ci": {
+          "1": [
+            0.0524,
+            0.3604
+          ],
+          "3": [
+            0.0807,
+            0.416
+          ],
+          "5": [
+            0.0807,
+            0.416
+          ],
+          "10": [
+            0.1119,
+            0.4687
+          ]
+        },
+        "ndcg": {
+          "1": 0.15,
+          "3": 0.1815,
+          "5": 0.1815,
+          "10": 0.1966
+        },
+        "distinct_clusters": {
+          "1": 0.6,
+          "3": 1.6,
+          "5": 2.45,
+          "10": 3.8
+        },
+        "recovered_rate": 0.35,
+        "recovered_ci": [
+          0.1812,
+          0.5671
+        ],
+        "unrecovered": 13,
+        "rank": {
+          "p50": 2,
+          "mean": 8.43,
+          "max": 28
+        }
+      },
+      "hybrid": {
+        "mrr": 0.6824,
+        "hit": {
+          "1": 0.55,
+          "3": 0.8,
+          "5": 0.8,
+          "10": 0.85
+        },
+        "hit_ci": {
+          "1": [
+            0.3421,
+            0.7418
+          ],
+          "3": [
+            0.584,
+            0.9193
+          ],
+          "5": [
+            0.584,
+            0.9193
+          ],
+          "10": [
+            0.6396,
+            0.9476
+          ]
+        },
+        "ndcg": {
+          "1": 0.55,
+          "3": 0.7012,
+          "5": 0.7012,
+          "10": 0.7179
+        },
+        "distinct_clusters": {
+          "1": 1,
+          "3": 3,
+          "5": 5,
+          "10": 10
+        },
+        "recovered_rate": 1.0,
+        "recovered_ci": [
+          0.8389,
+          1.0
+        ],
+        "unrecovered": 0,
+        "rank": {
+          "p50": 1.0,
+          "mean": 4.15,
+          "max": 22
+        }
+      },
+      "rc": {
+        "mrr": 0.75,
+        "hit": {
+          "1": 0.75,
+          "3": 0.75,
+          "5": 0.75,
+          "10": 0.75
+        },
+        "hit_ci": {
+          "1": [
+            0.5313,
+            0.8881
+          ],
+          "3": [
+            0.5313,
+            0.8881
+          ],
+          "5": [
+            0.5313,
+            0.8881
+          ],
+          "10": [
+            0.5313,
+            0.8881
+          ]
+        },
+        "ndcg": {
+          "1": 0.75,
+          "3": 0.75,
+          "5": 0.75,
+          "10": 0.75
+        },
+        "distinct_clusters": {
+          "1": 1,
+          "3": 3,
+          "5": 5,
+          "10": 10
+        },
+        "recovered_rate": 0.75,
+        "recovered_ci": [
+          0.5313,
+          0.8881
+        ],
+        "unrecovered": 5,
+        "rank": {
+          "p50": 1,
+          "mean": 1,
+          "max": 1
+        }
+      }
+    },
+    "by_area": {
+      "A: Fact-Pattern": {
+        "n": 5,
+        "vector": {
+          "hit@1": 0.6,
+          "hit@5": 0.8,
+          "mrr": 0.676
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.0,
+          "mrr": 0.0
+        },
+        "hybrid": {
+          "hit@1": 0.6,
+          "hit@5": 0.8,
+          "mrr": 0.676
+        },
+        "rc": {
+          "hit@1": 0.8,
+          "hit@5": 0.8,
+          "mrr": 0.8
+        }
+      },
+      "B: Abstract Concept": {
+        "n": 5,
+        "vector": {
+          "hit@1": 0.2,
+          "hit@5": 0.6,
+          "mrr": 0.451
+        },
+        "fts": {
+          "hit@1": 0.4,
+          "hit@5": 0.4,
+          "mrr": 0.4
+        },
+        "hybrid": {
+          "hit@1": 0.4,
+          "hit@5": 0.6,
+          "mrr": 0.543
+        },
+        "rc": {
+          "hit@1": 0.6,
+          "hit@5": 0.6,
+          "mrr": 0.6
+        }
+      },
+      "C: Fragmentary/Citation": {
+        "n": 5,
+        "vector": {
+          "hit@1": 0.8,
+          "hit@5": 1.0,
+          "mrr": 0.9
+        },
+        "fts": {
+          "hit@1": 0.0,
+          "hit@5": 0.2,
+          "mrr": 0.122
+        },
+        "hybrid": {
+          "hit@1": 0.6,
+          "hit@5": 1.0,
+          "mrr": 0.8
+        },
+        "rc": {
+          "hit@1": 1.0,
+          "hit@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "D: Adversarial": {
+        "n": 5,
+        "vector": {
+          "hit@1": 0.6,
+          "hit@5": 0.8,
+          "mrr": 0.672
+        },
+        "fts": {
+          "hit@1": 0.2,
+          "hit@5": 0.2,
+          "mrr": 0.219
+        },
+        "hybrid": {
+          "hit@1": 0.6,
+          "hit@5": 0.8,
+          "mrr": 0.711
+        },
+        "rc": {
+          "hit@1": 0.6,
+          "hit@5": 0.6,
+          "mrr": 0.6
+        }
+      }
+    },
+    "vector_analytics": {
+      "top1_sim": {
+        "n": 20,
+        "min": 0.4534,
+        "p25": 0.533,
+        "p50": 0.6254,
+        "mean": 0.6184,
+        "p75": 0.6847,
+        "p90": 0.7182,
+        "max": 0.7458
+      },
+      "target_sim": {
+        "n": 20,
+        "min": 0.4164,
+        "p25": 0.5165,
+        "p50": 0.6123,
+        "mean": 0.6008,
+        "p75": 0.6847,
+        "p90": 0.7181,
+        "max": 0.7458
+      }
+    },
+    "judge": {
+      "config": "rc",
+      "model": "gpt-4o",
+      "k": 5,
+      "n": 20,
+      "errors": 0,
+      "answerable_counts": {
+        "yes": 15,
+        "partial": 3,
+        "no": 2
+      },
+      "answerable_yes_rate": 0.75,
+      "answerable_yes_or_partial_rate": 0.9,
+      "controlling_present_rate": 0.75,
+      "stale_warning_count": 0,
+      "stale_cases": [],
+      "target_in_shown_rate": 0.75,
+      "answerable_when_target_absent": {
+        "n": 5,
+        "yes_or_partial": 5
+      }
+    }
+  },
+  "latency_ms": {
+    "embed": {
+      "n": 20,
+      "min": 150.6754,
+      "p25": 172.2741,
+      "p50": 179.6357,
+      "mean": 202.6553,
+      "p75": 189.5165,
+      "p90": 194.207,
+      "max": 616.4788
+    },
+    "vector": {
+      "n": 20,
+      "min": 466.524,
+      "p25": 516.1686,
+      "p50": 536.91,
+      "mean": 541.5044,
+      "p75": 570.3639,
+      "p90": 582.3777,
+      "max": 626.412
+    },
+    "fts": {
+      "n": 20,
+      "min": 3.3849,
+      "p25": 5.6773,
+      "p50": 8.0084,
+      "mean": 19.475,
+      "p75": 14.2839,
+      "p90": 23.5453,
+      "max": 186.9423
+    },
+    "hybrid": {
+      "n": 20,
+      "min": 1135.9828,
+      "p25": 1672.8082,
+      "p50": 2921.9706,
+      "mean": 2790.8287,
+      "p75": 3737.7141,
+      "p90": 4170.6919,
+      "max": 4584.2066
+    },
+    "judge": {
+      "n": 20,
+      "min": 2031.0606,
+      "p25": 2265.3346,
+      "p50": 2620.424,
+      "mean": 2813.2969,
+      "p75": 3253.305,
+      "p90": 3504.9595,
+      "max": 4987.7528
+    },
+    "rc": {
+      "n": 20,
+      "min": 1710.7466,
+      "p25": 2477.8375,
+      "p50": 3880.2826,
+      "mean": 3620.9268,
+      "p75": 4699.774,
+      "p90": 5050.8594,
+      "max": 5312.9236
+    }
+  },
+  "per_query": [
+    {
+      "id": 1,
+      "case_name": "State v. Wright",
+      "citation": "961 N.W.2d 396 (Iowa 2021)",
+      "area": "A: Fact-Pattern",
+      "query": "An officer spots garbage bags tied shut inside plastic bins on the edge of a gravel alley and rips them open to find weed residue.",
+      "target": "cl-cluster-4893114",
+      "configs": {
+        "vector": {
+          "first_rank": 3,
+          "reciprocal_rank": 0.3333333333333333,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.5,
+            "5": 0.5,
+            "10": 0.5
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4724384",
+            "cl-cluster-4894883"
+          ],
+          "top1_sim": 0.4534,
+          "target_sim": 0.4367
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 0,
+            "3": 0,
+            "5": 0,
+            "10": 0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 3,
+          "reciprocal_rank": 0.3333333333333333,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.5,
+            "5": 0.5,
+            "10": 0.5
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4724384",
+            "cl-cluster-4894883"
+          ]
+        },
+        "rc": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-5290145",
+            "cl-cluster-10604323",
+            "cl-cluster-4893113",
+            "cl-cluster-1662967",
+            "cl-cluster-1865343"
+          ]
+        }
+      },
+      "judge": {
+        "answer": "The question of whether an officer can search garbage bags tied shut inside plastic bins without a warrant is addressed in State of Iowa v. Charles Aaron Amble and John Joseph Mandracchia, where the court discusses the constitutionality of warrantless searches of garbage. The court in this case reversed a district court ruling that declared such searches unconstitutional, indicating that under Iowa Code section 808.16, garbage placed curbside is considered abandoned property and can be searched without a warrant.",
+        "answerable": "yes",
+        "best_case": "State of Iowa v. Charles Aaron Amble and John Joseph Mandracchia",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "State of Iowa v. Nicholas Dean Wright",
+            "relevance": "medium"
+          },
+          {
+            "case": "State of Iowa v. Charles Aaron Amble and John Joseph Mandracchia",
+            "relevance": "high"
+          },
+          {
+            "case": "State of Iowa v. Ryan Joseph Hahn",
+            "relevance": "medium"
+          },
+          {
+            "case": "State v. Henderson",
+            "relevance": "medium"
+          },
+          {
+            "case": "State v. Casteel",
+            "relevance": "off"
+          }
+        ],
+        "rationale": "The retrieval includes a case that directly addresses the legality of warrantless searches of garbage, making it possible to answer the question. The most relevant case is State of Iowa v. Charles Aaron Amble and John Joseph Mandracchia, which discusses the current legal framework under Iowa law. Other cases provide context but are less directly applicable.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-5290145",
+          "cl-cluster-10604323",
+          "cl-cluster-4893113",
+          "cl-cluster-1662967",
+          "cl-cluster-1865343"
+        ],
+        "shown_cases": [
+          "State of Iowa v. Nicholas Dean Wright",
+          "State of Iowa v. Charles Aaron Amble and John Joseph Mandracchia",
+          "State of Iowa v. Ryan Joseph Hahn",
+          "State v. Henderson",
+          "State v. Casteel"
+        ],
+        "target_in_shown": false
+      }
+    },
+    {
+      "id": 2,
+      "case_name": "Alcala v. Marriott International, Inc.",
+      "citation": "880 N.W.2d 699 (Iowa 2016)",
+      "area": "A: Fact-Pattern",
+      "query": "A woman steps out of a downtown hotel lobby onto the concrete walkway during a light, freezing drizzle, slips on patch ice, and shatters her ankle.",
+      "target": "cl-cluster-3212053",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6098,
+          "target_sim": 0.6098
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 0,
+            "3": 0,
+            "5": 0,
+            "10": 0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The cases suggest that liability for slip and fall accidents on icy walkways can depend on factors such as the presence of a continuing storm, the condition of the walkway, and the actions of the property owner. In Alcala v. Marriott, the court considered the continuing-storm doctrine, which may absolve property owners from liability during ongoing storms. In Hodges v. City of Waterloo, liability was found where ice had accumulated in a rough and uneven form for a period of time. Thus, the woman's case may hinge on whether the ice was a result of a continuing storm or if it had been allowed to accumulate negligently.",
+        "answerable": "partial",
+        "best_case": "Brenda J. Alcala v. Marriott International, Inc. and Courtyard Management Corporation D/B/A Quad Cities Courtyard by Marriott",
+        "controlling_present": false,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Brenda J. Alcala v. Marriott International, Inc. and Courtyard Management Corporation D/B/A Quad Cities Courtyard by Marriott",
+            "relevance": "high"
+          },
+          {
+            "case": "Smith v. JC Penney Company",
+            "relevance": "medium"
+          },
+          {
+            "case": "Hodges v. City of Waterloo",
+            "relevance": "medium"
+          },
+          {
+            "case": "cl-cluster-2993570",
+            "relevance": "medium"
+          },
+          {
+            "case": "Parks v. City of Des Moines",
+            "relevance": "low"
+          }
+        ],
+        "rationale": "The retrieval includes cases relevant to slip and fall incidents on icy walkways, but none directly address the specific scenario of a hotel walkway during a freezing drizzle. Alcala v. Marriott is the most relevant due to its discussion of the continuing-storm doctrine, but the cases collectively do not provide a definitive answer to the question.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-3212053",
+          "cl-cluster-2103846",
+          "cl-cluster-7197631",
+          "cl-cluster-2993570",
+          "cl-cluster-7208527"
+        ],
+        "shown_cases": [
+          "Brenda J. Alcala v. Marriott International, Inc. and Courtyard Management Corporation D/B/A Quad Cities Courtyard by Marriott",
+          "Smith v. JC Penney Company",
+          "Hodges v. City of Waterloo",
+          "cl-cluster-2993570",
+          "Parks v. City of Des Moines"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 3,
+      "case_name": "Schoff v. Combined Ins. Co. of America",
+      "citation": "604 N.W.2d 43 (Iowa 1999)",
+      "area": "A: Fact-Pattern",
+      "query": "A job applicant quits his steady position because a hiring manager told him a past felony arrest record wouldn't block his employment, but the company fired him anyway on his first day.",
+      "target": "cl-cluster-1614851",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.4821,
+          "target_sim": 0.4821
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 0,
+            "3": 0,
+            "5": 0,
+            "10": 0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The cases provided do not directly address the specific scenario of a job applicant being misled about the impact of a felony arrest record on employment and then being fired. While Schoff v. Combined Insurance Co. of America discusses promissory estoppel in employment, it does not resolve the issue of reliance on a hiring manager's statements about criminal records. Borschel v. City of Perry touches on wrongful discharge but does not cover misleading statements about hiring criteria. Therefore, the supplied cases are insufficient to answer the question.",
+        "answerable": "no",
+        "best_case": "Schoff v. Combined Insurance Co. of America",
+        "controlling_present": false,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Schoff v. Combined Insurance Co. of America",
+            "relevance": "medium"
+          },
+          {
+            "case": "Borschel v. City of Perry",
+            "relevance": "medium"
+          },
+          {
+            "case": "Slater v. Olson",
+            "relevance": "low"
+          },
+          {
+            "case": "Consolidated Freightways, Inc. v. Cedar Rapids Civil Rights Commission",
+            "relevance": "low"
+          },
+          {
+            "case": "Walters v. United States Gypsum Co.",
+            "relevance": "low"
+          }
+        ],
+        "rationale": "The retrieval includes cases related to employment law and wrongful discharge, but none directly address the issue of reliance on a hiring manager's statements regarding criminal records. The most relevant case, Schoff, discusses promissory estoppel but not in the context of criminal record misrepresentation.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-1614851",
+          "cl-cluster-1244511",
+          "cl-cluster-3439652",
+          "cl-cluster-1821940",
+          "cl-cluster-1280857"
+        ],
+        "shown_cases": [
+          "Schoff v. Combined Insurance Co. of America",
+          "Borschel v. City of Perry",
+          "Slater v. Olson",
+          "Consolidated Freightways, Inc. v. Cedar Rapids Civil Rights Commission",
+          "Walters v. United States Gypsum Co."
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 4,
+      "case_name": "Standard Water Control Systems, Inc. v. Jones",
+      "citation": "938 N.W.2d 651 (Iowa 2020)",
+      "area": "A: Fact-Pattern",
+      "query": "A contractor installs a basement waterproofing system, sues the homeowners over an unpaid invoice, and attempts to force a sheriff's sale of their primary residence to collect forty thousand dollars in attorney fees.",
+      "target": "cl-cluster-4725276",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.5165,
+          "target_sim": 0.5165
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 0,
+            "3": 0,
+            "5": 0,
+            "10": 0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The cases suggest that a contractor may recover attorney fees against a homestead in an action to enforce a mechanic\u2019s lien, as seen in Standard Water Control Systems, Inc. v. Michael D. Jones and Cori Jones (2020). However, the specific ability to force a sheriff's sale for attorney fees alone is not directly addressed in the provided cases.",
+        "answerable": "partial",
+        "best_case": "Standard Water Control Systems, Inc. v. Michael D. Jones and Cori Jones",
+        "controlling_present": false,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Standard Water Control Systems, Inc. v. Michael D. Jones and Cori Jones",
+            "relevance": "high"
+          },
+          {
+            "case": "Standard Water Control Systems, Inc., plaintiff-appellees/counterclaim-defendants v. Michael D. Jones and Cori Jones",
+            "relevance": "medium"
+          },
+          {
+            "case": "Olberding Const. Co., Inc. v. Ruden",
+            "relevance": "low"
+          },
+          {
+            "case": "Arthur H. Kollias d/b/a Custom Builders & Remodelers v. Mark J. Cardis, Laura Elena C. De Gallego, and Ohnward Bank & Trust",
+            "relevance": "low"
+          },
+          {
+            "case": "Nepstad Custom Homes Co. v. Krull",
+            "relevance": "low"
+          }
+        ],
+        "rationale": "The retrieval includes a case that discusses the recovery of attorney fees in the context of a mechanic's lien, which is relevant to the question. However, none of the cases specifically address the enforcement of a sheriff's sale for attorney fees, making the answer incomplete.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-4725276",
+          "cl-cluster-4252937",
+          "cl-cluster-1311359",
+          "cl-cluster-4769882",
+          "cl-cluster-1303729"
+        ],
+        "shown_cases": [
+          "Standard Water Control Systems, Inc. v. Michael D. Jones and Cori Jones",
+          "Standard Water Control Systems, Inc., plaintiff-appellees/counterclaim-defendants v. Michael D. Jones and Cori Jones, defendants-appellants/counterclaim-plaintiffs.",
+          "Olberding Const. Co., Inc. v. Ruden",
+          "Arthur H. Kollias d/b/a Custom Builders & Remodelers v. Mark J. Cardis, Laura Elena C. De Gallego, and Ohnward Bank & Trust",
+          "Nepstad Custom Homes Co. v. Krull"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 5,
+      "case_name": "State v. Heemstra",
+      "citation": "721 N.W.2d 549 (Iowa 2006)",
+      "area": "A: Fact-Pattern",
+      "query": "During a roadside fight over a land deal, a farmer pulls a rifle out of his truck bed, shoots his neighbor in the head, and then drags the body into a nearby water cistern.",
+      "target": "cl-cluster-1652030",
+      "configs": {
+        "vector": {
+          "first_rank": 22,
+          "reciprocal_rank": 0.045454545454545456,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-3438720",
+            "cl-cluster-3431840",
+            "cl-cluster-3435542",
+            "cl-cluster-7209146",
+            "cl-cluster-3436958"
+          ],
+          "top1_sim": 0.4923,
+          "target_sim": 0.4379
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 0,
+            "3": 0,
+            "5": 0,
+            "10": 0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 22,
+          "reciprocal_rank": 0.045454545454545456,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-3438720",
+            "cl-cluster-3431840",
+            "cl-cluster-3435542",
+            "cl-cluster-7209146",
+            "cl-cluster-3436958"
+          ]
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The scenario described in the question is similar to the facts in State v. Heemstra, where a farmer was convicted of first-degree murder after a dispute over land led to a shooting. This case suggests that the farmer in the question could be charged with murder, as the act of shooting the neighbor in the head and disposing of the body indicates premeditation and intent to kill.",
+        "answerable": "yes",
+        "best_case": "State v. Heemstra",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "State v. Heemstra",
+            "relevance": "high"
+          },
+          {
+            "case": "State v. Rhone",
+            "relevance": "medium"
+          },
+          {
+            "case": "State v. Blee",
+            "relevance": "medium"
+          },
+          {
+            "case": "State v. Warner",
+            "relevance": "medium"
+          },
+          {
+            "case": "State v. Stewart",
+            "relevance": "low"
+          }
+        ],
+        "rationale": "The retrieval includes a case directly addressing a similar situation involving a land dispute and a shooting, making it highly relevant. Other cases provide context on disputes leading to violence but are less directly applicable. The retrieval is effective in providing a clear precedent for the scenario described.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-1652030",
+          "cl-cluster-3436464",
+          "cl-cluster-7201064",
+          "cl-cluster-7196363",
+          "cl-cluster-7209151"
+        ],
+        "shown_cases": [
+          "State v. Heemstra",
+          "State v. Rhone",
+          "State v. Blee",
+          "State v. Warner",
+          "State v. Stewart"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 6,
+      "case_name": "Burnett v. Smith",
+      "citation": "990 N.W.2d 289 (Iowa 2023)",
+      "area": "B: Abstract Concept",
+      "query": "Whether the state judiciary possesses the common law authority to recognize an implied private cause of action for monetary damages stemming from a direct violation of the state constitution.",
+      "target": "cl-cluster-9397060",
+      "configs": {
+        "vector": {
+          "first_rank": 7,
+          "reciprocal_rank": 0.14285714285714285,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3333333333333333
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4405284",
+            "cl-cluster-4471913",
+            "cl-cluster-4408833",
+            "cl-cluster-2789045",
+            "cl-cluster-4512940"
+          ],
+          "top1_sim": 0.6342,
+          "target_sim": 0.5485
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 7
+          },
+          "outranked_by": [
+            "cl-cluster-5290145",
+            "cl-cluster-4894883",
+            "cl-cluster-4893114",
+            "cl-cluster-4512940",
+            "cl-cluster-4405284"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 7,
+          "reciprocal_rank": 0.14285714285714285,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3333333333333333
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4405284",
+            "cl-cluster-4471913",
+            "cl-cluster-4408833",
+            "cl-cluster-4512940",
+            "cl-cluster-2789045"
+          ]
+        },
+        "rc": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4405284",
+            "cl-cluster-4512940",
+            "cl-cluster-4844322",
+            "cl-cluster-7192772",
+            "cl-cluster-7195910"
+          ]
+        }
+      },
+      "judge": {
+        "answer": "The Iowa judiciary does not possess the common law authority to recognize an implied private cause of action for monetary damages stemming from a direct violation of the state constitution. In Godfrey v. State of Iowa, the dissenting opinion highlights that historically, Iowa courts have not recognized direct claims under the Iowa Constitution for damages without legislative authorization or a basis in established common law doctrines.",
+        "answerable": "yes",
+        "best_case": "Christopher J. Godfrey v. State of Iowa",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Christopher J. Godfrey v. State of Iowa",
+            "relevance": "high"
+          },
+          {
+            "case": "Gregory Baldwin v. City of Estherville, Iowa",
+            "relevance": "medium"
+          },
+          {
+            "case": "Krystal Wagner, Individually and as Administrator of the Estate of Shane Jensen v. State of Iowa and William L. Spece a/k/a Bill L. Spece",
+            "relevance": "medium"
+          },
+          {
+            "case": "Trustees of the Diocese v. City of Anamosa",
+            "relevance": "off"
+          },
+          {
+            "case": "State ex rel. West v. City of Des Moines",
+            "relevance": "off"
+          }
+        ],
+        "rationale": "The retrieval includes a case directly addressing the question, providing a clear answer regarding the lack of common law authority for implied constitutional damages claims in Iowa. Other cases provide some context but are less directly relevant, and two cases are unrelated to the question.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-4405284",
+          "cl-cluster-4512940",
+          "cl-cluster-4844322",
+          "cl-cluster-7192772",
+          "cl-cluster-7195910"
+        ],
+        "shown_cases": [
+          "Christopher J. Godfrey v. State of Iowa Terry Branstad, Governor of the State of Iowa, Individually and in His Official Capacity Kimberly Reynolds, Lieutenant Governor of the State of Iowa, Individually and in Her Official Capacity Jeffrey Boeyink, Chief of Staff to the Governor of the State of Iowa, Individually and in His Official Capacity Brenna Findley, Legal Counsel to the Governor of The",
+          "Gregory Baldwin v. City of Estherville, Iowa Matt Reineke, Individually and in His Official Capacity as an Officer of the Estherville Police Department and Matt Hellickson, Individually and in His Official Capacity as an Officer of the Estherville Police Department",
+          "Krystal Wagner, Individually and as Administrator of the Estate of Shane Jensen v. State of Iowa and William L. Spece a/k/a Bill L. Spece",
+          "Trustees of the Diocese v. City of Anamosa",
+          "State ex rel. West v. City of Des Moines"
+        ],
+        "target_in_shown": false
+      }
+    },
+    {
+      "id": 7,
+      "case_name": "De Boom v. Raining Rose, Inc.",
+      "citation": "772 N.W.2d 1 (Iowa 2009)",
+      "area": "B: Abstract Concept",
+      "query": "The required evidentiary burden and standard jury instructions for a plaintiff alleging a pretextual termination under the Iowa Civil Rights Act based on pregnancy.",
+      "target": "cl-cluster-2058665",
+      "configs": {
+        "vector": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4472630"
+          ],
+          "top1_sim": 0.7112,
+          "target_sim": 0.686
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 1,
+            "5": 1,
+            "10": 1
+          },
+          "outranked_by": [
+            "cl-cluster-4635123"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4472630"
+          ]
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The case of Deboom v. Raining Rose, Inc. (772 N.W.2d 1) provides guidance on the evidentiary burden and jury instructions for a pretextual termination claim under the Iowa Civil Rights Act based on pregnancy. The court held that the jury should be instructed that it can infer discrimination if it believes the employer's reasons for termination are a pretext. Additionally, the case highlights the importance of correctly defining 'determining factor' in jury instructions.",
+        "answerable": "yes",
+        "best_case": "Deboom v. Raining Rose, Inc.",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Deboom v. Raining Rose, Inc.",
+            "relevance": "high"
+          },
+          {
+            "case": "Karen McQuistion v. City of Clinton, Iowa Mark Regenwether Jeffrey Farwell And Jeffrey Horne",
+            "relevance": "medium"
+          },
+          {
+            "case": "Elizabeth Chacey Deboom Vs. Raining Rose, Inc., Chart Acquisition Corp., Charles Hammond, And Estate Of Art Christoffersen",
+            "relevance": "high"
+          },
+          {
+            "case": "Hamer v. Iowa Civil Rights Commission",
+            "relevance": "medium"
+          },
+          {
+            "case": "Atwood v. City of Des Moines",
+            "relevance": "medium"
+          }
+        ],
+        "rationale": "The retrieval includes a directly relevant case, Deboom v. Raining Rose, Inc., which addresses the evidentiary burden and jury instructions for pretextual termination claims under the Iowa Civil Rights Act. Other cases provide context on discrimination claims but do not directly address the specific question.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-2058665",
+          "cl-cluster-3165523",
+          "cl-cluster-4472630",
+          "cl-cluster-2188926",
+          "cl-cluster-1599469"
+        ],
+        "shown_cases": [
+          "Deboom v. Raining Rose, Inc.",
+          "Karen McQuistion v. City of Clinton, Iowa Mark Regenwether Jeffrey Farwell And Jeffrey Horne",
+          "Elizabeth Chacey Deboom Vs. Raining Rose, Inc., Chart Acquisition Corp., Charles Hammond, And Estate Of Art Christoffersen",
+          "Hamer v. Iowa Civil Rights Commission",
+          "Atwood v. City of Des Moines"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 8,
+      "case_name": "State v. Roby",
+      "citation": "897 N.W.2d 127 (Iowa 2017)",
+      "area": "B: Abstract Concept",
+      "query": "Application of the Miller factors and requirement for individualized sentencing hearings when evaluating lengthy term-of-years prison sentences that constitute the functional equivalent of life without parole for a minor.",
+      "target": "cl-cluster-4400906",
+      "configs": {
+        "vector": {
+          "first_rank": 9,
+          "reciprocal_rank": 0.1111111111111111,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3010299956639812
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-10136146",
+            "cl-cluster-2812180",
+            "cl-cluster-4892239",
+            "cl-cluster-4472205",
+            "cl-cluster-4472149"
+          ],
+          "top1_sim": 0.6142,
+          "target_sim": 0.592
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 7
+          },
+          "outranked_by": [
+            "cl-cluster-4472206",
+            "cl-cluster-4471933",
+            "cl-cluster-4394388",
+            "cl-cluster-4396753",
+            "cl-cluster-4472149"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 14,
+          "reciprocal_rank": 0.07142857142857142,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4472149",
+            "cl-cluster-2687555",
+            "cl-cluster-4471933",
+            "cl-cluster-4472206",
+            "cl-cluster-8281429"
+          ]
+        },
+        "rc": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-2812178",
+            "cl-cluster-2812180",
+            "cl-cluster-8281429",
+            "cl-cluster-3169194",
+            "cl-cluster-4472206"
+          ]
+        }
+      },
+      "judge": {
+        "answer": "The cases indicate that Iowa requires individualized sentencing hearings for juveniles facing lengthy term-of-years sentences that are the functional equivalent of life without parole. The Miller factors must be considered in such cases, as established in State v. Lyle and reaffirmed in State of Iowa v. Durius Antwan Davis. These factors include the juvenile's age, family and home environment, circumstances of the offense, and potential for rehabilitation.",
+        "answerable": "yes",
+        "best_case": "State of Iowa v. Durius Antwan Davis",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "State of Iowa v. Yvette Marie Louisell",
+            "relevance": "medium"
+          },
+          {
+            "case": "State of Iowa v. Damion John Seats",
+            "relevance": "medium"
+          },
+          {
+            "case": "State v. Lyle",
+            "relevance": "high"
+          },
+          {
+            "case": "State of Iowa v. Durius Antwan Davis",
+            "relevance": "high"
+          },
+          {
+            "case": "State of Iowa v. Denem Anthony Null",
+            "relevance": "medium"
+          }
+        ],
+        "rationale": "The retrieval includes cases that directly address the application of the Miller factors and the requirement for individualized sentencing for juveniles, particularly State v. Lyle and State of Iowa v. Durius Antwan Davis. These cases provide a clear basis for answering the question, indicating a well-targeted retrieval.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-2812178",
+          "cl-cluster-2812180",
+          "cl-cluster-8281429",
+          "cl-cluster-3169194",
+          "cl-cluster-4472206"
+        ],
+        "shown_cases": [
+          "State of Iowa v. Yvette Marie Louisell",
+          "State of Iowa v. Damion John Seats",
+          "State v. Lyle",
+          "State of Iowa v. Durius Antwan Davis",
+          "State of Iowa v. Denem Anthony Null"
+        ],
+        "target_in_shown": false
+      }
+    },
+    {
+      "id": 9,
+      "case_name": "State v. Pettijohn",
+      "citation": "899 N.W.2d 1 (Iowa 2017)",
+      "area": "B: Abstract Concept",
+      "query": "Constitutionality of the statutory implied consent framework and warrantless chemical testing applied to operators of watercraft or motorboats suspected of intoxication.",
+      "target": "cl-cluster-4405281",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6527,
+          "target_sim": 0.6527
+        },
+        "fts": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 6
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The statutory implied consent framework for warrantless chemical testing of operators of watercraft or motorboats suspected of intoxication is deemed unconstitutional under the Iowa Constitution due to its inherently coercive nature, as established in State of Iowa v. Dale Dean Pettijohn Jr. The court found that the statutory scheme could not justify warrantless searches based on consent because the consent was not voluntary.",
+        "answerable": "yes",
+        "best_case": "State of Iowa v. Dale Dean Pettijohn Jr.",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "State of Iowa v. Dale Dean Pettijohn Jr.",
+            "relevance": "high"
+          },
+          {
+            "case": "State v. Frescoln",
+            "relevance": "medium"
+          },
+          {
+            "case": "State of Iowa v. John Arthur Senn Jr.",
+            "relevance": "low"
+          },
+          {
+            "case": "State v. Hraha",
+            "relevance": "medium"
+          },
+          {
+            "case": "State v. Massengale",
+            "relevance": "medium"
+          }
+        ],
+        "rationale": "The case of State of Iowa v. Dale Dean Pettijohn Jr. directly addresses the constitutionality of the implied consent framework for watercraft, making it highly relevant and the best case for answering the question. Other cases provide context on implied consent and chemical testing but do not directly address the specific question about watercraft.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-4405281",
+          "cl-cluster-4473365",
+          "cl-cluster-3216872",
+          "cl-cluster-1999196",
+          "cl-cluster-1911741"
+        ],
+        "shown_cases": [
+          "State of Iowa v. Dale Dean Pettijohn Jr.",
+          "State v. Frescoln",
+          "State of Iowa v. John Arthur Senn Jr.",
+          "State v. Hraha",
+          "State v. Massengale"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 10,
+      "case_name": "Mease v. Fox",
+      "citation": "200 N.W.2d 791 (Iowa 1972)",
+      "area": "B: Abstract Concept",
+      "query": "Abrogation of caveat emptor in urban residential leasing and recognition of a landlord's mutual, dependent obligations under the implied warranty of habitability.",
+      "target": "cl-cluster-1618499",
+      "configs": {
+        "vector": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4472021"
+          ],
+          "top1_sim": 0.6249,
+          "target_sim": 0.6149
+        },
+        "fts": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 4,
+            "10": 4
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The case of Mease Ex Rel. Oliver v. Fox addresses the abrogation of caveat emptor in urban residential leasing by recognizing a landlord's duty to maintain habitable premises, effectively establishing an implied warranty of habitability. This case indicates that landlords have mutual, dependent obligations to ensure the leased property is safe and sanitary, thus moving away from the traditional caveat emptor doctrine.",
+        "answerable": "yes",
+        "best_case": "Mease Ex Rel. Oliver v. Fox",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Mease Ex Rel. Oliver v. Fox",
+            "relevance": "high"
+          },
+          {
+            "case": "Struve v. Payvandi",
+            "relevance": "low"
+          },
+          {
+            "case": "Kirk v. Ridgway",
+            "relevance": "low"
+          },
+          {
+            "case": "Jose Calderon, individually and as next friend to E.G. and A.G., and Veronica Gonzales, individually and as next friend to E.G. and A.G. v. Saber Khan",
+            "relevance": "medium"
+          },
+          {
+            "case": "Cohen v. Hayden",
+            "relevance": "off"
+          }
+        ],
+        "rationale": "The retrieval includes Mease Ex Rel. Oliver v. Fox, which directly addresses the implied warranty of habitability in urban residential leasing, making the question answerable. Other cases provide limited or no relevant information on the specific legal question.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-1618499",
+          "cl-cluster-2128401",
+          "cl-cluster-2187749",
+          "cl-cluster-5065305",
+          "cl-cluster-7205756"
+        ],
+        "shown_cases": [
+          "Mease Ex Rel. Oliver v. Fox",
+          "Struve v. Payvandi",
+          "Kirk v. Ridgway",
+          "Jose Calderon, individually and as next friend to E.G. and A.G., and Veronica Gonzales, individually and as next friend to E.G. and A.G. v. Saber Khan",
+          "Cohen v. Hayden"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 11,
+      "case_name": "Garrison v. New Fashion Pork LLP",
+      "citation": "977 N.W.2d 67 (Iowa 2022)",
+      "area": "C: Fragmentary/Citation",
+      "query": "Garrison v. New Fashion Pork CAFO nuisance right to farm",
+      "target": "cl-cluster-6620314",
+      "configs": {
+        "vector": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-8248971"
+          ],
+          "top1_sim": 0.7182,
+          "target_sim": 0.7181
+        },
+        "fts": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 3,
+            "10": 3
+          },
+          "outranked_by": [
+            "cl-cluster-8248971"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-8248971"
+          ]
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The case of Gordon Berg Garrison v. New Fashion Pork LLP and BWT Holdings LLP (2022) addresses the issue of nuisance claims against a confined animal feeding operation (CAFO) and discusses the application of Iowa's 'right-to-farm' law, specifically Iowa Code section 657.11. The court affirmed the dismissal of nuisance claims, indicating that the statutory immunity provided by the right-to-farm law was upheld. This case is directly relevant to the question about nuisance claims and the right-to-farm defense.",
+        "answerable": "yes",
+        "best_case": "Gordon Berg Garrison v. New Fashion Pork LLP and BWT Holdings LLP",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Gordon Berg Garrison v. New Fashion Pork LLP and BWT Holdings LLP",
+            "relevance": "high"
+          },
+          {
+            "case": "Weinhold v. Wolff",
+            "relevance": "medium"
+          },
+          {
+            "case": "Garrison Grain & Lumber Co. v. Farmers Mercantile Co.",
+            "relevance": "off"
+          },
+          {
+            "case": "Michael Merrill and Karen Jo Frescoln v. Valley View Swine, LLC and JBS Live Pork, LLC f/k/a Cargill Pork, LLC",
+            "relevance": "medium"
+          },
+          {
+            "case": "Tetzlaff v. Camp",
+            "relevance": "low"
+          }
+        ],
+        "rationale": "The retrieval includes a directly relevant case that discusses the right-to-farm law and its application to nuisance claims against CAFOs, making the question answerable. Other cases provide some context but are less directly relevant.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-6620314",
+          "cl-cluster-1721531",
+          "cl-cluster-7205927",
+          "cl-cluster-4741998",
+          "cl-cluster-2027082"
+        ],
+        "shown_cases": [
+          "Gordon Berg Garrison v. New Fashion Pork LLP and BWT Holdings LLP",
+          "Weinhold v. Wolff",
+          "Garrison Grain & Lumber Co. v. Farmers Mercantile Co.",
+          "Michael Merrill and Karen Jo Frescoln v. Valley View Swine, LLC and JBS Live Pork, LLC f/k/a Cargill Pork, LLC",
+          "Tetzlaff v. Camp"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 12,
+      "case_name": "Mitchell v. City of Cedar Rapids",
+      "citation": "926 N.W.2d 222 (Iowa 2019)",
+      "area": "C: Fragmentary/Citation",
+      "query": "Mitchell City of Cedar Rapids police bodycam video public records chapter 22",
+      "target": "cl-cluster-4607269",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6907,
+          "target_sim": 0.6907
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 1,
+            "5": 1,
+            "10": 1
+          },
+          "outranked_by": [
+            "cl-cluster-5313012"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-5313012"
+          ]
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The cases provided do not directly address whether police bodycam video is considered a public record under Iowa Code Chapter 22. The case Mitchell v. City of Cedar Rapids discusses the release of police investigative reports but does not specifically address bodycam footage. Other cases, such as Benjamin Ward v. Altoona Police Department, involve disputes over bodycam footage but do not resolve the question of its status as a public record under Chapter 22.",
+        "answerable": "no",
+        "best_case": "Mitchell v. City of Cedar Rapids",
+        "controlling_present": false,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Mitchell v. City of Cedar Rapids",
+            "relevance": "medium"
+          },
+          {
+            "case": "Benjamin Ward v. Iowa Public Information Board",
+            "relevance": "low"
+          },
+          {
+            "case": "Benjamin Ward v. Altoona Police Department",
+            "relevance": "medium"
+          },
+          {
+            "case": "Clymer v. City of Cedar Rapids",
+            "relevance": "low"
+          },
+          {
+            "case": "Mark Leonard Milligan v. Ottumwa Police Department and City of Otumwa, Iowa",
+            "relevance": "low"
+          }
+        ],
+        "rationale": "The retrieval includes cases related to public records and police footage, but none directly address the specific question of bodycam footage as a public record under Chapter 22. The most relevant case, Mitchell v. City of Cedar Rapids, discusses related issues but not the specific legal question posed.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-4607269",
+          "cl-cluster-10639583",
+          "cl-cluster-10639584",
+          "cl-cluster-2000607",
+          "cl-cluster-4691946"
+        ],
+        "shown_cases": [
+          "Mitchell v. City of Cedar Rapids",
+          "Benjamin Ward v. Iowa Public Information Board",
+          "Benjamin Ward v. Altoona Police Department",
+          "Clymer v. City of Cedar Rapids",
+          "Mark Leonard Milligan v. Ottumwa Police Department and City of Otumwa, Iowa"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 13,
+      "case_name": "State v. Liggins",
+      "citation": "557 N.W.2d 263 (Iowa 1996)",
+      "area": "C: Fragmentary/Citation",
+      "query": "Liggins 557 N.W.2d 263 territorial jurisdiction murder corpse found in Iowa",
+      "target": "cl-cluster-2226571",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.7458,
+          "target_sim": 0.7458
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 0,
+            "3": 0,
+            "5": 0,
+            "10": 0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The case of State v. Liggins (557 N.W.2d 263) addresses the issue of territorial jurisdiction in a murder case where the corpse was found in Iowa. The court affirmed the conviction, indicating that Iowa had jurisdiction over the murder charge despite the victim being last seen in Illinois, as the body was found in Iowa and the crime was prosecuted there.",
+        "answerable": "yes",
+        "best_case": "State v. Liggins",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "State v. Liggins",
+            "relevance": "high"
+          },
+          {
+            "case": "State of Iowa v. Stanley Liggins",
+            "relevance": "medium"
+          },
+          {
+            "case": "State v. Wagner",
+            "relevance": "low"
+          },
+          {
+            "case": "State v. Wedebrand",
+            "relevance": "low"
+          },
+          {
+            "case": "State v. Sweeney",
+            "relevance": "medium"
+          }
+        ],
+        "rationale": "The retrieval includes the controlling case, State v. Liggins, which directly addresses the question of territorial jurisdiction in the context of a murder where the body was found in Iowa. Other cases provide some context on jurisdictional issues but are less directly relevant.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-2226571",
+          "cl-cluster-6620313",
+          "cl-cluster-1984907",
+          "cl-cluster-1934648",
+          "cl-cluster-3438585"
+        ],
+        "shown_cases": [
+          "State v. Liggins",
+          "State of Iowa v. Stanley Liggins",
+          "State v. Wagner",
+          "State v. Wedebrand",
+          "State v. Sweeney"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 14,
+      "case_name": "Iowa Supreme Court Attorney Disciplinary Board v. Marzen",
+      "citation": "779 N.W.2d 757 (Iowa 2010)",
+      "area": "C: Fragmentary/Citation",
+      "query": "779 N.W.2d 757 Marzen attorney sex with client disciplinary board",
+      "target": "cl-cluster-1254899",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.7306,
+          "target_sim": 0.7306
+        },
+        "fts": {
+          "first_rank": 9,
+          "reciprocal_rank": 0.1111111111111111,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.3010299956639812
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-2784453",
+            "cl-cluster-2784558",
+            "cl-cluster-4472115",
+            "cl-cluster-2789648",
+            "cl-cluster-4472104"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The case of Iowa Supreme Court Attorney Disciplinary Board v. Marzen (779 N.W.2d 757) discusses allegations against Jesse M. Marzen for engaging in a sexual relationship with a client. However, the grievance commission found insufficient evidence of an ethical violation regarding the sexual relationship charge. Marzen was disciplined for disclosing client confidences, not for the alleged sexual relationship.",
+        "answerable": "yes",
+        "best_case": "Iowa Supreme Court Attorney Disciplinary Board v. Marzen",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Iowa Supreme Court Attorney Disciplinary Board v. Marzen",
+            "relevance": "high"
+          },
+          {
+            "case": "Iowa Supreme Court Attorney Disciplinary Board v. Melissa Nine",
+            "relevance": "medium"
+          },
+          {
+            "case": "Iowa Supreme Court Attorney Disciplinary Board v. Monroe",
+            "relevance": "medium"
+          },
+          {
+            "case": "Iowa Supreme Court Attorney Disciplinary Board v. Michael Jon Jacobsma",
+            "relevance": "medium"
+          },
+          {
+            "case": "Iowa Supreme Court Board of Professional Ethics & Conduct v. Hill",
+            "relevance": "medium"
+          }
+        ],
+        "rationale": "The retrieval includes the Marzen case, which directly addresses the question about Marzen's disciplinary proceedings related to a sexual relationship with a client. Other cases provide context on similar issues but do not directly pertain to Marzen's case.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-1254899",
+          "cl-cluster-4571076",
+          "cl-cluster-2119998",
+          "cl-cluster-4571075",
+          "cl-cluster-1911178"
+        ],
+        "shown_cases": [
+          "Iowa Supreme Court Attorney Disciplinary Board v. Marzen",
+          "Iowa Supreme Court Attorney Disciplinary Board v. Melissa Nine",
+          "Iowa Supreme Court Attorney Disciplinary Board v. Monroe",
+          "Iowa Supreme Court Attorney Disciplinary Board v. Michael Jon Jacobsma",
+          "Iowa Supreme Court Board of Professional Ethics & Conduct v. Hill"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 15,
+      "case_name": "Godfrey v. State",
+      "citation": "898 N.W.2d 844 (Iowa 2017)",
+      "area": "C: Fragmentary/Citation",
+      "query": "Godfrey v. State 898 N.W.2d 844 civil rights commissioner constitutional tort",
+      "target": "cl-cluster-4405284",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6259,
+          "target_sim": 0.6259
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-10688428",
+            "cl-cluster-9398621",
+            "cl-cluster-9397060",
+            "cl-cluster-5290141",
+            "cl-cluster-4896060"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The case of Godfrey v. State (898 N.W.2d 844) addresses whether the Iowa Constitution provides a direct action for damages in an employment dispute involving a state official, specifically the Iowa Workers\u2019 Compensation Commissioner. The court considered the applicability of equal protection and due process provisions in this context.",
+        "answerable": "yes",
+        "best_case": "Christopher J. Godfrey v. State of Iowa",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Christopher J. Godfrey v. State of Iowa",
+            "relevance": "high"
+          },
+          {
+            "case": "Gregory Baldwin v. City of Estherville, Iowa",
+            "relevance": "medium"
+          },
+          {
+            "case": "Cory Burnett v. Phillip Smith and State of Iowa",
+            "relevance": "low"
+          },
+          {
+            "case": "Butin v. Civil Service Commission",
+            "relevance": "off"
+          },
+          {
+            "case": "Deborah Ferguson v. Exide Technologies, Inc. and Fred Gilbert",
+            "relevance": "off"
+          }
+        ],
+        "rationale": "The retrieval includes the Godfrey v. State case, which directly addresses the question about constitutional torts involving a civil rights commissioner. Other cases provide context on constitutional torts and immunity but are less directly relevant.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-4405284",
+          "cl-cluster-4629600",
+          "cl-cluster-9398621",
+          "cl-cluster-7205689",
+          "cl-cluster-4686817"
+        ],
+        "shown_cases": [
+          "Christopher J. Godfrey v. State of Iowa Terry Branstad, Governor of the State of Iowa, Individually and in His Official Capacity Kimberly Reynolds, Lieutenant Governor of the State of Iowa, Individually and in Her Official Capacity Jeffrey Boeyink, Chief of Staff to the Governor of the State of Iowa, Individually and in His Official Capacity Brenna Findley, Legal Counsel to the Governor of The",
+          "Gregory Baldwin v. City of Estherville, Iowa",
+          "Cory Burnett v. Phillip Smith and State of Iowa",
+          "Butin v. Civil Service Commission",
+          "Deborah Ferguson v. Exide Technologies, Inc. and Fred Gilbert"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 16,
+      "case_name": "Garrison v. New Fashion Pork LLP",
+      "citation": "977 N.W.2d 67 (Iowa 2022)",
+      "area": "D: Adversarial",
+      "query": "Does the state legislature violate the inalienable rights clause when it provides statutory immunity to confined animal feeding operations against private nuisance claims brought by neighboring land owners?",
+      "target": "cl-cluster-6620314",
+      "configs": {
+        "vector": {
+          "first_rank": 3,
+          "reciprocal_rank": 0.3333333333333333,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.5,
+            "5": 0.5,
+            "10": 0.5
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-2107625",
+            "cl-cluster-8248971"
+          ],
+          "top1_sim": 0.6779,
+          "target_sim": 0.6559
+        },
+        "fts": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 7
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 2,
+          "reciprocal_rank": 0.5,
+          "hit": {
+            "1": 0.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.6309297535714575,
+            "5": 0.6309297535714575,
+            "10": 0.6309297535714575
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-8248971"
+          ]
+        },
+        "rc": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-8248971",
+            "cl-cluster-1235670",
+            "cl-cluster-1721531",
+            "cl-cluster-4324689",
+            "cl-cluster-7206591"
+          ]
+        }
+      },
+      "judge": {
+        "answer": "The state legislature does not violate the inalienable rights clause when it provides statutory immunity to confined animal feeding operations against private nuisance claims, as long as the immunity does not result in a taking of private property without just compensation. This was established in Bormann v. KOSSUTH COUNTY BD. OF SUP'RS, where the court found that statutory immunity from nuisance suits constituted a taking of private property for public use without just compensation, thus violating constitutional provisions.",
+        "answerable": "yes",
+        "best_case": "Bormann v. KOSSUTH COUNTY BD. OF SUP'RS",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Gordon Berg Garrison v. New Fashion Pork LLP and BWT Holdings LLP",
+            "relevance": "medium"
+          },
+          {
+            "case": "Bormann v. KOSSUTH COUNTY BD. OF SUP'RS",
+            "relevance": "high"
+          },
+          {
+            "case": "Weinhold v. Wolff",
+            "relevance": "medium"
+          },
+          {
+            "case": "Patricia J. McIlrath v. Prestage Farms of Iowa, L.L.C.",
+            "relevance": "medium"
+          },
+          {
+            "case": "Central Life Assurance Society of the United States v. City of Des Moines",
+            "relevance": "off"
+          }
+        ],
+        "rationale": "The retrieval includes Bormann, which directly addresses the constitutional issue of statutory immunity and its potential to violate property rights, making it highly relevant. Other cases provide context but do not directly address the constitutional question. The retrieval is effective in providing a clear answer to the question.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-8248971",
+          "cl-cluster-1235670",
+          "cl-cluster-1721531",
+          "cl-cluster-4324689",
+          "cl-cluster-7206591"
+        ],
+        "shown_cases": [
+          "Gordon Berg Garrison v. New Fashion Pork LLP and BWT Holdings LLP",
+          "Bormann v. KOSSUTH COUNTY BD. OF SUP'RS",
+          "Weinhold v. Wolff",
+          "Patricia J. McIlrath v. Prestage Farms of Iowa, L.L.C.",
+          "Central Life Assurance Society of the United States v. City of Des Moines"
+        ],
+        "target_in_shown": false
+      }
+    },
+    {
+      "id": 17,
+      "case_name": "Burnett v. Smith",
+      "citation": "990 N.W.2d 289 (Iowa 2023)",
+      "area": "D: Adversarial",
+      "query": "Can a public employee sue a state supervisor directly under the state constitution for damages after being wrongfully demoted or stripped of salary?",
+      "target": "cl-cluster-9397060",
+      "configs": {
+        "vector": {
+          "first_rank": 38,
+          "reciprocal_rank": 0.02631578947368421,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4405284",
+            "cl-cluster-4408833",
+            "cl-cluster-4471913",
+            "cl-cluster-2687582",
+            "cl-cluster-4472162"
+          ],
+          "top1_sim": 0.533,
+          "target_sim": 0.4164
+        },
+        "fts": {
+          "first_rank": 28,
+          "reciprocal_rank": 0.03571428571428571,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-7205551",
+            "cl-cluster-5290141",
+            "cl-cluster-4896060",
+            "cl-cluster-2194000",
+            "cl-cluster-1899597"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 18,
+          "reciprocal_rank": 0.05555555555555555,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4408833",
+            "cl-cluster-4405284",
+            "cl-cluster-4471913",
+            "cl-cluster-5290141",
+            "cl-cluster-4896060"
+          ]
+        },
+        "rc": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-4405284",
+            "cl-cluster-4507576",
+            "cl-cluster-2687645",
+            "cl-cluster-4635123",
+            "cl-cluster-7204484"
+          ]
+        }
+      },
+      "judge": {
+        "answer": "The case of Christopher J. Godfrey v. State of Iowa suggests that a public employee may have a direct action for damages under the Iowa Constitution in the context of an employment dispute, as the court considered claims against state officials for damages related to public employment. However, the case does not definitively resolve whether such a claim is permissible, as it involved a reversal in part and affirmation in part of the district court's judgment, indicating complexity in the legal landscape.",
+        "answerable": "partial",
+        "best_case": "Christopher J. Godfrey v. State of Iowa Terry Branstad, Governor of the State of Iowa, Individually and in His Official Capacity Kimberly Reynolds, Lieutenant Governor of the State of Iowa, Individually and in Her Official Capacity Jeffrey Boeyink, Chief of Staff to the Governor of the State of Iowa, Individually and in His Official Capacity Brenna Findley, Legal Counsel to the Governor of The",
+        "controlling_present": false,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "Christopher J. Godfrey v. State of Iowa Terry Branstad, Governor of the State of Iowa, Individually and in His Official Capacity Kimberly Reynolds, Lieutenant Governor of the State of Iowa, Individually and in Her Official Capacity Jeffrey Boeyink, Chief of Staff to the Governor of the State of Iowa, Individually and in His Official Capacity Brenna Findley, Legal Counsel to the Governor of The",
+            "relevance": "high"
+          },
+          {
+            "case": "Susan Ackerman v. State of Iowa, Iowa Workforce Development, Teresa Wahlert, Teresa Hillary, and Devon Lewis",
+            "relevance": "low"
+          },
+          {
+            "case": "Tina Lee v. State of Iowa and Polk County Clerk of Court",
+            "relevance": "low"
+          },
+          {
+            "case": "Larry R. Hedlund v. State of Iowa",
+            "relevance": "low"
+          },
+          {
+            "case": "Thurber v. Duckworth",
+            "relevance": "low"
+          }
+        ],
+        "rationale": "The retrieval includes one case that directly addresses the possibility of a constitutional claim for damages in an employment context, but it does not provide a definitive answer. The other cases are less relevant, focusing on different legal issues or procedural contexts.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-4405284",
+          "cl-cluster-4507576",
+          "cl-cluster-2687645",
+          "cl-cluster-4635123",
+          "cl-cluster-7204484"
+        ],
+        "shown_cases": [
+          "Christopher J. Godfrey v. State of Iowa Terry Branstad, Governor of the State of Iowa, Individually and in His Official Capacity Kimberly Reynolds, Lieutenant Governor of the State of Iowa, Individually and in Her Official Capacity Jeffrey Boeyink, Chief of Staff to the Governor of the State of Iowa, Individually and in His Official Capacity Brenna Findley, Legal Counsel to the Governor of The",
+          "Susan Ackerman v. State of Iowa, Iowa Workforce Development, Teresa Wahlert, Teresa Hillary, and Devon Lewis",
+          "Tina Lee v. State of Iowa and Polk County Clerk of Court",
+          "Larry R. Hedlund v. State of Iowa",
+          "Thurber v. Duckworth"
+        ],
+        "target_in_shown": false
+      }
+    },
+    {
+      "id": 18,
+      "case_name": "State v. Storm",
+      "citation": "898 N.W.2d 140 (Iowa 2017)",
+      "area": "D: Adversarial",
+      "query": "Retention of the warrantless automobile exception for motor vehicle searches under Article I, Section 8 of the Iowa Constitution.",
+      "target": "cl-cluster-4405282",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6847,
+          "target_sim": 0.6847
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 0,
+            "3": 0,
+            "5": 0,
+            "10": 0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The warrantless automobile exception is retained under Article I, Section 8 of the Iowa Constitution, as affirmed in State of Iowa v. Christopher George Storm. The court decided to maintain the exception, citing the inability to obtain a warrant electronically at the scene and aligning with federal caselaw and the majority of other states.",
+        "answerable": "yes",
+        "best_case": "State of Iowa v. Christopher George Storm",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "State of Iowa v. Christopher George Storm",
+            "relevance": "high"
+          },
+          {
+            "case": "State of Iowa v. Bion Blake Ingram",
+            "relevance": "medium"
+          },
+          {
+            "case": "State of Iowa v. Jesse Michael Gaskins",
+            "relevance": "medium"
+          },
+          {
+            "case": "State of Iowa v. Jesus Delgado-Jimenez",
+            "relevance": "medium"
+          },
+          {
+            "case": "State of Iowa v. Terry Lee Coffman",
+            "relevance": "low"
+          }
+        ],
+        "rationale": "The case of State of Iowa v. Christopher George Storm directly addresses the retention of the automobile exception under the Iowa Constitution, making it the most relevant case. Other cases provide context on search and seizure under the Iowa Constitution but do not directly address the automobile exception.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-4405282",
+          "cl-cluster-4512774",
+          "cl-cluster-2812905",
+          "cl-cluster-4693490",
+          "cl-cluster-4509998"
+        ],
+        "shown_cases": [
+          "State of Iowa v. Christopher George Storm",
+          "State of Iowa v. Bion Blake Ingram",
+          "State of Iowa v. Jesse Michael Gaskins",
+          "State of Iowa v. Jesus Delgado-Jimenez",
+          "State of Iowa v. Terry Lee Coffman"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 19,
+      "case_name": "State v. Mitchell",
+      "citation": "498 N.W.2d 691 (Iowa 1993)",
+      "area": "D: Adversarial",
+      "query": "Can a state trooper pull over a motor vehicle solely due to a burned-out rear taillight bulb to issue a non-criminal equipment repair warning?",
+      "target": "cl-cluster-1954382",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.5663,
+          "target_sim": 0.5663
+        },
+        "fts": {
+          "first_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 0,
+            "3": 0,
+            "5": 0,
+            "10": 0
+          },
+          "outranked_by": []
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "Yes, a state trooper can pull over a motor vehicle solely due to a burned-out rear taillight bulb to issue a non-criminal equipment repair warning. In State v. Mitchell, the court affirmed the stop of a vehicle for a taillight being out, indicating that such a stop is permissible even if it is not based on suspicion of criminal activity.",
+        "answerable": "yes",
+        "best_case": "State v. Mitchell",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "State v. Mitchell",
+            "relevance": "high"
+          },
+          {
+            "case": "State of Iowa v. Nathaniel Scott Akers",
+            "relevance": "medium"
+          },
+          {
+            "case": "State of Iowa v. Joseph Anthony Spencer",
+            "relevance": "medium"
+          },
+          {
+            "case": "State of Iowa v. Sun Eschell Lensgraf",
+            "relevance": "medium"
+          },
+          {
+            "case": "Rickie Rilea and Timothy Riley v. Iowa Department of Transportation",
+            "relevance": "off"
+          }
+        ],
+        "rationale": "State v. Mitchell directly addresses the question by affirming the legality of a stop for a taillight violation, making it highly relevant. Other cases provide context on traffic stops but do not directly address the specific question about taillight stops. The retrieval includes the controlling case, making the answer well-grounded.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-1954382",
+          "cl-cluster-4475332",
+          "cl-cluster-4498344",
+          "cl-cluster-2781881",
+          "cl-cluster-4545460"
+        ],
+        "shown_cases": [
+          "State v. Mitchell",
+          "State of Iowa v. Nathaniel Scott Akers",
+          "State of Iowa v. Joseph Anthony Spencer",
+          "State of Iowa v. Sun Eschell Lensgraf",
+          "Rickie Rilea and Timothy Riley v. Iowa Department of Transportation"
+        ],
+        "target_in_shown": true
+      }
+    },
+    {
+      "id": 20,
+      "case_name": "In re Marriage of Gallagher",
+      "citation": "539 N.W.2d 479 (Iowa 1995)",
+      "area": "D: Adversarial",
+      "query": "Can a man who is legally determined not to be the biological or adoptive father of a child still be granted legal custody or visitation rights under an equitable parent theory?",
+      "target": "cl-cluster-2219682",
+      "configs": {
+        "vector": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [],
+          "top1_sim": 0.6038,
+          "target_sim": 0.6038
+        },
+        "fts": {
+          "first_rank": 17,
+          "reciprocal_rank": 0.058823529411764705,
+          "hit": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "ndcg": {
+            "1": 0.0,
+            "3": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": [
+            "cl-cluster-9388341",
+            "cl-cluster-4512776",
+            "cl-cluster-9986189",
+            "cl-cluster-10114589",
+            "cl-cluster-6478664"
+          ]
+        },
+        "hybrid": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        },
+        "rc": {
+          "first_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "ndcg": {
+            "1": 1.0,
+            "3": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "distinct_clusters": {
+            "1": 1,
+            "3": 3,
+            "5": 5,
+            "10": 10
+          },
+          "outranked_by": []
+        }
+      },
+      "judge": {
+        "answer": "The cases indicate that Iowa does not recognize the equitable parent doctrine, as seen in In Re the Marriage of Gallagher, where the court rejected the equitable parent doctrine. In Re the Marriage of Halvorsen also supports this by affirming that a non-biological, non-adoptive parent was not granted custody or visitation rights. Therefore, under current Iowa law, a man who is not the biological or adoptive father cannot be granted custody or visitation rights under an equitable parent theory.",
+        "answerable": "yes",
+        "best_case": "In Re the Marriage of Gallagher",
+        "controlling_present": true,
+        "stale_warning": "",
+        "per_case": [
+          {
+            "case": "In Re the Marriage of Gallagher",
+            "relevance": "high"
+          },
+          {
+            "case": "In Re the Marriage of Halvorsen",
+            "relevance": "high"
+          },
+          {
+            "case": "In the Interest of J.c, Minor Child. D.C., Father",
+            "relevance": "medium"
+          },
+          {
+            "case": "Metallo v. Musengo",
+            "relevance": "medium"
+          },
+          {
+            "case": "Callender v. Skiles",
+            "relevance": "low"
+          }
+        ],
+        "rationale": "The retrieval includes cases that directly address the rejection of the equitable parent doctrine in Iowa, making the question answerable. In Re the Marriage of Gallagher is the most relevant case as it explicitly discusses the rejection of the equitable parent doctrine. The other cases provide additional context but do not directly address the question as clearly.",
+        "error": "",
+        "config": "rc",
+        "shown_clusters": [
+          "cl-cluster-2219682",
+          "cl-cluster-1969271",
+          "cl-cluster-2764892",
+          "cl-cluster-1276422",
+          "cl-cluster-1313090"
+        ],
+        "shown_cases": [
+          "In Re the Marriage of Gallagher",
+          "In Re the Marriage of Halvorsen",
+          "In the Interest of J.c, Minor Child. D.C., Father",
+          "Metallo v. Musengo",
+          "Callender v. Skiles"
+        ],
+        "target_in_shown": true
+      }
+    }
+  ]
+}

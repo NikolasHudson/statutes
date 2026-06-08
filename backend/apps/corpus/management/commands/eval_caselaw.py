@@ -51,6 +51,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from apps.corpus.models import Node, NodeVersion, Source
 from apps.corpus.services.rerank import NoopReranker, default_reranker
+from apps.corpus.services.retrieval import DEFAULT_MMR_LAMBDA, retrieve_context
 from apps.corpus.services.retrieval_judge import OpenAIRetrievalJudge, default_judge
 from apps.corpus.services.search import fts_search, hybrid_search, vector_search
 from apps.corpus.services.voyage import (
@@ -238,6 +239,24 @@ class Command(BaseCommand):
         )
         parser.add_argument("--judge-k", type=int, default=5)
         parser.add_argument(
+            "--use-retrieve-context",
+            action="store_true",
+            help="Add an 'rc' config that routes through the production shared "
+            "pipeline (apps.corpus.services.retrieval.retrieve_context): hybrid "
+            "retrieve -> Voyage rerank (citation lane bypasses) -> decision-cluster "
+            "dedup -> MMR -> chunk-aware excerpts -> U-order. This is the ONLY "
+            "config that exercises the PR2 surface behaviors; the others measure "
+            "raw retrievers. Pair with --judge --judge-config rc to grade the "
+            "chunk-centered excerpts the chat/MCP surfaces actually return.",
+        )
+        # PR2 A/B knobs — isolate one rc behavior. dedup/u-order/chunk-excerpt
+        # default ON (production); MMR defaults OFF (eval showed it regresses),
+        # so it is opt-IN here via --rc-mmr.
+        parser.add_argument("--rc-no-dedup", action="store_true")
+        parser.add_argument("--rc-mmr", action="store_true")
+        parser.add_argument("--rc-no-u-order", action="store_true")
+        parser.add_argument("--rc-no-chunk-excerpt", action="store_true")
+        parser.add_argument(
             "--allow-fake",
             action="store_true",
             help="Permit the fake embedder (results are meaningless; wiring smoke only).",
@@ -288,6 +307,25 @@ class Command(BaseCommand):
         configs = ["vector", "fts", "hybrid"]
         if rerank_on:
             configs += ["vector_rr", "hybrid_rr"]
+
+        # The shared-pipeline config. rc reranks with Voyage internally regardless
+        # of --rerank (it mirrors production), so it needs a real reranker.
+        rc_on = opts["use_retrieve_context"]
+        rc_reranker = default_reranker()
+        if rc_on and isinstance(rc_reranker, NoopReranker):
+            raise CommandError(
+                "--use-retrieve-context needs the Voyage reranker (VOYAGE_API_KEY "
+                "unset → NoopReranker, which would not exercise the rerank lane)."
+            )
+        rc_kwargs = dict(
+            dedup_clusters=not opts["rc_no_dedup"],
+            # MMR is off in production (it regressed); --rc-mmr opts it back in.
+            mmr_lambda=DEFAULT_MMR_LAMBDA if opts["rc_mmr"] else None,
+            u_order=not opts["rc_no_u_order"],
+            chunk_excerpts=not opts["rc_no_chunk_excerpt"],
+        )
+        if rc_on:
+            configs.append("rc")
 
         # LLM judge (optional). Reads ONE config's top-K per query.
         judge_on = opts["judge"]
@@ -352,6 +390,11 @@ class Command(BaseCommand):
             latency["rerank"] = []
         if judge_on:
             latency["judge"] = []
+        if rc_on:
+            latency["rc"] = []
+        # rc shows this many passages — enough for the deepest rank metric and the
+        # judge to both read the same displayed set.
+        rc_display = max(max(ks), judge_k if judge_on else 0)
         per_query: list[dict] = []
 
         for e in entries:
@@ -410,6 +453,30 @@ class Command(BaseCommand):
                     query, hyb_hits, rerank_pool, reranker, latency
                 )
 
+            # 4b) the shared production pipeline (PR2 surface behaviors).
+            rc_passages = []
+            if rc_on:
+                t = time.perf_counter()
+                ctx = retrieve_context(
+                    query,
+                    source_slug=source_slug,
+                    use_vector=True,
+                    candidate_pool=deep,
+                    display_limit=rc_display,
+                    rerank=True,
+                    reranker=rc_reranker,
+                    enrich_bodies=True,
+                    **rc_kwargs,
+                )
+                latency["rc"].append((time.perf_counter() - t) * 1000)
+                rc_passages = ctx.passages
+                # Passages are already cluster-deduped (dedup on); U-order is a
+                # set-preserving presentation reorder, so hit@k/recovered are
+                # honest, MRR reflects displayed order.
+                ranked["rc"] = [
+                    (_cluster_of(p.path), p.score) for p in rc_passages
+                ]
+
             row = {
                 "id": e.get("id"),
                 "case_name": e.get("case_name"),
@@ -425,6 +492,13 @@ class Command(BaseCommand):
                     clusters.index(target) + 1 if target in clusters else None
                 )
                 m = _metrics_from_rank(first_rank, ks)
+                # Distinct decision-clusters shown in the top-k — the dedup signal.
+                # The raw configs are already cluster-collapsed (_rank_clusters),
+                # so this is ~min(k, len) for them; it only drops below k for an
+                # rc run with dedup OFF (duplicate opinions filling slots).
+                m["distinct_clusters"] = {
+                    str(k): len(set(clusters[:k])) for k in ks
+                }
                 # cases ranked above the target (diagnostic) + target's own score.
                 above = clusters[: (first_rank - 1) if first_rank else len(clusters)]
                 m["outranked_by"] = above[:5]
@@ -437,8 +511,13 @@ class Command(BaseCommand):
 
             # 5) optional LLM-judge pass over the judge config's top-K.
             if judge_on:
-                jclusters = [c for c, _ in ranked.get(judge_config, [])]
-                cases = self._judge_payload(src, jclusters, judge_k)
+                if judge_config == "rc":
+                    # Judge the SAME chunk-centered excerpts the surface returns —
+                    # this is what measures the chunk-excerpt change on answerable.
+                    cases = self._rc_judge_cases(src, rc_passages, judge_k)
+                else:
+                    jclusters = [c for c, _ in ranked.get(judge_config, [])]
+                    cases = self._judge_payload(src, jclusters, judge_k)
                 t = time.perf_counter()
                 verdict = judge.judge(query, cases)
                 latency["judge"].append((time.perf_counter() - t) * 1000)
@@ -478,6 +557,14 @@ class Command(BaseCommand):
                 "embedding_dim": EMBEDDING_DIM,
                 "reranker": (
                     getattr(reranker, "model", "?") if rerank_on else "none"
+                ),
+                # The rc config reranks with default_reranker() (Voyage) regardless
+                # of --rerank, so record it separately — else an rc-only run looks
+                # like "reranker: none" when it actually reranked the whole pool.
+                "rc": (
+                    {"reranker": getattr(rc_reranker, "model", "?"), **rc_kwargs}
+                    if rc_on
+                    else None
                 ),
                 "judge": (judge.model if judge_on else "none"),
                 "judge_config": (judge_config if judge_on else None),
@@ -555,6 +642,35 @@ class Command(BaseCommand):
             })
         return cases
 
+    def _rc_judge_cases(self, src, passages, k):
+        """Judge view of the rc config: the chunk-centered excerpt the surface
+        actually returns (passage.excerpt), not a fresh opinion-head prefix. The
+        case name / citation / date still come from the decision metadata so the
+        only thing that varies vs ``_judge_payload`` is the excerpt — which is the
+        whole point of measuring the chunk-excerpt change."""
+        passages = passages[:k]
+        clusters = [_cluster_of(p.path) for p in passages]
+        meta = {
+            p: (md or {})
+            for p, md in Node.objects.filter(
+                source=src, path__in=clusters
+            ).values_list("path", "source_metadata")
+        }
+        cases = []
+        for i, p in enumerate(passages, 1):
+            cl = _cluster_of(p.path)
+            md = meta.get(cl, {})
+            cites = md.get("citations") or []
+            cases.append({
+                "rank": i,
+                "cluster": cl,
+                "case_name": md.get("case_name") or cl,
+                "citation": cites[0] if cites else "",
+                "date": md.get("date_filed") or "",
+                "excerpt": " ".join((p.excerpt or "").split())[:JUDGE_EXCERPT_CHARS],
+            })
+        return cases
+
     # ---- aggregation -----------------------------------------------------
 
     def _aggregate_judge(self, per_query, judge_config, model, k):
@@ -622,6 +738,12 @@ class Command(BaseCommand):
                     str(k): round(sum(m["ndcg"][str(k)] for m in ms) / n, 4)
                     for k in ks
                 },
+                "distinct_clusters": {
+                    str(k): round(
+                        mean(m["distinct_clusters"][str(k)] for m in ms), 2
+                    )
+                    for k in ks
+                },
                 "recovered_rate": round(len(ranks) / n, 4),
                 "recovered_ci": _wilson_ci(len(ranks), n),
                 "unrecovered": sum(1 for m in ms if m["first_rank"] is None),
@@ -673,10 +795,11 @@ class Command(BaseCommand):
         # config comparison
         w("\n" + "-" * 78)
         w(h("RANKING QUALITY  (case-level; ANY opinion of the case counts)"))
+        kmax = max(ks)
         hdr = (f"  {'config':9s} {'MRR':>6s}  "
                + "  ".join(f"hit@{k}" for k in ks)
                + "   " + "  ".join(f"ndcg@{k}" for k in ks)
-               + "   recov  medR")
+               + f"   recov  medR  dist@{kmax}")
         w(hdr)
         for cfg in m["configs"]:
             c = snap["results"]["overall"][cfg]
@@ -684,8 +807,10 @@ class Command(BaseCommand):
             ndcg = "  ".join(f"  {c['ndcg'][str(k)]:.2f}" for k in ks)
             medr = c["rank"]["p50"]
             medr = f"{medr:.0f}" if medr is not None else "—"
+            dist = c.get("distinct_clusters", {}).get(str(kmax))
+            dist = f"{dist:.2f}" if dist is not None else "—"
             w(f"  {cfg:9s} {c['mrr']:.3f}  {hits}   {ndcg}   "
-              f"{c['recovered_rate']:.0%}   {medr:>3s}")
+              f"{c['recovered_rate']:.0%}   {medr:>3s}   {dist:>5s}")
 
         # Wilson 95% CIs on the headline binomial metrics. At small n these are
         # wide on purpose: when two configs' intervals overlap heavily the
