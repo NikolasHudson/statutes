@@ -109,6 +109,74 @@ opinion-head excerpts that miss the holding, and no abstain path.
     (set-preserving — same cases shown, only reordered); revisit if a UI surfaces
     passages in list order. Pool-100 + 8000-char-cap rerank latency: p50 rc ~3.8s
     (vs hybrid ~3.1s) — acceptable, watch under load.
+  - **Enterprise-readiness (candid): too soon to claim; on current evidence, not
+    yet.** Two independent reasons, neither fixable by more tuning of PR2:
+    1. *The A/B is underpowered.* n=20, Wilson CIs ≈ ±0.18 on hit@1 — the "7/8
+       metrics better than `hybrid_rr`" is every metric moving ~one query, i.e.
+       **inside the noise floor**. It's a smoke signal, not a ship gate. A real
+       gate needs n in the hundreds across every query shape (citation,
+       party-name, procedural, multi-part, adversarial), a held-out set, and
+       human-rated relevance wired into CI with regression thresholds — plus
+       latency-under-load / multi-tenant / red-team coverage that this eval has
+       none of. Scope is also one jurisdiction (Iowa) on a favorable
+       landmark-case slice.
+    2. *The enterprise-critical safety properties are deliberately deferred.* The
+       headline legal risk from the design (overruled law cited as good law) is
+       **untouched** by PR2: `stale_warning` is structurally 0 because
+       treatment/good-law currency is PR3 and abstention is PR4. Until those land
+       the system will still confidently cite a bad case and stretch an adjacent
+       rule rather than abstain. Absolute retrieval (hit@1 ~0.75, answerable
+       ~0.75) is solid for a **lawyer-in-the-loop research assistant**, below the
+       bar for any authoritative/autonomous use.
+    What *is* already enterprise-grade is the **discipline**, not the numbers: one
+    shared pipeline (no chat/MCP drift to test/monitor twice), green-for-green
+    tests, and an eval harness that gated a real decision (MMR reverted on
+    evidence). That machinery is the prerequisite for *earning* the claim once
+    PR3/PR4 close the safety gaps and the eval set is scaled up.
+- [x] **PR2.5 — Ingest the CourtListener citation-map (graph + depth).** ✅ DONE
+  (2026-06-08; new — PR3 foundation, split out after researching CL's offerings.)
+  - **Ingested:** streamed `citation-map-2026-03-31.csv.bz2` (522 MB, 76,959,991
+    national rows) → **475,375 in-corpus Iowa edges** written as
+    `CrossReference(source=CASELAW_GRAPH, weight=depth)`. `weight` now 100%
+    populated (depth min 1 / max 70 / avg 1.79) — it was 100% NULL before.
+    `caselaw_link` (#1) unchanged at 693,497 (source-scoping verified). Skips:
+    76.3M citing-not-in-corpus, 205,901 cited-not-in-corpus, 1,836 sibling, 0
+    self / 0 bad-depth. ~7 min, streamed (never decompressed to disk).
+  - **Semantic spot-check passed:** the most-cited in-corpus cases are the
+    expected Iowa landmarks (*In re P.L.* 1,502; *Meier v. Senecaut* 1,234; the
+    foundational TPR/juvenile cluster); heaviest edge depth 70 (*State v. Short* →
+    *State v. Ochoa*) = the deep-engagement the treatment pass should prioritize.
+  - **Command:** `apps/ingestion_caselaw/management/commands/build_caselaw_citation_graph.py`
+    (mirrors #1; idempotent delete-all-CASELAW_GRAPH-for-source + rebuild; internal
+    edges only; self/sibling skip). 5 golden tests. Adversarially reviewed (one
+    real fix: non-positive depth coerced to 1 so a corrupt row can't crash the
+    PositiveIntegerField insert).
+  - *Why this exists:* PR3's treatment classifier needs the **incoming-citation
+    graph with depth** as its substrate (which later opinions cite a target, and
+    how heavily — to prioritise the LLM budget and to be sure the negative-
+    treatment scan sees every citing case). We have a citation graph today
+    (`caselaw_link`, 693K edges) but it was built from inline `<a>` links in
+    `html_with_citations`, so it carries **no depth** (`CrossReference.weight` is
+    100% NULL) and `CASELAW_GRAPH` is empty. The `Case Law/CASELAW_INGESTION_PLAN.md`
+    plan (L110) intended to use CL's `citation-map` for this but the build took
+    the inline-link route instead.
+  - *Key research finding (changes a design assumption):* CourtListener does **not
+    publish citation *treatment*** for state courts — their AI citator (free.law,
+    May 2025) is a SCOTUS-only, overruling-only proof-of-concept, not in the API/
+    bulk data, no timeline. So "ingest treatment from CL" is **not** an option for
+    Iowa; we ingest the **graph + depth** and build the treatment classifier
+    ourselves (design §5). CL's citator *does* validate that approach (EyeCite +
+    ±6 sentences + LLM; Claude 3.5 Sonnet >90% recall, F1 >80% on overruling) and
+    gives a benchmark. Leave a `TreatmentFlag.source="courtlistener"` hook for when
+    their citator generalises.
+  - *Scope:* download `bulk-data/citation-map-<date>.csv.bz2` (~500 MB compressed,
+    `search_opinionscited`: `id, depth, citing_opinion_id, cited_opinion_id`),
+    stream-filter via `csv_stream.open_bulk_csv` to in-corpus Iowa edges (join on
+    `cl_opinion_id`, which every node carries), and write
+    `CrossReference(source=CASELAW_GRAPH, weight=depth)`. New command
+    `build_caselaw_citation_graph` mirroring `backfill_caselaw_cross_references`
+    (#1); idempotent (delete CASELAW_GRAPH edges, rebuild). Never decompress to
+    disk. Resolves §8 Q3.
 - [ ] **PR3 — Treatment graph + deterministic v1 good-law flag.**
 - [ ] **PR4 — Verify+abstain extraction and stale-use gate.**
 - [ ] **PR5 — LLM-assisted treatment v2 + (optional) claim-level NLI + query rewrite.**
@@ -137,10 +205,15 @@ opinion-head excerpts that miss the holding, and no abstain path.
   380/1-known-red. Real-corpus A/B drove the one design change from the plan: **MMR is
   default-OFF** (it regressed pinpoint retrieval); dedup + chunk-excerpt + U-order +
   cite-bypass are on and net-positive vs the production `hybrid_rr` path. Eval artifacts
-  in `benchmarks/caselaw/pr2/`. PR1+PR2 are entangled in the same uncommitted files —
-  commit strategy still the user's call.
-  Next action: **PR3** — treatment graph + deterministic v1 good-law flag (answer §8
-  Q3/Q4/Q5 first: re-pull CL OpinionsCited CSV? citing-sentence re-scan vs re-ingest?
-  `source_metadata["treatment"]` cache vs `Treatment` table?). The `TreatmentFlag`
-  dataclass + per-passage `treatment` field already exist (PR1 forward-compat), emitting
-  the behavior-preserving "unknown" default — PR3 populates them.
+  in `benchmarks/caselaw/pr2/`. PR1 committed as `5ca5243`; PR2 committed as `acc5337`.
+- 2026-06-08: **PR2.5 done** — CL `citation-map` ingested (475,375 in-corpus Iowa edges,
+  `CrossReference.weight=depth` now populated; `caselaw_link` untouched). Research
+  finding: CL publishes the citation **graph+depth** but **not treatment** for state
+  courts (their citator is SCOTUS-only PoC), so we build the Iowa treatment classifier
+  ourselves. §8 Q3 resolved. Command + 5 tests adversarially reviewed (uncommitted).
+  Next action: **PR3** — treatment graph + deterministic v1 good-law flag. Substrate is
+  now ready (incoming CASELAW_GRAPH edges + depth). Answer §8 Q4/Q5 first (citing-sentence
+  re-scan vs re-ingest? `source_metadata["treatment"]` cache vs `Treatment` table?). The
+  `TreatmentFlag` dataclass + per-passage `treatment` field already exist (PR1
+  forward-compat), emitting the "unknown" default — PR3's `annotate_treatment` populates
+  them by walking each target's incoming CASELAW_GRAPH edges (depth-prioritized).

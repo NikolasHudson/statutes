@@ -109,6 +109,14 @@ itself retrievable/embeddable.
 - `CrossReference` (phase 2):
   - CL `citation-map` → case→case links (`from_version` = citing opinion, `to_node` =
     cited case if in-corpus, else `external_text`).
+    - **As-built note (2026-06-08):** the case→case edges were first built from the
+      inline `<a>` links in `html_with_citations` (`backfill_caselaw_cross_references`,
+      `source=caselaw_link`, ~693K edges) — which carry **no depth**
+      (`CrossReference.weight` = NULL). The `citation-map` bulk file
+      (`search_opinionscited`, the table that carries `depth`) was **not** ingested
+      until the RAG pipeline's PR2.5 (`build_caselaw_citation_graph`,
+      `source=caselaw_graph`, `weight=depth`), which the treatment/good-law pass
+      needs. The two passes coexist on different `source` values.
   - **High-value:** parse Iowa Code §/Court Rule references in opinion text → link cases to
     statute/rule nodes. This is the payoff — grounding cases *to* the existing corpus.
 

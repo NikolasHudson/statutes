@@ -197,7 +197,8 @@ Each stage notes **what it does / reuses / new / how the judge measures it**. Al
 
 **What must be built:**
 - The **citing-sentence text is not captured today** — `extract_citation_links` (`parser.py:427`) lifts only the `<a>` href + anchor display text, not the surrounding sentence. The negative-treatment phrase classifier needs the citing opinion's prose around the link. Source it from the citing `from_version.body_text` (we have offsets to the link in the display HTML; v1 can re-scan `body_text` for the cited case's reporter cite / anchor text and grab the enclosing sentence).
-- **CourtListener OpinionsCited depth**: CL's `/api/rest/.../opinions-cited/` (and the bulk `citations.csv`) exposes a directed graph with a `depth` field (times A cites B). This is **not yet ingested**; building the `caselaw_graph` pass populates `CrossReference.weight=depth`, which both prioritizes the LLM budget (deep engagement = worth classifying) and feeds the transitive risk pass.
+- **CourtListener OpinionsCited depth**: CL's `/api/rest/.../opinions-cited/` and the bulk **`citation-map-<date>.csv.bz2`** file (the `search_opinionscited` table: `id, depth, citing_opinion_id, cited_opinion_id`, ~500 MB compressed, regenerated quarterly) expose a directed graph with a `depth` field (times A cites B). Ingested in **PR2.5** (`build_caselaw_citation_graph`) → `CrossReference(source=CASELAW_GRAPH, weight=depth)`, which both prioritizes the LLM budget (deep engagement = worth classifying) and feeds the transitive risk pass. NOTE: this is a *different* bulk file from the `citations` CSV (~120 MB, `search_citation`: reporter volume/reporter/page) already ingested into `source_metadata.citations[]`.
+- **CL treatment is NOT available for us (verified 2026-06-08).** Free Law Project's AI citator (free.law, May 2025) — which classifies overruling/distinguishing — is a SCOTUS-only, overruling-only proof-of-concept, not exposed via API or bulk data, no production timeline, and scoped to the Supreme Court (useless for Iowa state courts). So we **cannot ingest treatment from CL**; we ingest the graph+depth and build the Iowa treatment classifier ourselves. Their citator *does* validate the approach below (EyeCite + ±6 sentences context + LLM; Claude 3.5 Sonnet >90% recall / F1 >80% on overruling) — reserve a `TreatmentFlag.source="courtlistener"` slot for when it generalizes.
 
 **Deterministic v1 (`treatment.py`, no LLM):**
 1. **Direct history** (reliable): `is_repealed` / non-null `effective_to` → `superseded`/`repealed` (severity 5). 
@@ -230,9 +231,15 @@ Each stage notes **what it does / reuses / new / how the judge measures it**. Al
 - *Risk*: medium — chunk-excerpt change alters what the model sees; gate carefully.
 - *Proves*: `eval_caselaw` distinct-cluster-count-in-top-5 ↑; judge `answerable` ↑, `per_case` "off" ↓; Recall@k not regressed (Wilson CI).
 
-**PR3 — Treatment graph + deterministic v1 flag.**
-- *Scope*: `build_caselaw_citation_graph` (#2 depth pass), `treatment.py` v1, `annotate_treatment` backfill, `source_metadata["treatment"]` read in `retrieve_context`, `TreatmentFlag` on passages and serialized to MCP.
-- *Files*: new command + `treatment.py`; `models`/migration only if a `Treatment` table is chosen (default: reuse metadata, no migration).
+**PR2.5 — Ingest the CourtListener citation-map (graph + depth).** *(split out of PR3 — the treatment classifier's substrate.)*
+- *Scope*: `build_caselaw_citation_graph` (#2 depth pass) — stream CL's `citation-map-<date>.csv.bz2` via `csv_stream.open_bulk_csv` (never decompress to disk), keep in-corpus Iowa edges (join on `cl_opinion_id`), write `CrossReference(source=CASELAW_GRAPH, weight=depth)`. Internal edges only; self/sibling skipped; idempotent (delete-all-CASELAW_GRAPH-for-source then rebuild).
+- *Files*: new command in `apps/ingestion_caselaw` (mirrors `backfill_caselaw_cross_references` #1).
+- *Risk*: low — additive, source-scoped (never touches `caselaw_link`), recoverable (idempotent rebuild on a prod-clone DB).
+- *Proves*: `CrossReference.weight` populated for the Iowa internal graph; edge/depth distribution sane; the #1 inline-link edges untouched.
+
+**PR3 — Treatment graph + deterministic v1 flag.** *(Assumes PR2.5's graph+depth is built.)*
+- *Scope*: `treatment.py` v1, `annotate_treatment` backfill (walks **incoming** CASELAW_GRAPH edges, depth-prioritized), `source_metadata["treatment"]` read in `retrieve_context`, `TreatmentFlag` on passages and serialized to MCP.
+- *Files*: `treatment.py` + `annotate_treatment` command; `models`/migration only if a `Treatment` table is chosen (default: reuse metadata, no migration).
 - *Risk*: medium — false-negative-treatment flags. Ship advisory (flag shown, not blocking).
 - *Proves*: judge `stale_warning` agreement (flag present whenever judge names a stale case); zero negative cases in top-k presented as good law on the overruled-precedent eval subset.
 
@@ -265,7 +272,7 @@ Each stage notes **what it does / reuses / new / how the judge measures it**. Al
 
 1. **Excerpt change risk (PR2)**: switching chat from whole-version-prefix to matched-chunk excerpt changes what the model reads. Confirm we want this for statutes too, or only caselaw (statutes are short; the prefix is fine). Recommend caselaw-only chunk excerpts, statute prefix unchanged.
 2. **Blocking vs advisory abstention**: do we hard-block answers that rely on `severity>=5` cases, or keep advisory + red flag? Stanford says block; UX says a calibrated warning may suffice. Confirm policy and the severity threshold.
-3. **CourtListener OpinionsCited availability**: confirm the bulk citation graph / API depth field is accessible for the Iowa slice we have (the memory notes the ~58GB bulk export was archived to DO Spaces). Need to confirm we can re-pull just the citations CSV for the loaded clusters.
+3. **CourtListener OpinionsCited availability**: ✅ RESOLVED (PR2.5, 2026-06-08). The depth graph is the bulk **`citation-map-<date>.csv.bz2`** (`search_opinionscited`), ~500 MB compressed, on the public S3 bucket `com-courtlistener-storage/bulk-data/`, regenerated quarterly. Re-pulled just this one file (separate from the archived ~58 GB of big files); streamed + Iowa-filtered by `cl_opinion_id` (every node carries it). CL **treatment** labels are NOT available for state courts (their citator is SCOTUS-only PoC) — we ingest graph+depth and build treatment ourselves.
 4. **Citing-sentence sourcing**: the parser doesn't capture surrounding prose. Confirm we can re-scan citing `body_text` for the enclosing sentence, vs re-ingesting `html_with_citations` with offsets. Affects PR3 scope.
 5. **`source_metadata["treatment"]` cache vs dedicated table**: writing flags onto the cited decision node is fast to read but couples treatment to node metadata and needs re-run on re-ingest. Confirm acceptable, or do a `Treatment` table.
 6. **As-of date in retrieval**: chat/MCP have no as-of date input today. Confirm whether to add it now (extend `_approved_filter_clause` to a date predicate) or defer — affects whether jurisdiction/temporal hard-filtering lands in PR1's signature.
