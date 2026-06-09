@@ -119,12 +119,94 @@ _PROX = 70
 
 _STATUS_BY_SEVERITY = {5: "negative", 4: "caution", 3: "caution", 0: "good"}
 
-# Sentence boundaries used to isolate the cite's own sentence. We scan ONLY that
-# sentence for a negative stem, so the stem and the target cite must co-occur in
-# one sentence ("expressly overruling PPH 2018"; "PPH 2018 … is overruled"). A
-# looser char window mis-attributes a stem from an adjacent sentence (often about
-# a different case, or "the court overruled the objection") to the target.
-_SENT_SPLIT = re.compile(r"(?<=[.?;])\s+|\n+")
+# Sentence segmentation. We scan ONLY the cite's own sentence for a negative stem,
+# so the stem and the target cite must co-occur in one sentence ("expressly
+# overruling PPH 2018"; "PPH 2018 … is overruled"). A looser char window
+# mis-attributes a stem from an adjacent sentence (a different case, or "the court
+# overruled the objection") to the target.
+#
+# Segmenting court-opinion ``body_text`` is two-step. (1) NORMALIZE: PDF text
+# extraction injects ``\n\n`` (and hyphen line-wraps "rea-\n\nsons") MID-sentence,
+# so "in overruling\n\nMadden v. City of Iowa City, 848 N.W.2d 40" gets the
+# overrule stem and the reporter cite torn into different "lines". Naive
+# newline-splitting therefore SILENTLY DROPS real overrulings (this exact case:
+# Bankers Trust → Madden). We repair the soft hyphenation and collapse ALL
+# whitespace to single spaces first. (2) SPLIT on sentence punctuation, skipping
+# periods inside legal abbreviations so a caption between the stem and the cite
+# ("overruling Madden v. City of Iowa City, 848 N.W.2d 40") is not chopped.
+#
+# The abbreviation handling is deliberately NOT a flat "v."-like set (an earlier
+# version was, and it MERGED two real sentences — "...we overrule Acme Co. The
+# plaintiff cites [target]" — mis-attributing the overrule to [target], a
+# false-positive "this case is dead" flag, the exact harm this module guards). Two
+# classes: (A) abbreviations that NEVER end a sentence (titles, "v.", cite-internal
+# single letters) — always non-terminal; (B) entity / citation SUFFIXES
+# ("Co."/"Inc."/"No."/"App.") that legitimately end a party name AND can end a
+# sentence — non-terminal only when the next token CONTINUES the clause (lowercase
+# / digit / "("), terminal when it starts a Capitalized new sentence. "Iowa" is in
+# NEITHER (so "...of Iowa. We reaffirm X" splits correctly; "(Iowa 2014)" never
+# matches _SENT_END because the period is inside the paren after the year).
+_WRAP_HYPHEN = re.compile(r"(?<=[a-z])-\s*\n+\s*(?=[a-z])")  # soft-hyphen wrap only
+_WS = re.compile(r"\s+")
+_SENT_END = re.compile(r"[.?;]\s")
+_TRAIL_WORD = re.compile(r"([A-Za-z0-9]+)\)?$")
+# Another reporter cite between a stem and the target cite means the stem belongs
+# to that OTHER case (or it is a string-cite list) — not negative treatment of the
+# target. Catches the "newline cite-block collapses to one sentence" false positive.
+_CITE_IN_SPAN = re.compile(r"\d{1,4}\s+[A-Z][A-Za-z0-9.\s]{0,12}?[A-Za-z.]\s+\d")
+# (A) never a sentence end.
+_ABBREV_ALWAYS = frozenset({
+    "v", "vs", "mr", "mrs", "ms", "dr", "prof", "rev", "st", "mt",
+    "n", "w", "e", "s", "u", "f", "cf", "eg", "ie",
+})
+# (B) entity / citation suffixes — terminal only before a Capitalized new sentence.
+_ABBREV_SUFFIX = frozenset({
+    "co", "inc", "corp", "ltd", "llc", "lp", "bros", "assn", "dept", "div",
+    "ct", "cts", "app", "ed", "eds", "supp", "fed", "vol", "etc", "al", "id",
+    "ch", "sec", "art", "para", "p", "pp", "no", "nos", "jr", "sr", "a",
+})
+
+
+def _normalize_body(text: str) -> str:
+    """Repair PDF soft-hyphen line wraps (lowercase-``-``\\n-lowercase only, so page
+    ranges "33-\\n34" and date spans "2014-\\n2016" survive intact), then collapse
+    all whitespace (incl. the mid-sentence ``\\n\\n`` PDF extraction injects)."""
+    if not text:
+        return text
+    return _WS.sub(" ", _WRAP_HYPHEN.sub("", text))
+
+
+def _is_boundary(text: str, dot_idx: int, next_char: str) -> bool:
+    """Does the ``[.?;]`` at ``dot_idx`` end a sentence? Yes, unless the word it
+    terminates is an abbreviation: class (A) never ends a sentence; class (B) ends
+    one only when ``next_char`` starts a Capitalized new sentence.
+
+    Looks back only a bounded window (the trailing token is at most a few chars):
+    slicing the FULL prefix (``text[:dot_idx]``) and searching it per boundary is
+    O(n) each → O(n²) over a long opinion body, the cause of a pathological
+    annotation slowdown."""
+    m = _TRAIL_WORD.search(text[max(0, dot_idx - 24):dot_idx])
+    if m is None:
+        return True
+    w = m.group(1).lower()
+    if w in _ABBREV_ALWAYS:
+        return False
+    if w in _ABBREV_SUFFIX:
+        return next_char.isupper()
+    return True
+
+
+def _split_sentences(text: str) -> list[str]:
+    out: list[str] = []
+    start = 0
+    for m in _SENT_END.finditer(text):
+        nxt = text[m.end()] if m.end() < len(text) else ""
+        if _is_boundary(text, m.start(), nxt):
+            out.append(text[start:m.start() + 1])
+            start = m.end()
+    if start < len(text):
+        out.append(text[start:])
+    return out
 
 
 @dataclass
@@ -171,47 +253,38 @@ def _cite_anchors(citations: list[str]) -> list[str]:
     return out
 
 
-def _sentences_with(text: str, anchor: str):
-    """Yield ``(sentence, anchor_offset_within_sentence)`` for every sentence of
-    ``text`` that contains ``anchor`` (the target cite). Offset is into the
-    *normalized* (whitespace-collapsed) sentence that is returned."""
-    start = text.find(anchor)
-    seen: set[int] = set()
-    while start != -1:
-        lo = 0
-        for m in _SENT_SPLIT.finditer(text, 0, start):
-            lo = m.end()
-        m = _SENT_SPLIT.search(text, start)
-        hi = m.start() if m else len(text)
-        if lo not in seen:
-            seen.add(lo)
-            sent = " ".join(text[lo:hi].split())
-            apos = sent.find(anchor)
-            if apos != -1:
-                yield sent, apos
-        start = text.find(anchor, start + 1)
+def normalized_sentences(body: str) -> list[str]:
+    """Normalize a citing opinion body (repair PDF hyphen wraps, collapse the
+    mid-sentence ``\\n\\n`` PDF extraction injects) and split it abbreviation-aware
+    into sentences. This is the EXPENSIVE step (two full-body regex passes), so do
+    it ONCE per body — the batch annotator scans the same body against many target
+    cites, and re-normalizing per (target, anchor) is a large, needless cost."""
+    if not body:
+        return []
+    return _split_sentences(_normalize_body(body))
 
 
-def classify_citing_text(
-    citing_body: str, target_anchors: list[str]
+def classify_in_sentences(
+    sentences: list[str], target_anchors: list[str]
 ) -> tuple[int, str, str] | None:
-    """Scan one citing opinion for negative treatment of the target.
-
-    Returns ``(severity, label, sentence)`` for the most-severe negative stem
-    found within ``_PROX`` chars of a target-cite occurrence (and in its
-    sentence), or ``None``. Applies the negation / other-grounds / by-statute /
-    ruling-noun guards. The returned sentence is the verbatim evidence.
-    """
-    if not citing_body or not target_anchors:
+    """Scan PRE-NORMALIZED sentences (from :func:`normalized_sentences`) for the
+    most-severe negative treatment of the target. Same logic and guards as
+    :func:`classify_citing_text`, but reuses one normalization across the many
+    targets a single citing opinion cites (the hot batch path)."""
+    if not sentences or not target_anchors:
         return None
     best: tuple[int, str, str] | None = None
     for anchor in target_anchors:
-        for sent, apos in _sentences_with(citing_body, anchor):
+        alen = len(anchor)
+        for sent in sentences:
+            apos = sent.find(anchor)
+            if apos == -1:
+                continue
             for stem, severity, label in _NEG_STEMS:
                 for m in stem.finditer(sent):
                     # Proximity: the stem must sit next to THIS cite, not a
                     # different case mentioned elsewhere in a long sentence.
-                    if not (apos - _PROX <= m.start() <= apos + len(anchor) + _PROX):
+                    if not (apos - _PROX <= m.start() <= apos + alen + _PROX):
                         continue
                     # Guard 0: "overruled [...] by [target]" — the target is the
                     # OVERRULER (agent), not the overruled. Stem before the cite
@@ -229,6 +302,15 @@ def classify_citing_text(
                     # Guard 2: negation/hypothetical/party-request before the stem.
                     if _NEGATION_BEFORE.search(sent[max(0, m.start() - 60):m.start()]):
                         continue
+                    # Guard 2b: another reporter cite BETWEEN the stem and the
+                    # target cite → the stem belongs to that other case (or this is
+                    # a string-cite list / a whitespace-collapsed cite block, not a
+                    # single treatment statement). Defends precision after sentence
+                    # normalization joined newline-separated cite stacks.
+                    between = (sent[m.end():apos] if m.end() <= apos
+                               else sent[apos + alen:m.start()])
+                    if _CITE_IN_SPAN.search(between):
+                        continue
                     sev, lab = severity, label
                     # Guard 3: "on other grounds"/"in part" near the stem → the
                     # case survives for its cited holding; downgrade to a caution.
@@ -242,6 +324,21 @@ def classify_citing_text(
                     if best is None or sev > best[0]:
                         best = (sev, lab, sent[:400])
     return best
+
+
+def classify_citing_text(
+    citing_body: str, target_anchors: list[str]
+) -> tuple[int, str, str] | None:
+    """Scan one citing opinion (raw body) for negative treatment of the target.
+
+    Returns ``(severity, label, sentence)`` for the most-severe negative stem
+    found within ``_PROX`` chars of a target-cite occurrence (and in its
+    sentence), or ``None``. Convenience wrapper that normalizes the body then
+    delegates to :func:`classify_in_sentences`; the batch path should call
+    :func:`normalized_sentences` once and :func:`classify_in_sentences` per target."""
+    if not citing_body or not target_anchors:
+        return None
+    return classify_in_sentences(normalized_sentences(citing_body), target_anchors)
 
 
 def classify_target(

@@ -31,6 +31,37 @@ env = environ.Env(
     # they are not kept indefinitely. ``purge_chat_traces`` deletes rows older
     # than this many days (0 disables the purge).
     CHAT_TRACE_RETENTION_DAYS=(int, 7),
+    # PR4 RAG safety gate. When True, the chat answer gate WITHHOLDS an answer
+    # (instead of showing it with an advisory) if the draft relied on Iowa
+    # authority that has been invalidated — negatively treated at severity
+    # >= RAG_STALE_BLOCK_SEVERITY, without acknowledging that treatment — or if no
+    # good-law authority was retrieved at all. Default off: the gate ships dark
+    # (advisory-only) and is flipped to enforce per-deploy once trusted. See
+    # apps/corpus/services/answer.py (verify_answer / abstain_decision).
+    RAG_ABSTAIN_BLOCKING=(bool, False),
+    RAG_STALE_BLOCK_SEVERITY=(int, 5),
+    # PR5 LLM-assisted layers, each an OpenAI round-trip so each is flag-gated and
+    # OFF by default (deterministic v1 paths always run). RAG_CLAIM_NLI: check
+    # caselaw holding-claims for misgrounding (apps/corpus/services/answer.py).
+    # RAG_QUERY_REWRITE: rewrite the search query before retrieval
+    # (apps/corpus/services/query_rewrite.py). Both no-op without an OpenAI key.
+    RAG_CLAIM_NLI=(bool, False),
+    RAG_QUERY_REWRITE=(bool, False),
+    # PR6: before answering, verify case-holding premises the USER asserts in the
+    # question against the retrieved opinion, and inject a pre-answer caution so
+    # the model doesn't anchor on a wrong premise. OFF by default; no-op without a
+    # key. See apps/corpus/services/premise.py. This is the *fidelity* axis (is the
+    # premise a faithful reading of the case?) — an LLM round-trip, hence opt-in.
+    RAG_PREMISE_CHECK=(bool, False),
+    # PR7: the *currency* axis, orthogonal to fidelity — is the case the user's
+    # premise rests on still GOOD LAW? Deterministic (reads the PR3 treatment flag
+    # already on the retrieved passage; no LLM), so it ships ON by default: a
+    # faithful reading of an OVERRULED case (the Madden/Bankers Trust trap) is the
+    # failure the fidelity check is structurally blind to. See premise.check_premises.
+    # Cost: gated by extract_premises (pure regex) so ordinary questions short-circuit
+    # with no retrieval; only a turn whose text ASSERTS a named case's holding pays up
+    # to MAX_PREMISES retrieve_context calls pre-draft. Set False to disable.
+    RAG_CURRENCY_CHECK=(bool, True),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
@@ -51,6 +82,12 @@ CHAT_DAILY_USER_LIMIT = env("CHAT_DAILY_USER_LIMIT")
 CHAT_MONTHLY_GLOBAL_LIMIT = env("CHAT_MONTHLY_GLOBAL_LIMIT")
 CHAT_TRACE_CAPTURE = env("CHAT_TRACE_CAPTURE")
 CHAT_TRACE_RETENTION_DAYS = env("CHAT_TRACE_RETENTION_DAYS")
+RAG_ABSTAIN_BLOCKING = env("RAG_ABSTAIN_BLOCKING")
+RAG_STALE_BLOCK_SEVERITY = env("RAG_STALE_BLOCK_SEVERITY")
+RAG_CLAIM_NLI = env("RAG_CLAIM_NLI")
+RAG_QUERY_REWRITE = env("RAG_QUERY_REWRITE")
+RAG_PREMISE_CHECK = env("RAG_PREMISE_CHECK")
+RAG_CURRENCY_CHECK = env("RAG_CURRENCY_CHECK")
 DOCLING_SERVICE_URL = env("DOCLING_SERVICE_URL")
 DOCLING_TIMEOUT = env("DOCLING_TIMEOUT")
 

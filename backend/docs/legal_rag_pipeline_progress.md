@@ -214,13 +214,306 @@ opinion-head excerpts that miss the holding, and no abstain path.
     Enforcement (down-rank/abstain) is PR4; the LLM classifier + a multi-opinion
     support count are PR5. §8 Q4 (cite-sentence sourcing = re-scan body_text) and
     Q5 (cache on `source_metadata`, no table) resolved.
-- [ ] **PR4 — Verify+abstain extraction and stale-use gate.**
-- [ ] **PR5 — LLM-assisted treatment v2 + (optional) claim-level NLI + query rewrite.**
+- [x] **PR4 — Verify+abstain extraction and stale-use gate.** ✅ DONE
+  (2026-06-09, uncommitted). The treatment flags PR3 produced are now *enforced*
+  at answer time, behind a feature flag, with advisory as the default.
+  - **New `apps/corpus/services/answer.py`** — the answer gate, moved out of
+    `chat.py` so chat + MCP share one checked path. `verify_answer` (the old
+    `_verify_answer` body, verbatim) + `render_advisory` (old advisory) + the new
+    `should_abstain` / `abstain_decision`. `_verify_answer`/`_verification_advisory`
+    deleted from `chat.py`; `verify_document.py` doc-comments repointed.
+  - **Stale-use detection** — `verify_answer(content, *, source_slug, context=None)`
+    cross-references the cases the *drafted answer* cites against the PR3
+    `treatment` flags on the turn's retrieved passages. It distinguishes
+    **silent reliance** on a `negative` case (the dangerous "overruled-as-good-law"
+    failure) from an **acknowledged** mention ("X was overruled by Y" — which the
+    system prompt *tells* the model to write, so it must not be punished): a case
+    is "acknowledged" only when a treatment cue or the treating case's name sits in
+    the **same sentence** as the mention. `context=None` ⇒ stale check is a no-op
+    and the report is byte-identical to the pre-PR4 gate (behavior-preserving).
+  - **Abstain** — `should_abstain` fires only when nothing was retrieved or
+    **every** passage is `negative`; `unknown` (all statutes + unflagged cases) is
+    presumed good, so statutes never spuriously abstain. Surfaced as an additive
+    `abstain`/`abstain_reason` on both the chat search tool and the MCP
+    `search_statutes_tool`, plus a system-prompt ABSTAIN rule.
+  - **Block policy (behind the flag, default OFF)** — `abstain_decision` withholds
+    the answer only when `settings.RAG_ABSTAIN_BLOCKING` is True and either the
+    answer silently relied on an invalidated case (`severity >=
+    RAG_STALE_BLOCK_SEVERITY`, default 5) or no good-law authority was retrieved
+    (guarded by a `searched` flag so a lookup-only / pinned-doc answer is never
+    blocked for an empty search set). Default ships **advisory-only** — nothing is
+    suppressed, the gate just appends a warning. Non-stream path replaces outright;
+    the streaming path can't un-send already-streamed text, so it appends a loud
+    trailing notice (documented divergence — true stream suppression needs answer
+    buffering, deferred). The chat loop now captures each `search_statutes`
+    `RetrievedContext` (both sync + stream loops), merges them (dedup by
+    `cluster_id`), and threads the result into the finalizers.
+  - **Tests:** new `apps/corpus/tests/test_answer.py` (38 — stale-use silent vs
+    acknowledged, anchor extraction, abstain, block policy + threshold + searched
+    guard, advisory render, behavior-preservation, chat-finalizer advisory-vs-block)
+    + 2 MCP abstain tests. Full suite **453 / 1-known-red** (the pre-existing
+    `lookup_citation` 714.99 fuzzy-suggest) — zero regressions.
+  - **Adversarial review** (4-dimension workflow + per-finding skeptic) caught a
+    **critical** real bug pre-merge: the stale-use anchor was mined from
+    `p.heading`, but for caselaw `_annotate_caselaw` puts the court+year there and
+    the **case name in `p.citation`** — so the name anchor never fired and an
+    overruled case cited by name (the common COA name-only shape) passed the gate
+    clean. Verified against the live dev DB (0/4000 heading-names vs 91%
+    citation-names). Fixed (mine the caption from `citation`, both fields), plus
+    two confirmed lower findings: the acknowledgment scan was a ±220-char window (a
+    cue about a *different* case excused silent reliance — fail-open) → tightened to
+    same-sentence with a `v.`-aware boundary; and the cue regex matched benign
+    vocab ("reject"/"abandon") → scoped to the treatment stems. My own test fixture
+    had **masked** the critical bug by inverting the real heading/citation shape;
+    fixtures corrected + a name-only-citation regression test added.
+  - **Live end-to-end validation** (real dev corpus + OpenAI `gpt-4o-mini`, known
+    overruled case *Metropolitan Jacobson*, 476 N.W.2d 726, flagged `negative/sev5`
+    by *Estate of DeTar*): the PR3 flag flows retrieval → search tool → model, which
+    answered "no longer good law… overruled by Estate of DeTar" (the whole PR3→PR4
+    chain working live). Deterministically a silent-reliance answer → advisory +
+    (blocking on) withheld; an acknowledged answer → clean. The live run surfaced
+    **one more boundary bug**: the same-sentence acknowledgment splitter only skipped
+    *single-letter* abbreviations, so a citation-internal "(Iowa **App.** 1991)"
+    between the case name and the cue falsely marked a correct answer `silent`. Fixed
+    (abbreviation-aware boundary: "App."/"Co."/"Inc."/"No."/… no longer end a
+    sentence) + regression test; the live answer then read `ok=True / acknowledged`.
+  - **Known v1 limits (advisory by design):** name matching is exact-caption /
+    reporter-cite, so a *shortened* prose cite ("State v. Worden" for "State of
+    Iowa v. Tre Evans Worden") is a residual false-negative; phrase-only treatment
+    recall (PR3) bounds it further. Streaming block degrades to a loud notice (see
+    above). §8 Q2 resolved (advisory default + block behind `RAG_ABSTAIN_BLOCKING`,
+    threshold 5).
+  - **Remaining (measurement, carried to its own step like PR3's):** extend
+    `eval_caselaw`'s judge with an adversarial set (no-authority questions →
+    abstain-rate; overruled-precedent questions → stale-block-rate, tracking
+    accurate/incomplete/hallucinated separately). Needs the paid OpenAI judge + a
+    new query set; not built yet.
+- [x] **PR5 — LLM-assisted treatment v2 + claim-level NLI + query rewrite.** ✅ DONE
+  (2026-06-09, uncommitted). Three LLM-assisted layers, each **flag-gated and OFF by
+  default** (deterministic v1 paths always run; every layer no-ops without a key),
+  each reusing the `semantic_support` OpenAI-call shape (injectable Protocol +
+  graceful degradation).
+  - **Treatment v2** — `treatment_llm.py` (`OpenAITreatmentClassifier`,
+    `parse_verdict`, `LLMTreatmentVerdict`, `paragraph_around`) + `annotate_treatment
+    --llm`. v1 stays the high-recall candidate generator; v2 reads the citing
+    **paragraph** + target identity + citing court level and confirms / relabels /
+    rejects each candidate. **Confidence policy** (in the command): confident negative
+    → refine (`source="llm"`), confident rejection → drop a v1 false positive,
+    uncertain (conf < `--llm-min-confidence`, default 0.55) → **keep the v1 flag**
+    (never silently lose a real flag). Depth-gated (`--llm-min-depth`) + capped
+    (`--llm-limit`) so cost tracks deep engagements. Severity derived in code from a
+    fixed label vocabulary (never trust the model's number).
+  - **Claim-level NLI** — `answer.py` (`_misgrounded_claims`, `_split_sentences`;
+    `verify_answer` gained a `claim_checker` param + a `misgrounded` report key).
+    Behind `RAG_CLAIM_NLI`. Pairs the answer's caselaw claims (anchor match, reused
+    from stale-use) with the retrieved opinion text and flags `contradicted` holdings
+    via `semantic_support`. Advisory only (never blocks); `context=None` stays
+    byte-identical to the PR4 report.
+  - **Query rewrite** — `query_rewrite.py` (`rewrite_query`, `OpenAIQueryRewriter`)
+    + a `retrieve_context` hook behind `RAG_QUERY_REWRITE`. Guaranteed **passthrough**
+    on any failure (empty/over-long/error/no-key) so retrieval never sees a worse
+    query; `ctx.query` keeps the ORIGINAL for display, only the rewrite reaches
+    `hybrid_search`/rerank, recorded in `diagnostics["query_rewritten"]`.
+  - **Tests:** `test_treatment_llm.py` (21 — parse/gate/policy/command refinement with
+    a fake classifier + minimal caselaw fixture), `test_query_rewrite.py` (16 —
+    passthrough contract + the gated hook), claim-NLI tests added to `test_answer.py`
+    (49 total). Full suite **499 / 1-known-red** — zero regressions.
+  - **Adversarial review** (4-dimension workflow + per-finding skeptic): 1 confirmed
+    (low) fix — `parse_verdict` read `target_is_subject` with a bare `bool()`, so a
+    quoted-string `"false"` would coerce True and flip a confident rejection into a
+    kept flag (the unsafe false-negative-treatment direction); normalized like the
+    sibling fields + regression test. 1 finding **dismissed with real-corpus
+    evidence** (the reviewer measured a 0.00% `paragraph_around` fallback rate over
+    377 live v1 candidates).
+  - **Live validation** (real corpus + OpenAI): v2 **REJECTED node 33228**
+    (*Metropolitan Jacobson*) — the exact v1 false positive the PR4 live test exposed
+    (prefix anchor "476 N.W.2d" had matched *Weidman*'s 476 N.W.2d 357) — and
+    relabeled a *contention* "overruled"→"questioned"; uncertain reads kept v1.
+    Claim-NLI flagged a fabricated "all warrantless blood draws are permitted" holding
+    as misgrounded while passing a faithful claim. Query rewrite turned verbose lay
+    questions into term-of-art queries.
+  - **Note:** v2's recall is the expected tradeoff — a confident reject can drop a
+    genuine-but-ambiguous flag (observed once in the sample); the uncertain→keep-v1
+    rule bounds the downside, and the whole layer is advisory. Re-running
+    `annotate_treatment --llm` over the full corpus to actually refine the 470 stored
+    flags is an operational step (cost: one gpt-4o call per candidate), not yet run.
+- [x] **PR6 — User-premise check (anti-anchoring).** ✅ DONE (2026-06-09, uncommitted).
+  Born from a live end-to-end run: a user's question *asserted* what *Madden v. City
+  of Iowa City* holds; the model anchored on the confident premise, and the
+  post-answer claim-NLI (which grades the *answer*) missed it. PR6 intercepts the
+  premise BEFORE the model drafts.
+  - **`premise.py`** — deterministic `extract_premises` (a sentence that names a case
+    via caption/reporter-cite AND attributes a holding — an assertion verb after the
+    name OR a holding-preposition "Under/Per [Case]" before it; hedge/treatment-cue
+    guarded) → `check_premises` retrieves the named case (top-K + **anchor-overlap
+    guard** so we never verify against the wrong case), runs `semantic_support` NLI of
+    the user's premise vs the opinion, and flags `contradicted`/`partial` (the
+    deliberate asymmetry vs PR5 — an overstated user premise is the anchor to
+    neutralize). The NLI verdict is the precision backstop (`supported`/`no_claim`
+    → silent), so extraction favors recall.
+  - **Wired** behind `RAG_PREMISE_CHECK` (default off, no-op without a key): a
+    pre-answer system **caution** is injected into both chat loops so the model
+    corrects rather than parrots; the findings ride into the post-answer report +
+    advisory (`premise_problems`). Design chosen via a 3-way design-panel workflow.
+  - **Tests:** `test_premise.py` (22 — extraction precision incl. see-cite/hedge/
+    treatment/Under-framing negatives, the anchor-overlap + topical-competitor pick,
+    verdict gating, degradation, the chat-guard gating). Full suite green-for-green.
+  - **Live validation drove three real fixes** + one important correction:
+    (1) the premise query needed the *topic* (not just the caption) so the chunk-aware
+    excerpt surfaces the relevant holding; (2) retrieval needed top-K + anchor-match
+    (the named case can rank below a topical competitor); (3) the caption regex
+    greedily ate the leading "Under". After fixes: the user's ACTUAL *Madden* premise
+    verified **supported → silent** (no false alarm), and an inverted false premise
+    ("a city can never shift liability") was flagged `contradicted` and the live model
+    **corrected** it ("Contrary to what you suggested, the court did not hold…").
+  - **Correction of record:** the live run proved the *Madden* premise is actually
+    CORRECT — the majority held the Iowa City liability-shifting ordinance "is not
+    preempted by Iowa Code § 364.12(2)" and affirmed; the "express legislative
+    authorization required / unlawful tax" language was the **dissent** and the losing
+    party's arguments. An earlier hand-analysis in chat had it backwards (anchored on
+    a dissent snippet — the same failure mode). The PR6 false-positive control
+    correctly stayed silent on the true premise.
+  - **⚠️ THIS "Correction of record" WAS ITSELF WRONG — superseded by PR7
+    (2026-06-09).** Multi-source verification (official Iowa Judicial Branch
+    opinions, Justia, Nyemaster's *On Brief*, the ICAP article) establishes that
+    *Madden v. City of Iowa City*, 848 N.W.2d 40 (Iowa, filed **June 13, 2014**),
+    was **EXPRESSLY OVERRULED** by *Splittgerber v. Bankers Trust Co.* /
+    *Bankers Trust Co. v. City of Des Moines*, No. 22-2085 (Iowa, filed **June 14,
+    2024**) — "we overrule Madden to the extent it permitted … liability beyond
+    what the legislature has expressly authorized in Iowa Code § 364.12(2)." The
+    PR6 note got Madden's 2014 *internal* structure right (majority = not-preempted
+    + affirmed; the express-authorization reasoning = the Mansfield/Waterman
+    dissent) but its bottom line — *"Madden is good law"* — was **stale/false** as
+    of 2024. So PR6's "live-validation success" (premise verified *supported →
+    silent*) was a **FALSE NEGATIVE**: the model confirmed a *faithful reading of a
+    dead case*. Fidelity-NLI is structurally blind to currency. This is exactly the
+    failure PR7 fixes. (Reporter pin cite for Bankers Trust: confirm the N.W.3d
+    page on Westlaw/Lexis — free sources 403'd; docket/date/holding are solid.)
+  - **Known v1 limits:** extraction is deterministic (misses paraphrases beyond
+    verb/"Under" framings); one retrieval + one NLI call per premise on the hot path
+    when enabled (capped at `MAX_PREMISES`); pre-answer latency before first token.
+- [x] **PR7 — Currency axis: faithful-reading-of-an-overruled-case.** ✅ DONE
+  (2026-06-09, uncommitted). Born from the *Bankers Trust* slip-and-fall re-test:
+  PR6 stayed silent on "Under *Madden*, abutting owners are liable" because the
+  premise is a **faithful** reading of *Madden*'s 2014 majority — but *Madden* was
+  **overruled** by *Bankers Trust* (2024). The root cause is **orthogonality**:
+  every grounding check we had (PR5 claim-NLI, PR6 premise, the verify gate) answers
+  *"is this faithful to the source?"* — none enforces *"is the source still good
+  law?"*. A faithful reading of a dead case is maximally faithful and maximally
+  wrong. (This is also why PR6's own "Madden is good law" live-validation was a
+  false negative — see the corrected record above.)
+  - **Layer 1 — recall (`treatment.py`).** PR3 never flagged *Madden* even though
+    *Bankers Trust* cites it 13× at depth and the dissent says "in overruling
+    *Madden v. City of Iowa City*, 848 N.W.2d 40". The classifier's sentence
+    splitter was **newline-naive**: PDF text extraction injects `\n\n` (and hyphen
+    wraps, "rea-\n\nsons") MID-sentence, tearing the overrule stem from the reporter
+    cite, so the same-sentence scan saw nothing. Fix: `_normalize_body` (repair
+    soft-hyphen wraps + collapse all whitespace) then **abbreviation-aware**
+    sentence splitting (don't break on the "v."/"Co."/"N.W." periods) — mirrors
+    `answer.py`'s boundary logic. Precision preserved: cite-anchoring still isolates
+    targets (the same opinion's overrulings of *Godfrey*/*Smith* carry their own
+    cites, so they flag *those*, not *Madden*). Proven live: `classify_citing_text`
+    now returns `(5, overruled, …)` for *Bankers → Madden*. +2 regression tests
+    (the PDF-wrap + the abbreviation-split cases). Re-ran `annotate_treatment`.
+  - **Layer 2 — wiring + policy (`premise.py`/`answer.py`/`chat.py`/`settings.py`).**
+    `check_premises` now reads the `TreatmentFlag` **already on the retrieved
+    passage** (it was fetched and discarded — one attribute away) and emits a
+    finding on EITHER axis: fidelity (NLI, as before) OR currency (negative/caution).
+    `PremiseFinding` gained `currency`/`treating_case`/`treatment_label`/
+    `treatment_evidence` (additive); `render_premise_caution` gained a
+    **correct-then-answer** branch that makes the model LEAD with the overruling
+    then answer under current law; `answer.render_advisory` renders the currency
+    note. Currency is **deterministic (no LLM)**, so it ships behind a new
+    `RAG_CURRENCY_CHECK` defaulting **ON** (the fidelity NLI stays opt-in behind
+    `RAG_PREMISE_CHECK`); `_premise_guard` runs currency with `checker=None`.
+  - **Adversarial review (4-dimension workflow + per-finding skeptics) caught a
+    CRITICAL regression** in the Layer-1 recall fix before it could ship: the
+    abbreviation-aware splitter MERGED two real sentences when sentence 1 ended in a
+    legal abbreviation ("...we overrule Acme **Co.** The plaintiff cites [target]"),
+    mis-attributing the overrule to [target] — a false "this case is dead" flag, the
+    exact harm the module guards. Two sibling false-positive classes: `iowa` in the
+    abbrev set ("...of Iowa. We reaffirm [target]"), and whitespace-collapse melting
+    newline cite-stacks so a far stem fell within `_PROX`. All FIXED and the
+    annotation re-run (the first run used the buggy splitter, killed pre-`_write` so
+    no bad data persisted): (a) **capitalization-aware boundaries + two abbrev
+    classes** — `v.`/titles never break; entity/citation suffixes break only before a
+    Capitalized new sentence; `iowa` dropped; (b) a **no-intervening-cite guard** (a
+    reporter cite between stem and target → reject); (c) `_WRAP_HYPHEN` tightened to
+    lowercase soft-wraps so page-ranges/date-spans aren't corrupted. Verified live:
+    all 7 review reproductions return `None`, recall preserved, Bankers→Madden still
+    `(5,'overruled')`. Lower-severity fixes: `RAG_CURRENCY_CHECK=False` now actually
+    disables the currency axis (threaded a `currency` param into `check_premises`);
+    `render_advisory` no longer mislabels a currency-only finding as a misreading.
+  - **Tests:** +12 premise (the Bankers Trust trap: faithful reading of an overruled
+    case is flagged; currency-without-a-key; both-axes; dual-flag gating; the
+    `RAG_CURRENCY_CHECK=False` suppression contract; `finding_dicts` keys), +8
+    treatment (the recall fix + the precision regression classes: entity-suffix
+    merge, sentence-final "Iowa.", intervening-cite, soft-hyphen span), +4 answer
+    (the `render_advisory` currency branch). Full `apps.corpus`+`apps.api`+
+    `apps.mcp_server` suite **539 / 1 known-red** (the pre-existing `lookup_citation`
+    714.16 fuzzy-suggest) — zero regressions.
+  - **Perf fix (the recall normalization had an O(n²) bug).** First re-annotation
+    ran **1.5 hr** and was killed: `_is_boundary` sliced the FULL prefix
+    (`text[:dot_idx]`) and searched it per sentence-boundary → O(n²) over a long
+    body; compounded by `classify_citing_text` re-normalizing the whole body per
+    anchor×target (landmark opinions cite hundreds of cases). Fixed: bounded 24-char
+    lookback in `_is_boundary` (O(n)); split into `normalized_sentences()` (once per
+    body) + `classify_in_sentences()` (per target); command normalizes each citing
+    body once. Measured: 34KB body normalize **12ms** (was hundreds), per-target
+    scan **0.4ms**. Re-annotation now **~7 min**.
+  - **Corpus state (shipped):** re-annotation flagged **893 decisions** (540
+    negative / 353 caution). **Madden (node 72214) flags `negative/overruled`** —
+    evidence found via *Clemen v. Dolgencorp*'s parenthetical "(overruling Madden v.
+    City of Iowa City, 848 N.W.2d 40 (Iowa 2014))", which also surfaced the
+    *Bankers Trust* reporter cite the web research couldn't pin: **8 N.W.3d 135, 141
+    (2024)**. **End-to-end verified:** the live slip-and-fall prompt → `extract_premises`
+    catches the Madden premise → `check_premises` reads the negative flag (no key
+    needed) → the pre-answer caution makes the model LEAD with the overruling, then
+    answer under current law. The trap is defeated.
+  - **⚠️ KNOWN LIMITATION — v1 deterministic precision (~1/3 false positives).** A
+    14-sample of `negative` flags showed ~5 clear FPs the v1 phrase-scan can't catch:
+    a trial ruling whose ruling-noun precedes the stem ("a motion … was overruled");
+    a party *contention* ("should be overruled"); the court *declining* ("without
+    substantially overruling Robb"); a possessive trial ruling ("overruled Butcher's
+    [objection]"); and agent confusion ("overruled in [target]" = target is the
+    venue). The recall-widening normalization raised recall AND this FP load. v1 was
+    always **advisory** by design (PR3); but PR7's **correct-then-answer is confident
+    enforcement**, so on a falsely-flagged good-law case it can confidently mis-correct.
+    Decision (2026-06-09): **ship the core on v1 flags; defer corpus-wide precision.**
+  - **`--llm` refinement — tested, NOT run (unsafe with drops).** Smoke + a 40-deepest
+    dry-run (gpt-4o) showed the PR5 `--llm` pass DROPS on confident rejection
+    (**19/40 ≈ 47%** of the deepest sample dropped) and **risks removing real
+    overrules** — *Madden* itself was rejected by gpt-4o and survived ONLY because the
+    rejection was conf 0.0 < the 0.55 keep-v1 threshold. Dropping a real overrule
+    re-creates the original "dead case shown as good law" bug, so a drop-enabled run
+    is unsafe to apply unsupervised. (Also: low-depth FPs like the *Taylor* "relies
+    on" case sit outside any practical `--llm-limit`.)
+  - **Recommended refine path (deferred follow-up).** To make the broader corpus
+    safe for confident correct-then-answer: (1) run `--llm` in a **CONFIRM-ONLY**
+    mode (upgrade genuine flags to `source=llm`/high-confidence + relabel, but NEVER
+    drop) so no real overrule is lost; (2) **confidence-gate the enforcement** —
+    confident "overruled, lead with the correction" only for `source=llm`/high-conf
+    flags, a softer "a later opinion used overruling language near this case's cite —
+    verify its current status before relying" for raw deterministic flags; (3) tighten
+    the deterministic guards for the FP patterns above (ruling-noun BEFORE the stem,
+    "should/could be" contentions, "without …ing" declining, "overruled in [target]"
+    agent); (4) fix **attribution** (the `by_citation` is the *reporting* case, not the
+    overruler — *Madden*'s flag says "by Clemen" not "by Bankers Trust"); (5) wire the
+    adversarial **eval** (overruled-premise correction-rate, no-authority abstain-rate,
+    v1-vs-confirm-only treatment precision).
+  - **Other carried residuals:** (a) a name-only overruling with NO cite-adjacent
+    mention anywhere is still missed (→ name-anchoring + LLM, eval-gated); (b)
+    **statute supersession** is uncovered (treatment is caselaw-only) — a premise on a
+    repealed/amended § gets no currency flag; (c) the **duplicate-cluster** split (two
+    *Madden* decision nodes) means the flag must land where retrieval surfaces it;
+    (d) `answer.py`'s `_is_sentence_boundary` has the same latent `text[:dot_idx]`
+    O(n²) pattern, harmless today (small inputs) but worth the same bounded-window fix.
 
 ## Open questions (from design §8) — answer before the PR that needs them
 
 1. (PR2) ✅ RESOLVED — caselaw-only chunk excerpts; statutes keep the prefix.
-2. (PR4) Hard-block `severity>=5` answers vs advisory red flag? + severity threshold.
+2. (PR4) ✅ RESOLVED — advisory by default; hard-block only behind
+   `RAG_ABSTAIN_BLOCKING` (default off), threshold `RAG_STALE_BLOCK_SEVERITY`=5.
 3. (PR3) Re-pull CL OpinionsCited citations CSV for the loaded Iowa clusters (bulk
    archived to DO Spaces).
 4. (PR3) Citing-sentence sourcing: re-scan `body_text` vs re-ingest `html_with_citations`.
@@ -253,8 +546,24 @@ opinion-head excerpts that miss the holding, and no abstain path.
   MCP/chat serializers, and the chat system prompt. §8 Q4/Q5 resolved (re-scan body_text;
   `source_metadata` cache). Advisory (no ranking change); evidence sentence shipped with
   every flag. Uncommitted.
-  Next action: **PR4** — verify+abstain extraction and the stale-use gate. Move
-  `_verify_answer` → `answer.py`; add `stale_used` (cross-ref answer's cited cases against
-  passage `treatment`) + `should_abstain`; wire the abstain path + a flag to BLOCK
-  severity>=5 (answer §8 Q2: hard-block vs advisory + threshold first). The treatment flags
-  PR4 enforces are now in place.
+- 2026-06-09: **PR4 done** — verify+abstain extraction + stale-use gate. Shared
+  `answer.py` (`verify_answer`/`render_advisory`/`should_abstain`/`abstain_decision`),
+  silent-vs-acknowledged stale-use detection, additive `abstain` on chat + MCP, and a
+  block path behind `RAG_ABSTAIN_BLOCKING` (default off; threshold 5). §8 Q2 resolved.
+  453/1-known-red. Adversarial review caught + fixed a critical name-anchor bug
+  (mined from heading, not citation) before merge. Uncommitted.
+- 2026-06-09: **PR5 done** — three flag-gated LLM layers (all default-off, all reuse
+  `semantic_support`): treatment **v2** (`treatment_llm.py` + `annotate_treatment
+  --llm`; confident-override / confident-drop / uncertain-keep-v1 policy, depth-gated),
+  claim-level **NLI** (`answer.py`, `RAG_CLAIM_NLI`, advisory misgrounding), and
+  **query rewrite** (`query_rewrite.py` + `retrieve_context` hook, `RAG_QUERY_REWRITE`,
+  guaranteed passthrough). 499/1-known-red. Adversarial review: 1 low fix
+  (`target_is_subject` bool-normalization); 1 dismissal backed by real-corpus
+  measurement. Live-validated: v2 rejected the *Metropolitan Jacobson* false positive
+  the PR4 live test exposed; claim-NLI caught a fabricated holding; rewrite tightened
+  lay questions. Uncommitted.
+  Remaining (operational / measurement, not new PRs): (a) run `annotate_treatment
+  --llm` over the full corpus to refine the 470 stored flags (cost: one gpt-4o call per
+  candidate); (b) the PR4 carry-forward — extend `eval_caselaw` with abstain-rate /
+  stale-block-rate (and now a v1-vs-v2 treatment-precision A/B) on an adversarial query
+  set. The phased design plan (PR1–PR5) is complete.

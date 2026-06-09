@@ -15,9 +15,7 @@ processes and deploys.
 from __future__ import annotations
 
 import json
-import re
 import time
-from difflib import SequenceMatcher
 from typing import Any
 
 from django.conf import settings
@@ -31,11 +29,7 @@ from apps.api.accounts import _require_login
 from apps.api.session_auth import session_auth
 from apps.api.trace_capture import record_chat_trace
 from apps.corpus.models import Node, NodeVersion, ReviewStatus, Source
-from apps.corpus.services.lookups import (
-    current_version,
-    validate_citations,
-    verify_quotes,
-)
+from apps.corpus.services.lookups import current_version
 from apps.corpus.services.corpus_tools import (
     _today,
     get_cross_references_tool,
@@ -46,9 +40,23 @@ from apps.corpus.services.corpus_tools import (
     lookup_citation_tool,
 )
 from apps.corpus.services.retrieval import (
+    RetrievedContext,
+    RetrievedPassage,
     _excerpt,
     retrieve_context,
     treatment_payload,
+)
+from apps.corpus.services.answer import (
+    abstain_decision,
+    render_advisory,
+    should_abstain,
+    verify_answer,
+)
+from apps.corpus.services import semantic_support
+from apps.corpus.services.premise import (
+    check_premises,
+    finding_dicts,
+    render_premise_caution,
 )
 
 
@@ -82,28 +90,35 @@ CHAT_CANDIDATE_POOL = 100
 CHAT_DISPLAY_LIMIT = 6
 
 
-def _enriched_search(args: dict) -> dict:
-    """Chat's search tool: delegate to the shared ``retrieve_context`` pipeline,
-    then serialize the passages into the chat hit shape.
+def _search_with_context(args: dict) -> tuple[dict, RetrievedContext | None]:
+    """Chat's search: delegate to the shared ``retrieve_context`` pipeline and
+    return BOTH the serialized chat-hit result and the underlying
+    ``RetrievedContext`` (whose passages carry the PR3 treatment flags).
+
+    The chat loop keeps the contexts for the turn so the final verify/abstain
+    gate can cross-reference the drafted answer against what was actually
+    retrieved (stale-use detection). ``None`` is returned for the empty-query
+    short-circuit, where no retrieval happened.
 
     ``source_slug`` is injected by the chat endpoint from the request-level
     source picker, not chosen by the model — scoping is a user decision. The
     model's ``limit`` is intentionally ignored: chat noise is a precision
-    problem, not a recall one.
-
-    Reranks the full candidate pool down to the display set, then attaches a
-    long ``body_excerpt`` (from the current version) and the section's
-    ``effective_from`` so the model can quote the real effective date instead
-    of fabricating one (today's date written as "Effective from …" was a
-    common hallucination tell)."""
+    problem, not a recall one. Reranks the full candidate pool down to the
+    display set, then attaches a long ``body_excerpt`` (from the current
+    version) and the section's ``effective_from`` so the model can quote the
+    real effective date instead of fabricating one (today's date written as
+    "Effective from …" was a common hallucination tell)."""
     query = args["query"]
     if not query or not query.strip():
-        return {
-            "query": query,
-            "hits": [],
-            "as_of_date": _today(),
-            "error": "query must not be empty",
-        }
+        return (
+            {
+                "query": query,
+                "hits": [],
+                "as_of_date": _today(),
+                "error": "query must not be empty",
+            },
+            None,
+        )
     ctx = retrieve_context(
         query,
         source_slug=args.get("source_slug"),
@@ -116,7 +131,11 @@ def _enriched_search(args: dict) -> dict:
         excerpt_budget_rest=SEARCH_BODY_MAX_CHARS,
         top_hits_full=TOP_HITS_FULL,
     )
-    return {
+    # PR4: surface the abstain signal to the model (advisory). The system prompt
+    # tells it to be candid when no good-law authority was found instead of
+    # stretching an adjacent rule. Additive — existing keys are unchanged.
+    ctx.abstain, ctx.abstain_reason = should_abstain(ctx)
+    payload = {
         "query": ctx.query,
         "hits": [
             {
@@ -137,7 +156,86 @@ def _enriched_search(args: dict) -> dict:
             for p in ctx.passages
         ],
         "as_of_date": ctx.as_of_date,
+        # PR4 (additive): whole-result abstain signal for this search.
+        "abstain": ctx.abstain,
+        "abstain_reason": ctx.abstain_reason,
     }
+    return payload, ctx
+
+
+def _enriched_search(args: dict) -> dict:
+    """Chat's search tool as registered in ``TOOL_HANDLERS`` — the serialized
+    result only. The loop calls :func:`_search_with_context` directly when it
+    needs to also capture the context for the turn's verify/abstain gate."""
+    return _search_with_context(args)[0]
+
+
+def _merge_turn_context(
+    contexts: list[RetrievedContext],
+) -> RetrievedContext | None:
+    """Collapse every ``search_statutes`` context from a turn into one, so the
+    final gate sees all retrieved authority. Passages are deduped by
+    ``cluster_id`` (a decision/section appears once even if several searches
+    surfaced it), keeping the first occurrence. Returns ``None`` only when the
+    turn ran no search at all — the signal the abstain gate uses to NOT block a
+    lookup-only / pinned-document answer for an empty search set. An empty-but-
+    present context (a search that genuinely returned nothing) is preserved."""
+    if not contexts:
+        return None
+    merged: list[RetrievedPassage] = []
+    seen: set[int] = set()
+    for ctx in contexts:
+        for p in ctx.passages:
+            if p.cluster_id in seen:
+                continue
+            seen.add(p.cluster_id)
+            merged.append(p)
+    queries = " | ".join(dict.fromkeys(c.query for c in contexts if c.query))
+    return RetrievedContext(
+        query=queries,
+        passages=merged,
+        as_of_date=contexts[0].as_of_date,
+    )
+
+
+def _premise_guard(
+    messages: list[dict[str, Any]], source_slug: str | None
+) -> tuple[str, list[dict[str, Any]]]:
+    """PR6 (anti-anchoring): verify the case-holding premises the user asserts in
+    the latest question against the retrieved opinions, BEFORE the model drafts.
+
+    Returns ``(caution_system_text, premise_problem_dicts)``. Two orthogonal axes,
+    independently gated:
+
+    * **Currency** (``RAG_CURRENCY_CHECK``, default ON): is the named case still
+      good law? Deterministic — needs no OpenAI key — so it runs by default and
+      catches the faithful-reading-of-an-overruled-case trap.
+    * **Fidelity** (``RAG_PREMISE_CHECK``, default off): does the case hold what
+      the user says? An LLM round-trip, so it only runs when on AND a key resolves
+      a checker.
+
+    A no-op ``("", [])`` only when BOTH are off. The caution is injected as a
+    system message so the model corrects the premise instead of parroting it; the
+    dicts ride into the final advisory."""
+    currency_on = getattr(settings, "RAG_CURRENCY_CHECK", True)
+    fidelity_on = getattr(settings, "RAG_PREMISE_CHECK", False)
+    if not (currency_on or fidelity_on):
+        return "", []
+    # The checker drives the fidelity axis only; currency reads the deterministic
+    # treatment flag and runs with checker=None.
+    checker = semantic_support.default_checker() if fidelity_on else None
+    last_user = next(
+        (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
+        "",
+    )
+    if not last_user.strip():
+        return "", []
+    findings = check_premises(
+        last_user, source_slug=source_slug, checker=checker, currency=currency_on
+    )
+    if not findings:
+        return "", []
+    return render_premise_caution(findings), finding_dicts(findings)
 
 
 chat_router = Router()
@@ -441,6 +539,13 @@ SYSTEM_PROMPT = (
     "limitation if it bears on the question. The flag is advisory and "
     "phrase-derived; if it conflicts with the opinion text you retrieved, say "
     "so rather than asserting a conclusion.\n\n"
+    "ABSTAIN: a search result carries an ``abstain`` flag (with "
+    "``abstain_reason``). When it is true — nothing on point was retrieved, or "
+    "every authority found has been negatively treated — say plainly that you "
+    "could not locate good-law Iowa authority on that point and do one more "
+    "targeted search; do NOT stretch an off-point or overruled source to fill "
+    "the gap. It is better to tell the user no current authority was found than "
+    "to manufacture a confident answer from bad law.\n\n"
     "When the tool result for a section includes a non-empty "
     "``official_url`` and / or ``effective_from``, copy them into your "
     "answer verbatim alongside that section's citation. When either field "
@@ -764,219 +869,46 @@ def _enforce_chat_quota(user) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Deterministic answer verification (Track B #1)
+# Deterministic answer verification (Track B #1) + stale-use / abstain (PR4)
 #
-# After the model produces its answer, we re-scan it with the same corpus the
-# answer was supposed to be grounded in and check two things deterministically,
-# without LLM judgment:
-#   • every section-shaped citation actually resolves to a live rule, and
-#   • every quoted passage actually appears in the rule it is attributed to.
-# Anything that fails is surfaced to the user as an explicit advisory rather
-# than silently presented as fact. This converts grounding from "the model
-# promised" to "the system checked."
+# After the model produces its answer, the shared gate in
+# ``apps.corpus.services.answer`` re-scans it against the same corpus and checks,
+# without LLM judgment: every section-shaped citation resolves to a live rule;
+# every quoted passage appears in the rule it is attributed to; and (PR4) the
+# answer did not silently rely on a case the retrieved context flags as
+# negatively treated. Failures are surfaced as an explicit advisory (default),
+# or — when ``RAG_ABSTAIN_BLOCKING`` is on — the answer is withheld. The two
+# finalizers below are the chat-side adapters: they thread the turn's retrieved
+# context into ``verify_answer`` / ``abstain_decision`` and emit the trace +
+# stream events. The verification logic itself lives in ``answer.py`` so chat
+# and any future answer surface share one checked path.
 # ---------------------------------------------------------------------------
 
 
-_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
-# Dollar amounts ("$7.25", "$1,000.50") parse as section-shaped citations
-# ("7.25") and would be flagged as fabricated — statutory text and answers are
-# full of them (minimum wage, fees, thresholds). Strip before scanning.
-_MONEY_RE = re.compile(r"\$\s?\d[\d,]*(?:\.\d+)?")
-
-
-def _is_real_section(citation) -> bool:
-    """True only when the part after the chapter is numeric — a genuine
-    section ("714.16", "32:1.10", "708.2A" → rest "16"/"1.10"/"2A"). Statutory
-    answers enumerate subsection markers like "1.d", "2.a", "2.d(1)" that parse
-    as section-shaped citations but are NOT standalone citations; their rest
-    starts with a letter, so this filters them out for both corpora (real Code
-    and Court Rule section numbers always start the rest with a digit)."""
-    section = citation.section or ""
-    chapter = citation.chapter or ""
-    rest = section[len(chapter) + 1:] if section.startswith(chapter) else section
-    return bool(rest) and rest[0].isdigit()
-_WS_RE = re.compile(r"\s+")
-
-
-def _normalize_for_match(text: str) -> str:
-    """Lowercase, unify quote glyphs, and collapse whitespace so a quoted
-    passage can be compared against rule text without tripping on smart quotes
-    or reflowed line breaks."""
-    text = text.replace("“", '"').replace("”", '"').replace("’", "'")
-    # Unify hyphen/dash glyphs so "attorney‑client" (U+2011 non-breaking
-    # hyphen, en/em dashes) matches the plain "-" used in the rule text.
-    for dash in ("‐", "‑", "‒", "–", "—"):
-        text = text.replace(dash, "-")
-    return _WS_RE.sub(" ", text).strip().lower()
-
-
-# Precedence when one citation is resolved against several sources: a
-# citation that resolves *valid* in ANY loaded source is good law, even if it
-# is not_found in the others. Higher rank wins the collapse.
-_STATUS_RANK = {"valid": 3, "repealed": 1, "not_found": 0, "parse_error": 0}
-
-
-def _verify_answer(content: str, source_slug: str | None) -> dict[str, Any] | None:
-    """Check the drafted answer's citations and quotes against the corpus.
-
-    Works for single-source answers AND mixed answers that legitimately span
-    corpora — a construction-defect question is grounded in both the Iowa Code
-    (§ 614.1 repose) and the Iowa Court Rules (1.402 relation-back, 32:3.3
-    candor). Every citation is resolved against ALL loaded sources and kept if
-    it resolves in any one of them; the quote-grounding corpus is the union of
-    every resolved rule's text. ``source_slug`` only labels the advisory now —
-    it no longer gates whether verification runs, so an unscoped / multi-corpus
-    answer (the highest-risk kind) is still checked.
-
-    Returns a structured report, or ``None`` when there is nothing to check
-    (empty answer or no sources loaded).
-    """
-    if not content.strip():
-        return None
-    sources = list(Source.objects.all())
-    if not sources:
-        return None
-    primary = next((s for s in sources if s.slug == source_slug), None)
-
-    # Strip URLs before scanning. Source links like ``.../chapter_32.pdf``
-    # contain ``number.word`` runs ("32.pdf") that parse as section-shaped
-    # citations and would be flagged as fabricated. The citation text in a
-    # markdown link *label* — ``[Iowa Ct. R. 32:1.10](http://…)`` — survives,
-    # so real citations are still checked; only the URL target is removed.
-    scan_text = _MONEY_RE.sub(" ", _URL_RE.sub(" ", content))
-
-    # Resolve every citation against each source. The reports share identical
-    # item order (same regex over the same text), so item ``i`` is the same
-    # in-text citation in all of them; we collapse to its best status. This
-    # replaces the old single-source scan + cross-reference guard: resolving
-    # across all sources directly is what the guard was approximating.
-    reports = [validate_citations(scan_text, source=s) for s in sources]
-    base_items = reports[0].items
-
-    citation_problems: list[dict[str, str]] = []
-    grounding_parts: list[str] = []
-    confident_total = 0
-    for idx, base in enumerate(base_items):
-        items_here = [rep.items[idx] for rep in reports]
-        # Grounding: heading + full body of every source where this citation
-        # resolves valid (usually exactly one). Building the quote haystack
-        # from ALL corpora is what lets a verbatim quote from a cross-source
-        # rule verify instead of being falsely flagged.
-        for it in items_here:
-            if it.status != "valid":
-                continue
-            if it.node is not None and it.node.heading:
-                grounding_parts.append(it.node.heading)
-            if it.version is not None and it.version.body_text:
-                grounding_parts.append(it.version.body_text)
-
-        # Only act on confident, section-shaped citations. A bare number like
-        # the "90" in "within 90 days" parses as a chapter-only reference and
-        # would otherwise be flagged not_found — legal prose is full of such
-        # numbers. ``_is_real_section`` additionally drops subsection list
-        # markers ("1.d", "2.a") that statutory answers enumerate.
-        cit = base.citation
-        if cit is None or cit.section is None or not _is_real_section(cit):
-            continue
-        confident_total += 1
-        best = max(items_here, key=lambda it: _STATUS_RANK.get(it.status, 0))
-        if best.status in ("not_found", "repealed"):
-            citation_problems.append({"raw": best.raw.strip(), "status": best.status})
-
-    # Quote check. The diagnostic ``verify_quotes`` pairs each quote with the
-    # *nearest* citation, which mispairs badly in multi-rule answers and only
-    # matches body_text (so a quoted rule heading fails). For the gate we use a
-    # higher-precision approach: flag a quote only when it shares almost no
-    # contiguous text with the union grounding corpus built above. We reuse
-    # ``verify_quotes`` purely to extract the quoted spans — its own
-    # source-scoped citation pairing is ignored — so the source we pass only
-    # affects work we discard; any loaded source yields the same spans.
-    grounding = _normalize_for_match(" ".join(grounding_parts))
-
-    quote_problems: list[dict[str, str]] = []
-    verifiable_quotes = 0
-    if grounding:
-        for q in verify_quotes(scan_text, source=primary or sources[0]).items:
-            qn = _normalize_for_match(q.quote)
-            # Skip fragments that aren't substantive verbatim claims:
-            #  • a multi-line capture is a markdown artifact, not one quote;
-            #  • ellipsis / [brackets] are the author signaling non-verbatim;
-            #  • a <4-word span is a term of art or heading ("work-product
-            #    protection"), not a quotation worth fact-checking.
-            if (
-                "\n" in q.quote
-                or "…" in q.quote
-                or "..." in q.quote
-                or "[" in q.quote
-                or len(qn.split()) < 4
-            ):
-                continue
-            verifiable_quotes += 1
-            if qn in grounding:
-                continue  # verbatim (normalized) — verified
-            # Near-verbatim: the quote must be reconstructable from a few
-            # CONTIGUOUS runs of the cited text covering most of its length.
-            # We sum matching blocks of >=4 chars (ignoring scattered
-            # single-word coincidences). A real quote broken only by internal
-            # numbering/punctuation ("...claim that (1)...") still covers ~all
-            # of itself; a fabrication shares only short common-word fragments
-            # and falls short. This is robust to section size — unlike
-            # bag-of-words, which over-verifies against long Iowa Code
-            # sections and lets fabrications through.
-            sm = SequenceMatcher(None, qn, grounding, autojunk=False)
-            covered = sum(b.size for b in sm.get_matching_blocks() if b.size >= 4)
-            if covered / max(len(qn), 1) < 0.6:
-                quote_problems.append({"quote": q.quote, "status": "not_found"})
-
-    return {
-        "ok": not citation_problems and not quote_problems,
-        "source_label": primary.name if primary else "any loaded source",
-        "citations_total": confident_total,
-        "citations_verified": confident_total - len(citation_problems),
-        "quotes_total": verifiable_quotes,
-        "quotes_verified": verifiable_quotes - len(quote_problems),
-        "citation_problems": citation_problems,
-        "quote_problems": quote_problems,
-    }
-
-
-def _verification_advisory(report: dict[str, Any]) -> str:
-    """Render a human-readable advisory block for an answer whose verification
-    turned up problems. Returns "" when everything checked out, so a clean
-    answer is never decorated."""
-    if report["ok"]:
-        return ""
-    label = report.get("source_label") or "the cited corpus"
-    lines: list[str] = []
-    for p in report["citation_problems"]:
-        reason = (
-            "could not be found in" if p["status"] == "not_found"
-            else "appears to be repealed in"
-        )
-        lines.append(f"- Citation **{p['raw']}** {reason} {label}.")
-    for p in report["quote_problems"]:
-        quote = p["quote"]
-        snippet = quote if len(quote) <= 100 else quote[:100].rstrip() + "…"
-        lines.append(
-            f"- The quotation “{snippet}” was not found verbatim in its "
-            f"cited rule."
-        )
-    return (
-        "\n\n---\n\n"
-        "**⚠️ Automated verification.** The following could not be confirmed "
-        "against the source text and should be checked before you rely on "
-        "them:\n\n" + "\n".join(lines)
-    )
-
-
 def _apply_verification(
-    content: str, source_slug: str | None, trace: list["ToolCallTrace"]
+    content: str,
+    source_slug: str | None,
+    trace: list["ToolCallTrace"],
+    context: RetrievedContext | None = None,
+    premise_problems: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Non-streaming finalizer: verify ``content``, record the report on the
-    trace for audit, and append an advisory if anything failed."""
-    report = _verify_answer(content, source_slug)
+    """Non-streaming finalizer: verify ``content`` against the corpus and the
+    turn's retrieved ``context`` (PR4 stale-use), record the report on the trace
+    for audit, then either append an advisory (default) or — when
+    ``RAG_ABSTAIN_BLOCKING`` is on and the answer relied on invalidated authority
+    / no good-law authority was retrieved — replace the answer with a
+    withheld/abstain notice. ``context`` is ``None`` when the turn ran no search
+    (lookup-only / pinned document), which suppresses the no-good-law block.
+    ``premise_problems`` (PR6) are the pre-answer user-premise findings, folded
+    into the report + advisory."""
+    report = verify_answer(content, source_slug=source_slug, context=context,
+                           premise_problems=premise_problems)
     if report is None:
         return content
+    block, replacement = abstain_decision(
+        report, context, searched=context is not None
+    )
+    report["blocked"] = block
     trace.append(
         ToolCallTrace(
             name="verify_answer",
@@ -984,7 +916,9 @@ def _apply_verification(
             result=report,
         )
     )
-    return content + _verification_advisory(report)
+    if block:
+        return replacement
+    return content + render_advisory(report)
 
 
 def _finalize_stream(
@@ -992,14 +926,29 @@ def _finalize_stream(
     actual_model: str,
     source_slug: str | None,
     trace: list["ToolCallTrace"],
+    context: RetrievedContext | None = None,
+    premise_problems: list[dict[str, Any]] | None = None,
 ):
-    """Streaming finalizer: emit the verification step events, append any
-    advisory as a trailing delta, and close out with ``done`` carrying the
-    full (advisory-inclusive) content so the audit trace matches the UI."""
-    report = _verify_answer(content, source_slug)
+    """Streaming finalizer: emit the verification step events, then append the
+    advisory (or block notice) as a trailing delta and close out with ``done``
+    carrying the full content so the audit trace matches the UI.
+
+    Note: the model's answer has already streamed to the user by the time this
+    gate runs, so a hard *block* (``RAG_ABSTAIN_BLOCKING`` on) cannot un-send it
+    here — it is surfaced as a prominent trailing notice, and the terminal
+    ``done`` content carries that notice so the persisted/audited answer reflects
+    it. True pre-emptive suppression on the streaming surface needs answer
+    buffering (future work); the non-streaming path blocks outright."""
+    report = verify_answer(content, source_slug=source_slug, context=context,
+                           premise_problems=premise_problems)
     if report is None:
         yield ("done", content, actual_model)
         return
+
+    block, replacement = abstain_decision(
+        report, context, searched=context is not None
+    )
+    report["blocked"] = block
 
     yield ("verify_start",)
     trace.append(
@@ -1009,7 +958,15 @@ def _finalize_stream(
             result=report,
         )
     )
-    advisory = _verification_advisory(report)
+    if block:
+        notice = "\n\n---\n\n" + replacement
+        # Cannot retract already-streamed text; surface the block as a loud
+        # trailing notice and carry it in the terminal content for the audit.
+        yield ("delta", notice)
+        yield ("verify_done", report)
+        yield ("done", content + notice, actual_model)
+        return
+    advisory = render_advisory(report)
     if advisory:
         # Stream the advisory as visible answer text so the user sees the
         # warning inline, not just in the progress step.
@@ -1083,6 +1040,15 @@ def run_chat_turn(
         convo.append({"role": role, "content": m.get("content", "")})
 
     token_state: dict = {}
+    # PR4: keep every search_statutes context this turn so the final gate can
+    # check the drafted answer against what was actually retrieved (stale-use)
+    # and decide whether to abstain.
+    search_contexts: list[RetrievedContext] = []
+    # PR6: verify the user's case-holding premises before the model drafts, and
+    # inject a caution so it corrects rather than anchors on a wrong premise.
+    premise_caution, premise_problems = _premise_guard(messages, source_slug)
+    if premise_caution:
+        convo.append({"role": "system", "content": premise_caution})
 
     for i in range(MAX_TOOL_LOOPS):
         # Last round: stop offering tools and tell the model to synthesize
@@ -1117,7 +1083,13 @@ def run_chat_turn(
         # verification gate over it before returning, so a fabricated citation
         # or misquote is flagged, not silently surfaced.
         if not tool_calls or final_round:
-            content = _apply_verification(msg.content or "", source_slug, trace)
+            content = _apply_verification(
+                msg.content or "",
+                source_slug,
+                trace,
+                context=_merge_turn_context(search_contexts),
+                premise_problems=premise_problems,
+            )
             return content, completion.model
 
         # Append the assistant turn (with its tool_calls) verbatim, then run
@@ -1159,6 +1131,15 @@ def run_chat_turn(
                 result: dict[str, Any] = {
                     "error": f"unknown tool: {tc.function.name}"
                 }
+            elif tc.function.name == "search_statutes":
+                # Capture the retrieved context (treatment flags + passages) so
+                # the final gate can run stale-use / abstain against it.
+                try:
+                    result, ctx = _search_with_context(args)
+                    if ctx is not None:
+                        search_contexts.append(ctx)
+                except Exception as exc:  # don't kill the loop on a bad arg
+                    result = {"error": f"{type(exc).__name__}: {exc}"}
             else:
                 try:
                     result = handler(args)
@@ -1245,6 +1226,12 @@ def run_chat_turn_stream(
         convo.append({"role": role, "content": m.get("content", "")})
 
     token_state: dict = {}
+    # PR4: keep every search_statutes context this turn (see run_chat_turn).
+    search_contexts: list[RetrievedContext] = []
+    # PR6: pre-answer premise guard (see run_chat_turn).
+    premise_caution, premise_problems = _premise_guard(messages, source_slug)
+    if premise_caution:
+        convo.append({"role": "system", "content": premise_caution})
 
     for i in range(MAX_TOOL_LOOPS):
         final_round = i == MAX_TOOL_LOOPS - 1
@@ -1322,7 +1309,12 @@ def run_chat_turn_stream(
         # before closing out.
         if not tool_calls:
             yield from _finalize_stream(
-                content, actual_model, source_slug, trace
+                content,
+                actual_model,
+                source_slug,
+                trace,
+                context=_merge_turn_context(search_contexts),
+                premise_problems=premise_problems,
             )
             return
 
@@ -1366,6 +1358,15 @@ def run_chat_turn_stream(
                 result: dict[str, Any] = {
                     "error": f"unknown tool: {tc['name']}"
                 }
+            elif tc["name"] == "search_statutes":
+                # Capture the retrieved context for the final stale-use / abstain
+                # gate (mirrors run_chat_turn).
+                try:
+                    result, ctx = _search_with_context(args)
+                    if ctx is not None:
+                        search_contexts.append(ctx)
+                except Exception as exc:  # don't kill the loop on a bad arg
+                    result = {"error": f"{type(exc).__name__}: {exc}"}
             else:
                 try:
                     result = handler(args)

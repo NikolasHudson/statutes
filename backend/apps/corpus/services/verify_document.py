@@ -1,7 +1,8 @@
 """Citation-centric document verification (Verify Document feature).
 
-Where ``apps.api.chat._verify_answer`` is *answer*-centric — it scans a drafted
-answer and returns aggregate counts plus two problem lists — this service is
+Where ``apps.corpus.services.answer.verify_answer`` is *answer*-centric — it
+scans a drafted answer and returns aggregate counts plus problem lists — this
+service is
 *citation*-centric: it walks an uploaded document and returns one
 ``CitationFinding`` per citation, each rolled up to a single traffic-light
 ``status`` (green / yellow / red). That shape is what the "verify document"
@@ -74,7 +75,8 @@ YELLOW = "yellow"
 RED = "red"
 
 # Precedence when one citation resolves against several sources: valid in ANY
-# loaded source wins. Identical to the chat gate's ``_STATUS_RANK``.
+# loaded source wins. Identical to the answer gate's ``_STATUS_RANK``
+# (``apps.corpus.services.answer``).
 _STATUS_RANK = {
     VALIDATION_VALID: 3,
     VALIDATION_REPEALED: 1,
@@ -99,7 +101,7 @@ def _is_real_section(citation) -> bool:
     """True only when the part after the chapter is numeric — a genuine section
     ("714.16", "32:1.10", "708.2A") rather than a subsection list marker
     ("1.d", "2.a") that parses section-shaped but is not a standalone cite.
-    Mirrors ``apps.api.chat._is_real_section``."""
+    Mirrors ``apps.corpus.services.answer._is_real_section``."""
     section = citation.section or ""
     chapter = citation.chapter or ""
     rest = section[len(chapter) + 1:] if section.startswith(chapter) else section

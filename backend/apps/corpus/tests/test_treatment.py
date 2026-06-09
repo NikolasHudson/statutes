@@ -130,6 +130,70 @@ class TreatmentGuardTests(SimpleTestCase):
             "reasoning unrelated to the standing question addressed in 778 N.W.2d 33."
         ))
 
+    # --- PDF line-wrap normalization (the Bankers Trust → Madden recall bug) --
+    def test_pdf_linewrap_does_not_sever_stem_from_cite(self):
+        # body_text from PDF extraction injects \n\n MID-sentence between the
+        # overrule stem and the reporter cite (and a hyphen line-wrap), which the
+        # old newline-naive splitter tore apart → the overruling was SILENTLY
+        # missed. Normalization must reunite them into one scannable sentence.
+        body = (
+            "The majority gives only passing lip service to stare decisis in "
+            "overruling\n\nSmith v. City of Iowa City, 778 N.W.2d 33 (Iowa 2014), "
+            "basing its deci-\n\nsion solely on the dissent's reasoning."
+        )
+        r = classify_citing_text(body, A)
+        self.assertIsNotNone(r)
+        self.assertEqual(r[0], 5)
+        self.assertEqual(r[1], "overruled")
+
+    def test_abbreviation_period_does_not_split_caption(self):
+        # "v." between the stem and the cite must not be a sentence boundary.
+        r = classify_citing_text("in overruling Smith v. Jones, 778 N.W.2d 33.", A)
+        self.assertIsNotNone(r)
+        self.assertEqual(r[0], 5)
+
+    # --- normalization must NOT manufacture false positives (precision) -------
+    def test_entity_suffix_period_before_capital_is_a_boundary(self):
+        # Sentence 1 overrules a DIFFERENT case and ends in "Co."/"Inc."/"Bros.";
+        # it must NOT merge with the next sentence that cites the target favorably,
+        # else the overrule mis-attributes to the target (false "dead case" flag).
+        for s in (
+            "We overrule the rule of Jones Bros. We then apply 778 N.W.2d 33 with approval.",
+            "We overruled Smith v. Acme, Inc. The plaintiff here relies on 778 N.W.2d 33.",
+            "We overrule old Acme Co. Today we reaffirm 778 N.W.2d 33 fully.",
+        ):
+            self.assertIsNone(sev(s), s)
+
+    def test_sentence_final_iowa_is_a_boundary(self):
+        # "...Supreme Court of Iowa." / "...in Iowa." is a real sentence end; it
+        # must not merge with the next sentence (the highest-frequency Iowa trap).
+        self.assertIsNone(sev(
+            "The court overruled Smith, a decision of the Supreme Court of Iowa. "
+            "We reaffirm 778 N.W.2d 33 today."
+        ))
+        self.assertIsNone(sev(
+            "The objection was overruled in Iowa. Later, 778 N.W.2d 33 was followed here."
+        ))
+
+    def test_intervening_cite_blocks_attribution(self):
+        # Another reporter cite between the stem and the target → the stem belongs
+        # to that other case (or this is a collapsed newline cite-stack). Not the
+        # target's treatment.
+        self.assertIsNone(sev(
+            "cases overruling prior law include\nSmith\n9 N.W.3d 1\n\n778 N.W.2d 33\nJones\n5 N.W.2d 9"
+        ))
+
+    def test_soft_hyphen_join_does_not_corrupt_numeric_spans(self):
+        # _WRAP_HYPHEN must only join lowercase soft-wraps; page ranges / date
+        # spans survive (the verbatim excerpt is a precision-critical surface).
+        from apps.corpus.services.treatment import _normalize_body
+        # Numeric spans are NOT glued into one number (the corruption being fixed);
+        # the hyphen survives and only the newline collapses to a space.
+        self.assertEqual(_normalize_body("778 N.W.2d 33-\n34"), "778 N.W.2d 33- 34")
+        self.assertEqual(_normalize_body("the 2014-\n2016 term"), "the 2014- 2016 term")
+        # but a genuine lowercase soft-wrap IS rejoined.
+        self.assertEqual(_normalize_body("the deci-\n\nsion stated"), "the decision stated")
+
 
 class PrefilterSupersetTests(SimpleTestCase):
     """The annotate_treatment prefilter MUST match everything the classifier can

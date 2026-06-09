@@ -41,6 +41,8 @@ from typing import Any
 
 import re
 
+from django.conf import settings
+
 from apps.corpus.models import Node, NodeChunk, NodeVersion
 from apps.corpus.services.corpus_tools import (
     _caselaw_decision,
@@ -360,8 +362,19 @@ def retrieve_context(
     if not query or not query.strip():
         return RetrievedContext(query=query, passages=[], as_of_date=as_of)
 
+    # PR5: optional LLM query rewrite for retrieval + rerank. Flag-gated and a
+    # safe passthrough (returns the original) without a key / on error, so the
+    # default path is byte-identical. ``RetrievedContext.query`` keeps the
+    # ORIGINAL question (what the surfaces display); only retrieval sees the
+    # rewrite, recorded in diagnostics for observability.
+    search_query = query
+    if getattr(settings, "RAG_QUERY_REWRITE", False):
+        from apps.corpus.services.query_rewrite import rewrite_query
+
+        search_query = rewrite_query(query)
+
     hits = hybrid_search(
-        query,
+        search_query,
         limit=candidate_pool,
         use_vector=use_vector,
         source_slug=source_slug,
@@ -376,6 +389,8 @@ def retrieve_context(
         "display_limit": display_limit,
         "reranked": bool(rerank),
     }
+    if search_query != query:
+        diagnostics["query_rewritten"] = search_query
 
     # --- Stage A: rerank, with the exact-citation lane bypassing it ----------
     # An exact reporter-cite hit is a known-item lookup (precision ~1.0); the
@@ -403,7 +418,7 @@ def retrieve_context(
             )
             for h in rerankable
         ]
-        ranked_ids = active.rerank(query, candidates, top_k=len(candidates))
+        ranked_ids = active.rerank(search_query, candidates, top_k=len(candidates))
         by_id = {h.node_version_id: h for h in rerankable}
         ordered = cite_hits + [by_id[i] for i in ranked_ids if i in by_id]
         diagnostics["cite_protected"] = len(cite_hits)

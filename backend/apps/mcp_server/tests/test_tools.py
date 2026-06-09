@@ -86,6 +86,22 @@ class ToolFunctionTests(TestCase):
         self.assertEqual(out["hits"][0]["node"]["path"], "714.16")
         self.assertLessEqual(len(out["hits"]), 5)
 
+    def test_search_statutes_surfaces_abstain_flag(self):
+        # PR4 additive field: a search that returns on-point (unknown-treatment)
+        # authority is NOT an abstain; the reason string is empty.
+        out = tools.search_statutes_tool("consumer fraud", use_vector=False)
+        self.assertTrue(out["hits"])
+        self.assertFalse(out["abstain"])
+        self.assertEqual(out["abstain_reason"], "")
+
+    def test_search_statutes_abstains_when_nothing_retrieved(self):
+        out = tools.search_statutes_tool(
+            "zzzz nonexistent quantum flux capacitor", use_vector=False
+        )
+        if not out["hits"]:
+            self.assertTrue(out["abstain"])
+            self.assertTrue(out["abstain_reason"])
+
     def test_validate_citations_marks_known_section_valid(self):
         text = "See Iowa Code § 714.16 (consumer fraud)."
         out = tools.validate_citations_tool(text)

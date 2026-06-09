@@ -45,6 +45,7 @@ from apps.corpus.services.corpus_tools import (  # noqa: F401
     verify_quote_tool,
 )
 from apps.corpus.services.retrieval import retrieve_context, treatment_payload
+from apps.corpus.services.answer import should_abstain
 
 
 # Candidate pool pulled from hybrid search before the shared pipeline narrows it.
@@ -99,6 +100,10 @@ def search_statutes_tool(
         rerank=rerank,
         enrich_bodies=False,
     )
+    # PR4 (additive): an external agent gets the same abstain signal a chat user
+    # does — true when nothing on point was retrieved or every authority found
+    # has been negatively treated — so it can decline rather than cite bad law.
+    abstain, abstain_reason = should_abstain(ctx)
     return {
         "query": query,
         "hits": [
@@ -115,4 +120,6 @@ def search_statutes_tool(
             for p in ctx.passages
         ],
         "as_of_date": ctx.as_of_date,
+        "abstain": abstain,
+        "abstain_reason": abstain_reason,
     }
