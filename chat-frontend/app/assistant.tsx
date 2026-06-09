@@ -72,11 +72,14 @@ const CHAT_MODELS = [
 	},
 ] as const;
 
-const DEFAULT_SCOPE = "iowa-court-rules";
 // Radix's <Select.Item> rejects value="" (it reserves the empty string for
 // the cleared/placeholder state). Use a sentinel and translate at the API
 // boundary instead.
 const SCOPE_ALL = "all";
+// Default to every corpus (statutes + court rules + caselaw). A null source_slug
+// skips the per-source filter in hybrid_search, so cases are searched alongside
+// statutes; the user can still narrow to one source via the dropdown.
+const DEFAULT_SCOPE = SCOPE_ALL;
 
 // File types the document verifier can ingest. PDFs/DOCX are parsed
 // server-side by the docling microservice; text/markdown are read directly.

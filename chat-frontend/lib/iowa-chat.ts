@@ -32,6 +32,7 @@ const SOURCE_LABELS: Record<string, string> = {
   "iowa-code": "Iowa Code",
   "iowa-court-rules": "Iowa Court Rules",
   "iowa-admin-code": "Iowa Admin. Code",
+  "iowa-caselaw": "Iowa Caselaw",
 };
 
 type ApiNode = {
@@ -41,7 +42,11 @@ type ApiNode = {
   official_url: string;
   source_slug: string;
   path?: string;
+  // Caselaw only: the decision (cluster) node id, for the /cases/<id> reader.
+  case_id?: number;
 };
+
+const isCase = (n: ApiNode) => n.source_slug === "iowa-caselaw";
 
 function isNode(v: unknown): v is ApiNode {
   return (
@@ -85,19 +90,32 @@ export function citationsMarkdown(
   if (byId.size === 0) return "";
 
   const all = [...byId.values()];
+  // What to look for in the answer to decide a source was actually cited: a
+  // code/rule node's canonical path ("714.16", "32:1.10") appears verbatim,
+  // but the model writes a case by its party name — so match on that instead.
   const key = (n: ApiNode) =>
-    (n.path && n.path.trim()) || n.citation.trim().split(/\s+/).pop() || "";
+    isCase(n)
+      ? n.citation.split(",")[0].trim()
+      : (n.path && n.path.trim()) || n.citation.trim().split(/\s+/).pop() || "";
   const cited = all.filter((n) => key(n) && answer.includes(key(n)!));
   const chosen = (cited.length ? cited : all).slice(0, 8);
 
   const lines = chosen.map((n) => {
     const label = SOURCE_LABELS[n.source_slug] ?? n.source_slug;
-    const bareCite =
-      (n.path && n.path.trim()) ||
-      n.citation.trim().split(/\s+/).pop() ||
-      "";
-    const browseUrl = `/browse#/${n.source_slug}/${bareCite}`;
-    return `- [**${n.citation}** — ${n.heading}](${browseUrl}) · ${label} · [official ↗](${n.official_url})`;
+    // Caselaw opens in the /cases/<decision id> reader; code/rules deep-link
+    // into the browse pane by their canonical path.
+    const url = isCase(n)
+      ? n.case_id != null
+        ? `/cases/${n.case_id}`
+        : `/browse#/${n.source_slug}`
+      : `/browse#/${n.source_slug}/${
+          (n.path && n.path.trim()) ||
+          n.citation.trim().split(/\s+/).pop() ||
+          ""
+        }`;
+    const tail = n.heading ? ` — ${n.heading}` : "";
+    const official = n.official_url ? ` · [official ↗](${n.official_url})` : "";
+    return `- [**${n.citation}**${tail}](${url}) · ${label}${official}`;
   });
   return `\n\n---\n\n**Sources**\n\n${lines.join("\n")}`;
 }
