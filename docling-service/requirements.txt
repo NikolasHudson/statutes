@@ -197,9 +197,9 @@ dill==0.4.1 \
     --hash=sha256:1e1ce33e978ae97fcfcff5638477032b801c46c7c65cf717f95fbc2248f79a9d \
     --hash=sha256:423092df4182177d4d8ba8290c8a5b640c66ab35ec7da59ccfa00f6fa3eea5fa
     # via multiprocess
-docling==2.96.1 \
-    --hash=sha256:6265f0ebeacd851c9fcbeb3c1220ce17f4165683d17e33dfdc0ba2ac435e5f1a \
-    --hash=sha256:a4bd3e644f532fae75561f432e5c2a1f59788b6a24344af277493dfed1c78402
+docling==2.99.0 \
+    --hash=sha256:306ea071d935f3852f75c873fe1b8663da580d2c359b8de162da52a6151c4c91 \
+    --hash=sha256:a78d4fd34e4ca495cd50003288b4de4a9b040dbff59f8ca5624aa8fa37d43728
     # via -r requirements.in
 docling-core[chunking]==2.78.0 \
     --hash=sha256:69c0d67e87e4d3aec1509a758691a27e8ba0496f61a85ba705cc48a5b21ffe86 \
@@ -235,9 +235,9 @@ docling-parse==6.2.0 \
     --hash=sha256:f13d6c49e3b5f9caaf0d626e0dcc7948c5b4700d0eae0559ec353ed07c4f2f50 \
     --hash=sha256:f8d269e41c7fc2d12f22418b163920f0c4ab11d63b945d3425e28d6d2aef30c5
     # via docling-slim
-docling-slim[standard]==2.96.1 \
-    --hash=sha256:0d0a76d3a853bf0841710a1564d51694391bf8167b32e795ce501786f0e09cb6 \
-    --hash=sha256:577b383e6397f1ff4111778dc524a82f06d4ab910ebfece5c82e23dd0d86ba2b
+docling-slim[standard]==2.99.0 \
+    --hash=sha256:b05150cda69e4c24c85aa32d2e329f21188dd4304547928eab32d8bb8b645bba \
+    --hash=sha256:f67e31ca3cc39c5b19df3cfcb8fbe7bcc5ef29ffff320bbafca56e3b9ce40f24
     # via docling
 et-xmlfile==2.0.0 \
     --hash=sha256:7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa \
@@ -541,6 +541,10 @@ lxml==6.1.1 \
     #   docling-slim
     #   python-docx
     #   python-pptx
+mail-parser==4.3.0 \
+    --hash=sha256:e4092a15023b7075f4666f5040e2fca71fa35a7020753b7e90359c357ed3a099 \
+    --hash=sha256:fb4c64ec0a74ed095b3bad274ab08f6fca024ad5fbf72ff9ccc501ba654ba3b2
+    # via docling-slim
 markdown-it-py==4.2.0 \
     --hash=sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49 \
     --hash=sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a
@@ -1942,7 +1946,6 @@ typing-extensions==4.15.0 \
     --hash=sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466 \
     --hash=sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548
     # via
-    #   anyio
     #   beautifulsoup4
     #   docling-core
     #   fastapi
@@ -1952,8 +1955,6 @@ typing-extensions==4.15.0 \
     #   pydantic-core
     #   python-docx
     #   python-pptx
-    #   referencing
-    #   starlette
     #   torch
     #   typing-inspection
 typing-inspection==0.4.2 \
@@ -1967,9 +1968,9 @@ urllib3==2.7.0 \
     --hash=sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c \
     --hash=sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897
     # via requests
-uvicorn[standard]==0.48.0 \
-    --hash=sha256:48097851328b87ec36117d3d575234519eb58c2b22d79666e9bbc6c49a761dad \
-    --hash=sha256:a5504207195d08c2511bf9125ede5ac4a4b71725d519e758d01dcf0bc2d31c37
+uvicorn[standard]==0.49.0 \
+    --hash=sha256:ba3d14c3ee7e41c6c654c46c9eb489d33213cdd30aa1696eab1374337c13f68f \
+    --hash=sha256:ebf4271aa580d9de97f93192d4595176df6e91f9aae919ca73e4fc07df1e66a3
     # via -r requirements.in
 uvloop==0.22.1 \
     --hash=sha256:017bd46f9e7b78e81606329d07141d3da446f8798c6baeec124260e22c262772 \
