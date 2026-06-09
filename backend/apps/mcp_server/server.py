@@ -95,11 +95,19 @@ def build_server():
 
     @mcp.tool(
         description=(
-            "Hybrid search across the Iowa Code (FTS + trigram fuzzy + "
-            "vector semantic, RRF-fused, then cross-encoder reranked for "
-            "relevance). Returns ranked hits with snippets, official URLs, "
-            "and an as_of_date stamp. Use this for natural-language queries; "
-            "use lookup_citation when you have a precise citation."
+            "Hybrid SEMANTIC search across all Iowa primary law in the corpus — "
+            "the Iowa Code, the Iowa Court Rules, AND Iowa CASELAW (appellate "
+            "court decisions). Combines full-text + trigram-fuzzy + vector-"
+            "semantic retrieval, RRF-fused and cross-encoder reranked. Cases are "
+            "matched by topic / holding (semantic), party name, or reporter "
+            "citation (e.g. '848 N.W.2d 40'); each case hit also carries a "
+            "good-law / treatment flag (e.g. overruled, superseded) so you do not "
+            "rely on invalidated precedent. Returns ranked hits with snippets, "
+            "official URLs, and an as_of_date stamp. Use this for any natural-"
+            "language question of Iowa statutes, rules, or case law; use "
+            "lookup_citation when you have a precise statute/rule citation. "
+            "(Tool name is 'search_statutes' for backward compatibility, but it "
+            "searches statutes, rules, and cases alike.)"
         )
     )
     async def search_statutes(

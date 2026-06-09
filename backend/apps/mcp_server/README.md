@@ -9,7 +9,7 @@ client like Claude Desktop can call into it directly.
 | Tool | What it does |
 |---|---|
 | `lookup_citation` | Precise citation → current section + version + official URL. Returns candidates if ambiguous, never a guess. |
-| `search_statutes` | Hybrid search (FTS + trigram + vector, RRF-fused) across the Iowa Code. |
+| `search_statutes` | Hybrid **semantic** search (FTS + trigram + vector, RRF-fused, reranked) across the Iowa Code, Court Rules, **and caselaw**. Case hits carry a good-law/treatment flag. (Name kept for back-compat; searches cases too.) |
 | `get_version_history` | All versions for a section, newest first. |
 | `get_section_at_date` | Version that was in effect on a given date. |
 | `get_cross_references` | Outgoing + incoming refs for a section. |
