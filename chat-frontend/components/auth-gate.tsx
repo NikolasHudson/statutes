@@ -34,8 +34,11 @@ export type AuthUser = {
 // Session-scoped flag so the first-login redirect into the wizard fires once
 // per browser session: after it nudges the user to /onboarding, "Skip for now"
 // lands them back in the app for the rest of the session (no redirect loop).
-// A fresh session re-nudges until onboarding is actually completed.
-const ONBOARDING_REDIRECT_KEY = "hlt-onboarding-redirected";
+// A fresh session re-nudges until onboarding is actually completed. Keyed per
+// user id — sessionStorage outlives logout, so a bare key would let user A's
+// nudge suppress user B's after an account switch in the same tab.
+const onboardingRedirectKey = (userId: number) =>
+	`hlt-onboarding-redirected:${userId}`;
 
 // Routes readable without signing in. Pages here must not call useAuth() —
 // they render outside the AuthContext provider, and the onboarding nudge
@@ -90,7 +93,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 	}, []);
 
 	// First-login nudge: route a not-yet-onboarded user into the wizard, once per
-	// session (see ONBOARDING_REDIRECT_KEY) so skipping out isn't a redirect loop.
+	// session (see onboardingRedirectKey) so skipping out isn't a redirect loop.
 	// Public pages are exempt — someone reading /terms before accepting them must
 	// not be yanked into the wizard (the nudge waits for their next navigation,
 	// since landing on a public page doesn't consume the once-per-session key).
@@ -98,8 +101,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
 		if (status !== "signed-in" || !user) return;
 		if (user.onboarding_completed) return;
 		if (pathname === "/onboarding" || PUBLIC_PATHS.includes(pathname)) return;
-		if (sessionStorage.getItem(ONBOARDING_REDIRECT_KEY)) return;
-		sessionStorage.setItem(ONBOARDING_REDIRECT_KEY, "1");
+		const key = onboardingRedirectKey(user.id);
+		if (sessionStorage.getItem(key)) return;
+		sessionStorage.setItem(key, "1");
 		router.replace("/onboarding");
 	}, [status, user, pathname, router]);
 
