@@ -7,7 +7,12 @@
 import type { ChatModelAdapter } from "@assistant-ui/react";
 
 import type { ProgressStep } from "@/components/tool-ui/progress-tracker";
-import { citationsMarkdown, streamChat, toolLabel } from "./iowa-chat";
+import {
+  citationsMarkdown,
+  linkifyCitations,
+  streamChat,
+  toolLabel,
+} from "./iowa-chat";
 
 type RunMessages = Parameters<ChatModelAdapter["run"]>[0]["messages"];
 
@@ -155,9 +160,14 @@ export async function* runChatTurnParts(
             s.status = "completed";
           }
         }
+        // Footer first (it matches case names against the raw answer), then
+        // linkify reporter cites in place so citations are clickable inline.
+        const footer = citationsMarkdown(event.tool_calls ?? [], answer);
         answer =
-          (answer || "(no answer returned)") +
-          citationsMarkdown(event.tool_calls ?? [], answer);
+          linkifyCitations(
+            answer || "(no answer returned)",
+            event.tool_calls ?? [],
+          ) + footer;
         yield yieldState({ kind: "success" });
         return;
       } else if (event.type === "error") {

@@ -58,10 +58,9 @@ function isNode(v: unknown): v is ApiNode {
   );
 }
 
-export function citationsMarkdown(
-  trace: ToolCallTrace[],
-  answer: string,
-): string {
+// Every corpus node surfaced by the turn's tool calls (search hits, section /
+// chapter lookups, candidates), deduped by node id.
+function collectNodes(trace: ToolCallTrace[]): ApiNode[] {
   const byId = new Map<number, ApiNode>();
   const add = (n: ApiNode) => {
     if (!byId.has(n.id)) byId.set(n.id, n);
@@ -86,10 +85,46 @@ export function citationsMarkdown(
       for (const n of r.candidates) if (isNode(n)) add(n);
     }
   }
+  return [...byId.values()];
+}
 
-  if (byId.size === 0) return "";
+// The Iowa reporter-cite core inside a canonical citation string
+// ("Ehlers v. Iowa Warehouse Company, 188 N.W.2d 368 (Iowa 1971)" → "188
+// N.W.2d 368"). The model reliably reproduces this exact form even when it
+// abbreviates the party names, so it is the anchor for inline links.
+const REPORTER_CITE =
+  /\d{1,4}\s+(?:N\.W\.(?:2d|3d)?|Iowa(?:\s+App\.)?)\s+\d{1,4}/;
 
-  const all = [...byId.values()];
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Wrap each reporter cite the answer mentions in a link to the /cases reader,
+// so a citation is clickable where it appears in the prose — not only in the
+// Sources footer. Run on the FINAL answer text only (linkifying mid-stream
+// would flicker as partial cites complete), and before the footer is appended
+// (so the footer's own links are never re-wrapped).
+export function linkifyCitations(
+  answer: string,
+  trace: ToolCallTrace[],
+): string {
+  let out = answer;
+  for (const n of collectNodes(trace)) {
+    if (!isCase(n) || n.case_id == null) continue;
+    const cite = n.citation.match(REPORTER_CITE)?.[0];
+    if (!cite) continue;
+    // Skip occurrences already inside a markdown link ("[188 N.W.2d 368]" or
+    // a /url target) — the char just before is "[", "/" or part of a word.
+    const re = new RegExp(`(?<![\\[\\w/])${escapeRegExp(cite)}(?!\\])`, "g");
+    out = out.replace(re, `[${cite}](/cases/${n.case_id})`);
+  }
+  return out;
+}
+
+export function citationsMarkdown(
+  trace: ToolCallTrace[],
+  answer: string,
+): string {
+  const all = collectNodes(trace);
+  if (all.length === 0) return "";
   // What to look for in the answer to decide a source was actually cited: a
   // code/rule node's canonical path ("714.16", "32:1.10") appears verbatim,
   // but the model writes a case by its party name — so match on that instead.
