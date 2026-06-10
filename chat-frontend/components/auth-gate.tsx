@@ -37,6 +37,12 @@ export type AuthUser = {
 // A fresh session re-nudges until onboarding is actually completed.
 const ONBOARDING_REDIRECT_KEY = "hlt-onboarding-redirected";
 
+// Routes readable without signing in. Pages here must not call useAuth() —
+// they render outside the AuthContext provider, and the onboarding nudge
+// skips them. /terms has to be public so the Terms of Service can be read
+// before account creation / acceptance; /privacy is its redirect alias.
+const PUBLIC_PATHS = ["/terms", "/privacy"];
+
 type AuthContextValue = {
 	user: AuthUser;
 	signOut: () => Promise<void>;
@@ -85,10 +91,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
 	// First-login nudge: route a not-yet-onboarded user into the wizard, once per
 	// session (see ONBOARDING_REDIRECT_KEY) so skipping out isn't a redirect loop.
+	// Public pages are exempt — someone reading /terms before accepting them must
+	// not be yanked into the wizard (the nudge waits for their next navigation,
+	// since landing on a public page doesn't consume the once-per-session key).
 	useEffect(() => {
 		if (status !== "signed-in" || !user) return;
 		if (user.onboarding_completed) return;
-		if (pathname === "/onboarding") return;
+		if (pathname === "/onboarding" || PUBLIC_PATHS.includes(pathname)) return;
 		if (sessionStorage.getItem(ONBOARDING_REDIRECT_KEY)) return;
 		sessionStorage.setItem(ONBOARDING_REDIRECT_KEY, "1");
 		router.replace("/onboarding");
@@ -103,6 +112,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
 		setStatus("signed-out");
 		setUser(null);
 	}, []);
+
+	// Public pages render outside the provider in every auth state, so they
+	// load instantly (no "Checking session…" flash) and never bounce to the
+	// sign-in screen.
+	if (PUBLIC_PATHS.includes(pathname)) {
+		return <>{children}</>;
+	}
 
 	if (status === "checking") {
 		return (
@@ -362,6 +378,21 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (u: AuthUser) => void }) {
 							{busy && <Loader2Icon className="size-4 animate-spin" />}
 							{busy ? "Working…" : cta}
 						</Button>
+
+						{mode === "register" && (
+							<p className="text-center text-muted-foreground text-xs">
+								By creating an account you agree to the{" "}
+								<a
+									href="/terms"
+									target="_blank"
+									className="text-primary underline underline-offset-2"
+									rel="noopener"
+								>
+									Terms of Service
+								</a>
+								.
+							</p>
+						)}
 
 						<button
 							type="button"

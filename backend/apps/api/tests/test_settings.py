@@ -14,6 +14,7 @@ from django.test import Client, TestCase
 
 from apps.accounts.audit import AuditEvent
 from apps.accounts.models import User, UserProfile
+from apps.api.accounts import CURRENT_TOS_VERSION
 
 
 def _post(client: Client, path: str, payload: dict | None = None):
@@ -58,7 +59,7 @@ class SettingsTests(TestCase):
         self.assertTrue(body["verify_citations"])
         self.assertFalse(body["onboarding_completed"])
         self.assertEqual(body["tos_version"], "")
-        self.assertEqual(body["current_tos_version"], "v2.4")
+        self.assertEqual(body["current_tos_version"], CURRENT_TOS_VERSION)
         self.assertEqual(body["email"], "settings@example.com")
 
     def test_settings_requires_auth(self):
@@ -157,11 +158,11 @@ class SettingsTests(TestCase):
 
     def test_complete_onboarding_stamps_state_and_audits(self):
         client = self._client()
-        resp = _post(client, "/api/account/onboarding/complete", {"tos_version": "v2.4"})
+        resp = _post(client, "/api/account/onboarding/complete", {"tos_version": CURRENT_TOS_VERSION})
         self.assertEqual(resp.status_code, 200, resp.content)
         body = resp.json()
         self.assertTrue(body["onboarding_completed"])
-        self.assertEqual(body["tos_version"], "v2.4")
+        self.assertEqual(body["tos_version"], CURRENT_TOS_VERSION)
         self.assertIsNotNone(body["tos_accepted_at"])
 
         # /me now reflects the flag (so the SPA stops routing into the wizard).
@@ -172,7 +173,7 @@ class SettingsTests(TestCase):
             event_type=AuditEvent.Event.TOS_ACCEPTED, actor=self.user
         ).first()
         self.assertIsNotNone(tos)
-        self.assertEqual(tos.detail["tos_version"], "v2.4")
+        self.assertEqual(tos.detail["tos_version"], CURRENT_TOS_VERSION)
         self.assertTrue(
             AuditEvent.objects.filter(
                 event_type=AuditEvent.Event.ONBOARDING_COMPLETED, actor=self.user
@@ -182,7 +183,7 @@ class SettingsTests(TestCase):
     def test_complete_onboarding_without_version_uses_server_value(self):
         resp = _post(self._client(), "/api/account/onboarding/complete")
         self.assertEqual(resp.status_code, 200, resp.content)
-        self.assertEqual(resp.json()["tos_version"], "v2.4")
+        self.assertEqual(resp.json()["tos_version"], CURRENT_TOS_VERSION)
 
     def test_complete_onboarding_rejects_stale_tos_version(self):
         resp = _post(

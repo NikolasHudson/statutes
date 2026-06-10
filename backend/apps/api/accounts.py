@@ -50,7 +50,9 @@ account_router = Router()
 # The currently published Terms of Service version. The server is the source of
 # truth: onboarding stamps THIS value, regardless of what a (possibly stale)
 # client sends. Bump it when the ToS text changes to force re-acceptance.
-CURRENT_TOS_VERSION = "v2.4"
+# Must match the version shown on the full-text page at
+# chat-frontend/app/terms/page.tsx — change them together.
+CURRENT_TOS_VERSION = "2026-06-10"
 
 
 # ---------------------------------------------------------------------------

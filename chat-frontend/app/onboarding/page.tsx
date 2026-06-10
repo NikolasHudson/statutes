@@ -1126,32 +1126,50 @@ function TermsStep(props: {
 				</p>
 				<p className="mt-2">
 					<span className="font-medium text-foreground">Your data.</span> We
-					store your account details, preferences, and research history to
-					operate the service. We do not sell personal data. See the Privacy
-					Policy for retention and deletion.
+					store your account details and preferences to operate the service;
+					chat logs are kept only briefly before automatic deletion. We do not
+					sell personal data and do not use your queries to train AI models. See
+					the Privacy &amp; Your Data section of the Terms for retention and
+					deletion.
 				</p>
 				<p className="mt-2">
 					Full text:{" "}
-					<span className="text-primary underline underline-offset-2">
+					<Link
+						href="/terms"
+						target="_blank"
+						className="text-primary underline underline-offset-2"
+					>
 						Terms of Service
-					</span>{" "}
+					</Link>{" "}
 					·{" "}
-					<span className="text-primary underline underline-offset-2">
-						Privacy Policy
-					</span>
+					<Link
+						href="/terms#privacy"
+						target="_blank"
+						className="text-primary underline underline-offset-2"
+					>
+						Privacy & Your Data
+					</Link>
 				</p>
 			</div>
 
 			<div className="space-y-2.5">
 				<CheckRow checked={props.agreeTos} onChange={props.setAgreeTos}>
 					I have read and agree to the{" "}
-					<span className="font-medium text-primary underline underline-offset-2">
+					<Link
+						href="/terms"
+						target="_blank"
+						className="font-medium text-primary underline underline-offset-2"
+					>
 						Terms of Service
-					</span>{" "}
-					and{" "}
-					<span className="font-medium text-primary underline underline-offset-2">
-						Privacy Policy
-					</span>
+					</Link>
+					, including its{" "}
+					<Link
+						href="/terms#privacy"
+						target="_blank"
+						className="font-medium text-primary underline underline-offset-2"
+					>
+						privacy and data practices
+					</Link>
 					.
 				</CheckRow>
 				<CheckRow
