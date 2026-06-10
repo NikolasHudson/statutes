@@ -51,6 +51,7 @@ def _passage(
     cluster_id=1,
     treatment=None,
     source_slug="iowa-caselaw",
+    is_repealed=False,
 ) -> RetrievedPassage:
     return RetrievedPassage(
         node_version_id=cluster_id,
@@ -66,7 +67,7 @@ def _passage(
         excerpt="",
         snippet="",
         effective_from=None,
-        is_repealed=False,
+        is_repealed=is_repealed,
         score=1.0,
         component_scores={},
         treatment=treatment or TreatmentFlag(),
@@ -258,6 +259,36 @@ class ShouldAbstainTests(SimpleTestCase):
     def test_unknown_treatment_is_presumed_good(self):
         # Statutes / unflagged cases default to "unknown" — never abstain on that.
         self.assertFalse(should_abstain(_ctx([_passage(treatment=TreatmentFlag())]))[0])
+
+    # PR8g: a repealed section is dead law even though treatment (caselaw-only)
+    # leaves its flag "unknown" — it must not count as the good-law passage.
+
+    def test_all_repealed_abstains(self):
+        ctx = _ctx([
+            _passage(cluster_id=1, source_slug="iowa-code", citation="Iowa Code § 123.4",
+                     heading="123.4 Old section", is_repealed=True),
+            _passage(cluster_id=2, source_slug="iowa-code", citation="Iowa Code § 123.5",
+                     heading="123.5 Old section", is_repealed=True),
+        ])
+        ab, reason = should_abstain(ctx)
+        self.assertTrue(ab)
+        self.assertIn("repealed", reason)
+
+    def test_repealed_plus_negative_abstains(self):
+        ctx = _ctx([
+            _passage(cluster_id=1, treatment=_neg()),
+            _passage(cluster_id=2, source_slug="iowa-code", citation="Iowa Code § 123.4",
+                     heading="123.4 Old section", is_repealed=True),
+        ])
+        self.assertTrue(should_abstain(ctx)[0])
+
+    def test_repealed_plus_live_passage_does_not_abstain(self):
+        ctx = _ctx([
+            _passage(cluster_id=1, source_slug="iowa-code", citation="Iowa Code § 123.4",
+                     heading="123.4 Old section", is_repealed=True),
+            _passage(cluster_id=2, treatment=TreatmentFlag()),  # live, unknown
+        ])
+        self.assertFalse(should_abstain(ctx)[0])
 
 
 class AbstainDecisionTests(SimpleTestCase):
@@ -533,6 +564,62 @@ class VerifyAnswerIntegrationTests(TestCase):
         self.assertEqual(len(report["misgrounded"]), 1)
         self.assertIn("Holder", report["misgrounded"][0]["citation"])
 
+    def test_caselaw_quote_grounds_against_retrieved_passage(self):
+        # A quote drawn from a retrieved OPINION must verify against the
+        # passage text — before this, the grounding corpus was statutes/rules
+        # only, so every accurate caselaw quote was flagged "not found".
+        p = _passage()
+        p.excerpt = (
+            "We adopt the rule permitting total or partial enforcement of "
+            "noncompetitive agreements to the extent reasonable under the "
+            "circumstances of this case."
+        )
+        report = verify_answer(
+            "Holder permits “total or partial enforcement of noncompetitive "
+            "agreements to the extent reasonable” in Iowa.",
+            source_slug="iowa-caselaw",
+            context=_ctx([p]),
+        )
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["quote_problems"], [])
+        self.assertEqual(report["quotes_total"], 1)
+        self.assertEqual(report["quotes_verified"], 1)
+
+    def test_quote_echoing_the_question_is_skipped(self):
+        # "anywhere in North America" came from the USER's hypothetical, not a
+        # source — it must not be checked against (and flagged missing from)
+        # source text.
+        p = _passage()
+        p.excerpt = "The covenant analysis turns on reasonableness."
+        report = verify_answer(
+            "A covenant barring work “anywhere in North America” is likely "
+            "overbroad under State v. Holder.",
+            source_slug="iowa-caselaw",
+            context=_ctx([p]),
+            question=(
+                "My non-compete says I can't work anywhere in North America. "
+                "Will an Iowa court enforce it?"
+            ),
+        )
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["quotes_total"], 0)
+        self.assertEqual(report["quote_problems"], [])
+
+    def test_unsourced_quote_is_still_flagged(self):
+        # Negative control: a quote found in neither the rules nor the
+        # retrieved passages (nor the question) still fails verification.
+        p = _passage()
+        p.excerpt = "The covenant analysis turns on reasonableness."
+        report = verify_answer(
+            "The court held that “employers must always win these disputes "
+            "regardless of geography” under Iowa law.",
+            source_slug="iowa-caselaw",
+            context=_ctx([p]),
+            question="Is my non-compete enforceable?",
+        )
+        self.assertFalse(report["ok"])
+        self.assertEqual(len(report["quote_problems"]), 1)
+
     def test_supported_caselaw_claim_stays_ok(self):
         p = _passage(treatment=TreatmentFlag())
         p.excerpt = "The court held the search was lawful and affirmed."
@@ -644,3 +731,10 @@ class SplitSentencesTests(SimpleTestCase):
         out = _split_sentences(
             "See State v. Holder, 1 N.W.2d 1 (Iowa App. 1990) for this rule.")
         self.assertEqual(len(out), 1)
+
+    def test_word_ending_in_abbreviation_token_still_ends_a_sentence(self):
+        # PR8g bounded-lookback boundary check: "tobacco." must split (the full
+        # word, not its "co" tail, decides) — guards the windowed _TRAIL_WORD
+        # search against tail-of-a-long-word misclassification.
+        out = _split_sentences("The statute regulates tobacco. The rule differs.")
+        self.assertEqual(len(out), 2)

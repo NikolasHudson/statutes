@@ -86,6 +86,61 @@ class TreatmentGuardTests(SimpleTestCase):
             sev("Lyman, overruled on the other grounds by 778 N.W.2d 33.")
         )
 
+    def test_history_chain_comma_target_is_the_overruler(self):
+        # West history shorthand: the comma stands for "by" — Brecher was
+        # overruled BY the target. (The live Ehlers v. Iowa Warehouse false
+        # positive: flagged as overruled by Ma & Pa, Inc. v. Kelly.)
+        self.assertIsNone(sev(
+            "and Brecher v. Brown, 235 Iowa 627, 17 N.W.2d 377 (1945), "
+            "overruled, Ehlers v. Iowa Warehouse Co., 778 N.W.2d 33, supp. "
+            "opinion, 190 N.W.2d 413 (Iowa 1971)."
+        ))
+
+    def test_history_chain_comma_target_overruled_still_flags(self):
+        # Same shorthand with the TARGET as the victim ("[target], overruled,
+        # X") — the stem follows the cite, so the guard must not fire.
+        self.assertEqual(
+            sev("778 N.W.2d 33, overruled, Smith v. Jones, 9 N.W.3d 1 (2001)."), 5
+        )
+
+    def test_prose_overrule_after_a_cite_still_flags(self):
+        # Genuine prose: a cite precedes the verb but there is no comma after
+        # it — "Smith ... overruled [target]" really did overrule the target.
+        self.assertEqual(
+            sev("Smith v. Jones, 9 N.W.3d 1, overruled 778 N.W.2d 33."), 5
+        )
+
+    def test_narrative_agent_in_target_this_court_overruled(self):
+        # "In [target] ... this court overruled <others>" narrates what the
+        # TARGET case did (the live Ehlers/Casey's General Stores false
+        # positive) — target is the overruler, not the overruled.
+        self.assertIsNone(sev(
+            "In Ehlers v. Iowa Warehouse Co., 778 N.W.2d 33, 369 (Iowa 1971), "
+            "this court overruled a line of prior cases which demanded an "
+            "“all or nothing” approach in enforcing noncompetition agreements."
+        ))
+
+    def test_narrative_agent_we_disapproved(self):
+        # Sibling pattern (the live Keppy v. Ehlers false positive).
+        self.assertIsNone(sev(
+            "In Keppy v. Ehlers (1962), 778 N.W.2d 33, we disapproved of an "
+            "ordinance which rezoned one corner of an intersection."
+        ))
+
+    def test_present_tense_self_overrule_still_flags(self):
+        # The citing court overruling the target in the same breath is present
+        # tense — the narrative guard is past-tense only.
+        self.assertEqual(
+            sev("Having reconsidered 778 N.W.2d 33, we overrule it today."), 5
+        )
+
+    def test_relative_pronoun_object_still_flags(self):
+        # "[cite], which we overruled" — the target IS the object; "which"
+        # breaks the narrative-subject match.
+        self.assertEqual(
+            sev("See 778 N.W.2d 33, which this court overruled in Burnett."), 5
+        )
+
     def test_target_overruling_other_gerund_after_cite(self):
         # "[target] (overruling X)" → target is the agent.
         self.assertIsNone(sev("See 778 N.W.2d 33, 813 (overruling State v. Smith)."))

@@ -509,6 +509,130 @@ opinion-head excerpts that miss the holding, and no abstain path.
     (d) `answer.py`'s `_is_sentence_boundary` has the same latent `text[:dot_idx]`
     O(n²) pattern, harmless today (small inputs) but worth the same bounded-window fix.
 
+- [ ] **PR8 — Treatment v3: tiered enforcement + AI-bulk citator refinement.** 📋 PLANNED
+  (2026-06-10). The design answer to PR7's known limitation: ~1/3 FP on v1 `negative`
+  flags is tolerable for *advisory* but PR7's correct-then-answer is **confident
+  enforcement**, and the PR5 `--llm` pass is unsafe in the other direction (confident-
+  drop rejected *Madden* itself; 47% drop rate on the deepest-40 dry-run). Governing
+  principle: the error costs are **asymmetric** — a missed overrule (dead case shown as
+  good law) is catastrophic, a false flag is an embarrassing mis-correction — so no
+  single classifier drives confident behavior; each error type gets a layer designed to
+  absorb it. **Decision (2026-06-10): a frontier LLM does the bulk of the work**
+  (labeling, confirmation, recall sweep); the human only adjudicates disagreements
+  (~1–2 hrs total). Budget approved for a larger/better model than gpt-4o.
+  - **8a — Tier the flags; gate enforcement by tier (code-only, ship first).**
+    Tier A (`source=llm`-confirmed or `human`) → the confident correct-then-answer
+    branch. Tier B (deterministic-only) → soft advisory only ("a later opinion used
+    overruling language near this case's cite — verify its current status before
+    relying"). Caps the FP blast radius *immediately*, before any bulk run; a Tier-B
+    FP is a mild hedge, a Tier-B true positive still warns.
+  - **8b — First-class `Treatment` table (reverses §8 Q5; the cache was right for a
+    v1 spike, wrong for a citator).** Row ≈ `(cited_node, citing_node,
+    treating_node, label, severity, confidence, source ∈ {deterministic, llm, human},
+    evidence_sentence + char offsets, classifier_version, created_at)`. Buys:
+    per-edge provenance/audit (SOC2 posture), human overrides that survive
+    re-annotation, incremental updates (scan only newly ingested citing opinions, not
+    7-min full rebuilds), versioned/diffable classifier rollouts, and the natural home
+    for the **attribution fix** — `treating_node` ≠ `citing_node` (*Madden*'s flag
+    should name *Bankers Trust*, even though the evidence sentence lives in *Clemen*).
+    Per-case status becomes a derivation (support-count-aware, not max-of-one-
+    sentence), not stored truth. Key on cluster so the duplicate-*Madden*-node
+    residual (PR7 (c)) is fixed in passing.
+  - **8c — AI-built gold-label set (the gate everything later passes through).**
+    ~300 (citing-paragraph, target) pairs stratified by label, depth, and the 5 known
+    FP patterns. **3 independent frontier-model votes** (different prompt framings);
+    unanimous → auto-label; disagreements + a 10% audit sample → human queue (est.
+    30–60 pairs ≈ one hour of adjudication — this is the bulk-AI move applied to
+    labeling itself). Wire per-label precision/recall into the eval harness with
+    regression thresholds, like the MMR gate. Benchmark to beat: CL's citator
+    (>90% recall, F1 >80% on overruling).
+  - **8d — Confirm-only bulk refinement over all stored v1 flags.** PR5's
+    `annotate_treatment --llm` machinery with the policy inverted: **NEVER drop.**
+    Confident negative → promote to Tier A (`source=llm`, confidence, + extract the
+    treating case's name/cite from the paragraph — the attribution fix falls out
+    free); confident rejection → *demote* to Tier B + write to a human review queue;
+    uncertain → stay Tier B. Frontier model, not gpt-4o (gpt-4o is what rejected
+    *Madden*); structured output, fixed label vocab, severity derived in code (the
+    PR5 pattern). **Prompt-semantics fix (root-cause hypothesis for the *Madden*
+    rejection, 2026-06-10 external review):** the v1 evidence for *Madden* is a
+    *parenthetical in Clemen* — "(overruling Madden …)" — which **reports** *Bankers
+    Trust*'s act; a careful model asked "does this citing opinion negatively treat
+    the target?" can *correctly* answer no. The v2 question must be "does this
+    passage **establish OR report** that the target has been negatively treated by
+    any authority?", with the treating case extracted as a separate field. Verify
+    against the PR7 dry-run transcripts before blaming model capability; this may
+    also defuse the "confirm-only pass confirms v1 noise" risk. Scale: the 893 flagged decisions' candidate sentences — small
+    money even at frontier prices; use the OpenAI **Batch API** (50% off, nothing
+    here is latency-sensitive).
+  - **8e — AI recall sweep over the citation graph (the "AI handles the bulk"
+    step).** The phrase-scan floor structurally misses name-only and implicit
+    treatment (PR7 residual (a)). Sweep the incoming-citation substrate (475,375
+    in-corpus edges, optionally depth-gated): pull the citing context per edge
+    (cite-anchored + caption-anchored windows), then a **two-stage cascade** —
+    a cheap screener model answers "any indication of negative treatment of the
+    target? y/n" over every edge; the frontier model classifies only the survivors
+    (label + treating case + evidence span). Sizing at ~800 tok/screen call:
+    475K edges ≈ ~380M tokens ≈ low-hundreds of $ at mini-tier, halved by Batch;
+    survivors (est. 1–5%) at frontier ≈ tens of $. Total well under $500.
+    Output only ever **adds** Tier-A/B rows (additive, same never-drop contract);
+    resumable/idempotent by edge id; `classifier_version` stamped. Gold-set-gated
+    (8c) before the results feed enforcement.
+  - **8f — Deterministic guard tightening** for the 5 named FP patterns
+    (ruling-noun-before-stem, "should/could be" contentions, "without …ing"
+    declining, possessive trial rulings, "overruled in [target]" agent confusion) —
+    each guard's recall cost measured against the gold set before landing.
+  - **8g — External-review adoptions (2026-06-10; reviewed a second agent's findings
+    against the code, adopted 4, dismissed 1):**
+    - **Wire `Node.is_repealed` into the currency axis** ✅ DONE (2026-06-10,
+      uncommitted; pulled forward from the "statute supersession is a separate
+      workstream" deferral). On inspection the answer-side advisory was **already
+      covered**: `verify_answer` resolves every cited § via `validate_citations`,
+      which returns status `repealed` → citation_problems → the "appears to be
+      repealed" advisory line. The genuinely missing read was `should_abstain`,
+      which presumed a repealed § good (treatment is caselaw-only, so its flag is
+      `unknown`): now a passage counts as dead law when `treatment.status ==
+      "negative"` **or `p.is_repealed`** (the field was already carried on
+      `RetrievedPassage`, one attribute away — the PR7 pattern again). MCP's
+      additive `abstain` field benefits automatically. +3 tests (all-repealed
+      abstains; repealed+negative abstains; repealed+live does not). The
+      *premise-side* half still needs statute-cite extraction (`extract_premises`
+      is caselaw-only — captions/reporter cites), which remains deferred with the
+      rest of supersession (amendment history etc.).
+    - **Rerank candidate text from the winning `NodeChunk` window, not
+      `body[:8000]`:** a query-relevant holding deep in a long opinion is invisible
+      to the reranker's hard prefix even though chunk-level vector search is what
+      surfaced the hit; `chunk_id` is already on every hit, so candidate text =
+      heading + chunk span (± neighbor window). Small change, **eval-gated** (rc
+      A/B before default-on).
+    - **Blocking implies buffering:** when `RAG_ABSTAIN_BLOCKING=True`, finalize
+      non-streamed (or UI-mask until verify passes) — the verify gate is
+      deterministic and fast, and the trailing-notice degradation has a real
+      copy-paste race (user copies the streamed rule of law before the notice
+      lands). Default advisory mode keeps streaming. Land with whatever ships
+      blocking.
+    - **`answer.py` `_is_sentence_boundary` bounded-lookback fix** ✅ DONE
+      (2026-06-10, uncommitted; PR7 residual (d)) — the latent O(n²)
+      `text[:dot_idx]` slice replaced with the proven `treatment._is_boundary`
+      24-char window. Behavior-preserving (+1 regression test locking the
+      bounded-window tail semantics: "tobacco." still ends a sentence).
+    - **Dismissed with reasoning:** the reviewer's "1.9% ambiguous
+      `ReporterCitation` triples could silently swallow a fatal overruling" —
+      wrong data flow: treatment anchors on the *target's own*
+      `source_metadata.citations` against citing text, and the graph joins on CL
+      opinion ids; neither routes through `ReporterCitation`. The *adjacent* real
+      risk (volume+reporter **prefix-anchor collisions**, e.g. "476 N.W.2d"
+      matching *Weidman* for *Metropolitan Jacobson*) is already known and is what
+      v2 confirmation exists to catch.
+  - **Sequencing:** 8a (safety, unblocks shipping) → 8b (substrate) → 8c (gate) →
+    8d → 8e → 8f iterate; 8g items slot in independently (`is_repealed` wiring +
+    the `answer.py` boundary fix ✅ done 2026-06-10, suite **544 / 1 known-red** —
+    the pre-existing `lookup_citation` 714.16 fuzzy-suggest — zero regressions;
+    chunk-window rerank is eval-gated whenever; blocking-implies-buffering lands
+    with blocking).
+    Explicitly out of scope, separate workstreams: full statute supersession
+    (amendment/repeal machinery beyond the `is_repealed` read); true streaming
+    suppression beyond the blocking-implies-buffering policy.
+
 ## Open questions (from design §8) — answer before the PR that needs them
 
 1. (PR2) ✅ RESOLVED — caselaw-only chunk excerpts; statutes keep the prefix.
@@ -567,3 +691,55 @@ opinion-head excerpts that miss the holding, and no abstain path.
   candidate); (b) the PR4 carry-forward — extend `eval_caselaw` with abstain-rate /
   stale-block-rate (and now a v1-vs-v2 treatment-precision A/B) on an adversarial query
   set. The phased design plan (PR1–PR5) is complete.
+- 2026-06-10: **PR8 planned** — treatment v3 (tiered enforcement + `Treatment` table +
+  AI-bulk refinement/recall-sweep with a frontier model, confirm-only / never-drop,
+  gold-set-gated). Decision: AI does the bulk (labeling votes, confirmation, graph
+  sweep via Batch API cascade); human adjudicates disagreement queues only. Nothing
+  built yet.
+- 2026-06-10: **System overview handoff doc written**
+  (`legal_rag_pipeline_system_overview.md`, code-grounded) + an external agent's
+  review of it triaged → **PR8g adoptions**: `is_repealed` → currency axis
+  (retrieval-side, near-free), chunk-window rerank candidate text (eval-gated),
+  blocking-implies-buffering, the `answer.py` boundary perf fix pre-commit, and the
+  PR8d **establish-OR-report prompt-semantics fix** (likely root cause of gpt-4o's
+  *Madden* rejection — *Clemen* reports the overruling, it doesn't perform it).
+  Dismissed the reviewer's `ReporterCitation`-ambiguity hole (wrong data flow).
+  **The two immediate 8g items were then implemented** (uncommitted):
+  `should_abstain` counts `is_repealed` passages as dead law (answer-side advisory
+  was already covered via `validate_citations`' `repealed` status), and the
+  `answer.py` boundary check got the bounded 24-char lookback. +5 tests; full
+  suite 544 / 1 known-red, zero regressions.
+- 2026-06-10: **Live-prod advisory false positives fixed (the non-compete answer).**
+  A production chat answer on Iowa non-compete reformation surfaced three gate bugs
+  at once, all fixed + tested (uncommitted):
+  1. **Treatment FP — West history-chain shorthand** ("Brecher v. Brown, 17 N.W.2d
+     377 (1945), overruled, Ehlers v. Iowa Warehouse Co., 188 N.W.2d 368"): the
+     comma stands for "by", so the case AFTER the stem is the OVERRULER; the v1
+     classifier flagged *Ehlers* (the foundational partial-enforcement case) as
+     overruled by *Ma & Pa, Inc. v. Kelly*. New guard 0c in
+     `treatment.classify_in_sentences`: stem-before-target + comma right after the
+     stem + reporter cite ≤45 chars before it → target is the agent, skip.
+  2. **Treatment FP — narrative-agent pattern** ("In Ehlers …, 188 N.W.2d 368, 369
+     (Iowa 1971), this court overruled a line of prior cases" — *Casey's General
+     Stores* describing what *Ehlers did*): new guard 0d — PAST-tense stem after
+     the cite where the only material between is pincite/paren + court subject
+     ("this court"/"the court"/"we") → target is the agent. Present-tense
+     self-overrulings ("having reconsidered [cite], we overrule it") and relative-
+     pronoun objects ("[cite], which we overruled") still flag. After both guards:
+     full Ehlers citing-set (21 opinions) → 0 flags; Madden→Clemen real overruling
+     preserved. Full re-annotation run on dev; **must re-run `annotate_treatment`
+     on prod after deploy**.
+  3. **Quote-check FPs** — (a) quotes drawn from retrieved OPINIONS were graded
+     against the statutes/rules grounding corpus only → every accurate caselaw
+     quote flagged "not found": `verify_answer` now appends the retrieved
+     passages' text (`p.excerpt or p.snippet`) to the grounding corpus. (b) Quotes
+     the answer ECHOES FROM THE QUESTION ("anywhere in North America", the user's
+     hypothetical) were graded against source text: `verify_answer` takes
+     `question=` (threaded from both chat finalizers via `_last_user_message`) and
+     skips quotes found in the question. Advisory wording "in its cited rule" →
+     "in the cited source text" (caselaw isn't a rule).
+  Also: **inline case hyperlinks** in the chat frontend — `linkifyCitations()`
+  (`lib/iowa-chat.ts`) wraps every reporter cite the answer mentions ("188 N.W.2d
+  368") in a `/cases/<id>` link at done-time (before the Sources footer, which
+  keeps its own links). +7 backend tests (44 treatment / 60 answer); corpus 335 +
+  api 184 green; frontend tsc clean.

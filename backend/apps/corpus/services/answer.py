@@ -139,8 +139,13 @@ _ABBREV = frozenset(
 def _is_sentence_boundary(norm: str, dot_idx: int) -> bool:
     """A candidate punctuation+space at ``dot_idx`` is a real sentence end unless
     the word it terminates is a known abbreviation (so "App."/"Co."/"v." inside a
-    citation or caption do not chop a sentence)."""
-    m = _TRAIL_WORD.search(norm[:dot_idx])
+    citation or caption do not chop a sentence).
+
+    Looks back only a bounded window (the trailing token is at most a few chars):
+    slicing the FULL prefix (``norm[:dot_idx]``) and searching it per boundary is
+    O(n) each → O(n²) over long text — the same pathological pattern fixed in
+    ``treatment._is_boundary``."""
+    m = _TRAIL_WORD.search(norm[max(0, dot_idx - 24):dot_idx])
     return m is None or m.group(1) not in _ABBREV
 
 
@@ -324,6 +329,7 @@ def verify_answer(
     context: RetrievedContext | None = None,
     claim_checker: "semantic_support.SemanticChecker | None" = None,
     premise_problems: list[dict[str, Any]] | None = None,
+    question: str | None = None,
 ) -> dict[str, Any] | None:
     """Check the drafted answer's citations and quotes against the corpus, and
     (PR4) flag any negative-treatment case it relied on silently.
@@ -341,7 +347,15 @@ def verify_answer(
     ``treatment`` flag). When supplied, the report's ``stale_used`` lists the
     negative-treatment cases the answer references; when ``None`` (the legacy
     call shape) the stale check is a no-op and the report is byte-identical to
-    the pre-PR4 gate.
+    the pre-PR4 gate. The retrieved passage text also joins the quote-grounding
+    corpus: a caselaw answer quotes the *opinions* it retrieved, and checking
+    those quotes only against statutory rule text flagged every accurate
+    opinion quote as "not found".
+
+    ``question`` is the user's question for the turn. A quoted span the answer
+    *echoes from the question* ("anywhere in North America" in a hypothetical)
+    is the user's language, not a source quotation, and is skipped instead of
+    being flagged as unverifiable.
 
     Returns a structured report, or ``None`` when there is nothing to check
     (empty answer or no sources loaded).
@@ -390,7 +404,15 @@ def verify_answer(
     # Quote check. We reuse ``verify_quotes`` purely to extract the quoted spans;
     # its own source-scoped citation pairing is ignored. A quote verifies when it
     # is reconstructable from a few CONTIGUOUS runs of the union grounding text.
+    # The grounding corpus is the union of every resolved rule's text AND the
+    # retrieved passages — caselaw answers quote the opinions they retrieved,
+    # which never resolve through ``validate_citations`` (that is section-shaped
+    # statutes/rules only).
+    if context is not None:
+        for p in context.passages:
+            grounding_parts.append(p.excerpt or p.snippet or "")
     grounding = _normalize_for_match(" ".join(grounding_parts))
+    question_norm = _normalize_for_match(question or "")
 
     quote_problems: list[dict[str, str]] = []
     verifiable_quotes = 0
@@ -404,6 +426,10 @@ def verify_answer(
                 or "[" in q.quote
                 or len(qn.split()) < 4
             ):
+                continue
+            if question_norm and qn in question_norm:
+                # The answer is quoting the USER (restating a hypothetical /
+                # the question's own words) — not attributing text to a source.
                 continue
             verifiable_quotes += 1
             if qn in grounding:
@@ -472,8 +498,8 @@ def render_advisory(report: dict[str, Any]) -> str:
         quote = p["quote"]
         snippet = quote if len(quote) <= 100 else quote[:100].rstrip() + "…"
         lines.append(
-            f"- The quotation “{snippet}” was not found verbatim in its "
-            f"cited rule."
+            f"- The quotation “{snippet}” was not found verbatim in the "
+            f"cited source text."
         )
     for s in report.get("stale_used", []):
         if s["acknowledged"]:
@@ -554,18 +580,23 @@ def should_abstain(context: RetrievedContext | None) -> tuple[bool, str]:
 
     Deterministic and deliberately conservative (this is advisory by default):
     fires only when (a) nothing was retrieved, or (b) every retrieved passage is
-    flagged ``negative`` (all candidate authority is overruled/superseded).
-    ``unknown`` treatment — the default for unflagged cases and for *all*
-    statutes, since the v1 classifier is caselaw-only — is treated as
-    presumptively good: phrase-scan recall is partial, so the absence of a flag
-    is NOT evidence of staleness. Returns ``(abstain, reason)``."""
+    dead law — flagged ``negative`` (overruled/superseded caselaw) or a
+    **repealed** section (PR8g: ``is_repealed`` rides on every passage; treatment
+    is caselaw-only, so without this read a repealed § would be presumed good).
+    ``unknown`` treatment on a non-repealed passage — the default for unflagged
+    cases and live statutes — is treated as presumptively good: phrase-scan
+    recall is partial, so the absence of a flag is NOT evidence of staleness.
+    Returns ``(abstain, reason)``."""
     if context is None or not context.passages:
         return True, "no on-point Iowa authority was retrieved"
-    if all(p.treatment.status == "negative" for p in context.passages):
+    if all(
+        p.treatment.status == "negative" or p.is_repealed
+        for p in context.passages
+    ):
         return (
             True,
             "every Iowa authority retrieved on this question has been negatively "
-            "treated (overruled / superseded)",
+            "treated (overruled / superseded) or repealed",
         )
     return False, ""
 

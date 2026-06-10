@@ -885,12 +885,23 @@ def _enforce_chat_quota(user) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _last_user_message(messages: list[dict[str, Any]]) -> str:
+    """The latest user turn — passed to ``verify_answer`` so quoted spans the
+    answer echoes from the QUESTION (a hypothetical's "anywhere in North
+    America") are not checked against source text."""
+    return next(
+        (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
+        "",
+    )
+
+
 def _apply_verification(
     content: str,
     source_slug: str | None,
     trace: list["ToolCallTrace"],
     context: RetrievedContext | None = None,
     premise_problems: list[dict[str, Any]] | None = None,
+    question: str = "",
 ) -> str:
     """Non-streaming finalizer: verify ``content`` against the corpus and the
     turn's retrieved ``context`` (PR4 stale-use), record the report on the trace
@@ -902,7 +913,7 @@ def _apply_verification(
     ``premise_problems`` (PR6) are the pre-answer user-premise findings, folded
     into the report + advisory."""
     report = verify_answer(content, source_slug=source_slug, context=context,
-                           premise_problems=premise_problems)
+                           premise_problems=premise_problems, question=question)
     if report is None:
         return content
     block, replacement = abstain_decision(
@@ -928,6 +939,7 @@ def _finalize_stream(
     trace: list["ToolCallTrace"],
     context: RetrievedContext | None = None,
     premise_problems: list[dict[str, Any]] | None = None,
+    question: str = "",
 ):
     """Streaming finalizer: emit the verification step events, then append the
     advisory (or block notice) as a trailing delta and close out with ``done``
@@ -940,7 +952,7 @@ def _finalize_stream(
     it. True pre-emptive suppression on the streaming surface needs answer
     buffering (future work); the non-streaming path blocks outright."""
     report = verify_answer(content, source_slug=source_slug, context=context,
-                           premise_problems=premise_problems)
+                           premise_problems=premise_problems, question=question)
     if report is None:
         yield ("done", content, actual_model)
         return
@@ -1089,6 +1101,7 @@ def run_chat_turn(
                 trace,
                 context=_merge_turn_context(search_contexts),
                 premise_problems=premise_problems,
+                question=_last_user_message(messages),
             )
             return content, completion.model
 
@@ -1315,6 +1328,7 @@ def run_chat_turn_stream(
                 trace,
                 context=_merge_turn_context(search_contexts),
                 premise_problems=premise_problems,
+                question=_last_user_message(messages),
             )
             return
 

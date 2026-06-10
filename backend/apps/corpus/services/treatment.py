@@ -98,6 +98,31 @@ _OTHER_GROUNDS = re.compile(r"on\s+(?:the\s+)?other\s+grounds|in\s+part", re.I)
 # When a negative stem precedes the target cite with a "by" linking them, the
 # target is the agent and must NOT be flagged.
 _AGENT_BY = re.compile(r"\bby\b", re.I)
+# West history-chain shorthand: "Brecher v. Brown, 17 N.W.2d 377 (1945),
+# overruled, Ehlers v. Iowa Warehouse Co., 188 N.W.2d 368". The comma after the
+# stem stands for "by" — the PRECEDING cite is the overruled case and the case
+# that FOLLOWS is the overruler. A stem is in this form when it is immediately
+# followed by a comma; combined with a reporter cite shortly BEFORE the stem
+# (the victim's cite), the target after the stem is the agent and must NOT be
+# flagged. Genuine prose ("Smith, 1 N.W.2d 2, overruled [target]") has no comma
+# after the verb, so it still flags.
+_COMMA_AFTER = re.compile(r"\s*,")
+# Narrative-agent pattern: "In [target], 188 N.W.2d 368, 369 (Iowa 1971), this
+# court overruled a line of prior cases" — the citing opinion is describing what
+# the TARGET case did (the target is the overruler). Matches when the ONLY
+# material between the target cite and the stem is pincite pages / a court-year
+# paren / a court subject ("this court", "the court", "we"). A relative pronoun
+# ("[cite], which we overruled") breaks the match, so a genuine object-position
+# target still flags; the guard further requires a PAST-tense stem ("-ed") —
+# a citing court overruling the target in the same breath writes the present
+# ("having reconsidered [cite], we overrule it"), while past tense after the
+# cite narrates what the target case itself did.
+_NARRATIVE_SUBJECT = re.compile(
+    r"^[\s\d,–—-]*(?:\([^)]{0,40}\))?[\s,]*"
+    r"(?:this\s+court|the\s+(?:\w+\s+)?court|we)\s+"
+    r"(?:expressly\s+|specifically\s+|effectively\s+)?$",
+    re.I,
+)
 # superseded/overruled BY STATUTE is a distinct (still-negative) label.
 _BY_STATUTE = re.compile(r"by\s+statute|legislativ\w*|amend\w*\s+the\s+statute", re.I)
 # "overruled the objection / overruling a motion / overruled his motion to
@@ -291,10 +316,32 @@ def classify_in_sentences(
                     # with a linking "by" → skip.
                     if m.end() <= apos and _AGENT_BY.search(sent[m.end():apos]):
                         continue
+                    # Guard 0a: West history-chain comma form — "X, 17 N.W.2d
+                    # 377 (1945), overruled, [target]": the comma stands for
+                    # "by", so the target FOLLOWING the stem is the OVERRULER
+                    # of the cite preceding it. Both marks required (comma
+                    # right after the stem AND a reporter cite shortly before
+                    # it) so prose overrulings still flag.
+                    if (
+                        m.end() <= apos
+                        and _COMMA_AFTER.match(sent, m.end())
+                        and _CITE_IN_SPAN.search(sent[max(0, m.start() - 45):m.start()])
+                    ):
+                        continue
                     # Guard 0b: "[target] (overruling X)" — a gerund AFTER the cite
                     # is a parenthetical describing what the target DID (agent).
                     # ("overruling [target]" keeps the stem BEFORE the cite.)
                     if m.start() > apos and m.group().lower().endswith("ing"):
+                        continue
+                    # Guard 0d: "In [target], this court overruled <others>" —
+                    # a PAST-tense stem after the cite with only pincite/paren
+                    # + a court subject between them: the citing opinion
+                    # narrates what the TARGET case did (target is the agent).
+                    if (
+                        m.start() > apos
+                        and m.group().lower().endswith("ed")
+                        and _NARRATIVE_SUBJECT.match(sent[apos + alen:m.start()])
+                    ):
                         continue
                     # Guard 1: ruling noun right after → "overruled the objection".
                     if _RULING_NOUN.match(sent[m.end():m.end() + 40].lstrip()):
