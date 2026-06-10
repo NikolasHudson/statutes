@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AppSidebarBrand } from "@/components/app-sidebar-brand";
 import { AppSidebarFooter } from "@/components/app-sidebar-footer";
 import { AppSidebarNav } from "@/components/app-sidebar-nav";
 import { SOURCE_ICON } from "@/components/browse/advanced-search";
@@ -25,7 +26,6 @@ import {
 	SidebarFooter,
 	SidebarGroup,
 	SidebarGroupLabel,
-	SidebarHeader,
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
@@ -70,25 +70,7 @@ export function BrowseSidebar({
 
 	return (
 		<Sidebar collapsible="icon" className="print:hidden" {...hoverProps}>
-			<SidebarHeader className="mb-2 border-b">
-				<SidebarMenu>
-					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" asChild>
-							<Link href="/">
-								<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-									<BookOpenIcon className="size-4" />
-								</div>
-								<div className="me-6 flex flex-col gap-0.5 leading-none">
-									<span className="font-semibold">Hudson Legal Tech</span>
-									<span className="text-sidebar-foreground/60 text-xs">
-										Browse the corpus
-									</span>
-								</div>
-							</Link>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				</SidebarMenu>
-			</SidebarHeader>
+			<AppSidebarBrand />
 
 			{/* px-2 insets the labelled menu when expanded; drop it when collapsed
 			    so the 2rem buttons sit centered in the 3rem icon rail (the group's

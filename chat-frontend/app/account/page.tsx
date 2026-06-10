@@ -32,8 +32,8 @@ import {
 	TrashIcon,
 	UserIcon,
 } from "lucide-react";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AppSidebarBrand } from "@/components/app-sidebar-brand";
 import { AppSidebarFooter } from "@/components/app-sidebar-footer";
 import { AppSidebarNav } from "@/components/app-sidebar-nav";
 import { type AuthUser, useAuth } from "@/components/auth-gate";
@@ -62,7 +62,6 @@ import {
 	SidebarFooter,
 	SidebarGroup,
 	SidebarGroupLabel,
-	SidebarHeader,
 	SidebarInset,
 	SidebarMenu,
 	SidebarMenuButton,
@@ -146,25 +145,7 @@ export default function AccountPage() {
 function AccountSidebar() {
 	return (
 		<Sidebar>
-			<SidebarHeader className="mb-2 border-b">
-				<SidebarMenu>
-					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" asChild>
-							<Link href="/">
-								<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-									<UserIcon className="size-4" />
-								</div>
-								<div className="me-6 flex flex-col gap-0.5 leading-none">
-									<span className="font-semibold">Hudson Legal Tech</span>
-									<span className="text-sidebar-foreground/60 text-xs">
-										Account settings
-									</span>
-								</div>
-							</Link>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				</SidebarMenu>
-			</SidebarHeader>
+			<AppSidebarBrand />
 
 			<SidebarContent className="px-2">
 				<AppSidebarNav />
