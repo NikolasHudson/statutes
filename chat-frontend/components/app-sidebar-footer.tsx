@@ -98,7 +98,7 @@ function SidebarUserMenu() {
           aria-label="Sign out"
           title="Sign out"
           onClick={signOut}
-          className="top-1/2 -translate-y-1/2"
+          className="top-1/2 -translate-y-1/2 peer-data-[size=lg]/menu-button:top-1/2"
         >
           <LogOutIcon />
         </SidebarMenuAction>
