@@ -145,6 +145,17 @@ ingress:
     component:
       name: statutes
       preserve_path_prefix: true
+  # Django admin's static (CSS/JS) is served by WhiteNoise at /static/. When
+  # the Next.js chat-frontend took over the / catch-all, /static/* started
+  # falling through to it and 404ing — which strips all styling from the
+  # admin. Route it back to Django. The frontend doesn't use /static (Next.js
+  # assets live under /_next/), so this shadows nothing.
+  - match:
+      path:
+        prefix: /static
+    component:
+      name: statutes
+      preserve_path_prefix: true
   - match:
       path:
         prefix: /
