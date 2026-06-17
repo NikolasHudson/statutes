@@ -1619,9 +1619,9 @@ python-json-logger==4.1.0 \
     --hash=sha256:132994765cf75bf44554be9aa49b06ef2345d23661a96720262716438141b6b2 \
     --hash=sha256:b396b9e3ed782b09ff9d6e4f1683d46c83ad0d35d2e407c09a9ebbf038f88195
     # via -r requirements.in
-python-multipart==0.0.30 \
-    --hash=sha256:0edfe0475c1f46ddd3ff7785a626f6118af32bdcf359bb21260367313bb32118 \
-    --hash=sha256:830964def8c90607ac5daa00514e3987815865713ade8d20febc9177ac0c3c5b
+python-multipart==0.0.31 \
+    --hash=sha256:8408153d68a9773291fc1da39a8b85a50044bddbabd2dd72e9229776b7b15e28 \
+    --hash=sha256:fc631183bb13e56db3158a4909908dfb2e23565286744e798241e63750e5d680
     # via mcp
 pyyaml==6.0.3 \
     --hash=sha256:00c4bdeba853cc34e7dd471f16b4114f4162dc03e6b7afcc2128711f0eca823c \
