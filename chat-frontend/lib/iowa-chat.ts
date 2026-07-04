@@ -9,83 +9,103 @@ import { csrfHeaders } from "./csrf";
 // Empty base = same-origin (Next.js rewrites forward /api/* to Django).
 export const DJANGO_BASE = "";
 
+// Must stay in sync with ALLOWED_CHAT_MODELS in apps/api/chat.py. Shared by
+// the legacy assistant (app/assistant.tsx) and the Carbon v2 assistant.
+export const CHAT_MODELS = [
+	{
+		id: "gpt-5-mini",
+		name: "GPT-5 Mini",
+		description: "Best accuracy on Iowa Court Rules. Reasoning model.",
+	},
+	{
+		id: "gpt-4o",
+		name: "GPT-4o",
+		description: "Fast, classic chat model.",
+	},
+	{
+		id: "gpt-4o-mini",
+		name: "GPT-4o Mini",
+		description: "Cheapest. Acceptable for simple lookups.",
+	},
+] as const;
+
 export type ToolCallTrace = {
-  name: string;
-  arguments: Record<string, unknown>;
-  result: Record<string, unknown>;
+	name: string;
+	arguments: Record<string, unknown>;
+	result: Record<string, unknown>;
 };
 
 export type ChatResponse = {
-  content: string;
-  tool_calls: ToolCallTrace[];
-  model: string;
+	content: string;
+	tool_calls: ToolCallTrace[];
+	model: string;
 };
 
 export type BrowseSource = {
-  slug: string;
-  name: string;
-  abbreviation: string;
-  jurisdiction: string;
+	slug: string;
+	name: string;
+	abbreviation: string;
+	jurisdiction: string;
 };
 
 const SOURCE_LABELS: Record<string, string> = {
-  "iowa-code": "Iowa Code",
-  "iowa-court-rules": "Iowa Court Rules",
-  "iowa-admin-code": "Iowa Admin. Code",
-  "iowa-caselaw": "Iowa Caselaw",
+	"iowa-code": "Iowa Code",
+	"iowa-court-rules": "Iowa Court Rules",
+	"iowa-admin-code": "Iowa Admin. Code",
+	"iowa-caselaw": "Iowa Caselaw",
 };
 
 type ApiNode = {
-  id: number;
-  heading: string;
-  citation: string;
-  official_url: string;
-  source_slug: string;
-  path?: string;
-  // Caselaw only: the decision (cluster) node id, for the /cases/<id> reader.
-  case_id?: number;
+	id: number;
+	heading: string;
+	citation: string;
+	official_url: string;
+	source_slug: string;
+	path?: string;
+	// Caselaw only: the decision (cluster) node id, for the /cases/<id> reader.
+	case_id?: number;
 };
 
 const isCase = (n: ApiNode) => n.source_slug === "iowa-caselaw";
 
 function isNode(v: unknown): v is ApiNode {
-  return (
-    !!v &&
-    typeof v === "object" &&
-    "id" in v &&
-    "citation" in v &&
-    "heading" in v
-  );
+	return (
+		!!v &&
+		typeof v === "object" &&
+		"id" in v &&
+		"citation" in v &&
+		"heading" in v
+	);
 }
 
 // Every corpus node surfaced by the turn's tool calls (search hits, section /
 // chapter lookups, candidates), deduped by node id.
 function collectNodes(trace: ToolCallTrace[]): ApiNode[] {
-  const byId = new Map<number, ApiNode>();
-  const add = (n: ApiNode) => {
-    if (!byId.has(n.id)) byId.set(n.id, n);
-  };
+	const byId = new Map<number, ApiNode>();
+	const add = (n: ApiNode) => {
+		if (!byId.has(n.id)) byId.set(n.id, n);
+	};
 
-  for (const call of trace) {
-    const r = call.result as Record<string, unknown> | null;
-    if (!r) continue;
-    if (Array.isArray(r.hits)) {
-      for (const h of r.hits as Record<string, unknown>[]) {
-        if (isNode(h.node)) add(h.node);
-      }
-    }
-    const section = r.section as Record<string, unknown> | null;
-    if (section && isNode(section.node)) add(section.node);
-    const chapter = r.chapter as Record<string, unknown> | null;
-    if (chapter && isNode(chapter.node)) add(chapter.node);
-    if (chapter && Array.isArray(chapter.sections)) {
-      for (const n of chapter.sections) if (isNode(n)) add(n);
-    }
-    if (Array.isArray(r.candidates)) {
-      for (const n of r.candidates) if (isNode(n)) add(n);
-    }
-  }
-  return [...byId.values()];
+	for (const call of trace) {
+		const r = call.result as Record<string, unknown> | null;
+		if (!r) continue;
+		if (Array.isArray(r.hits)) {
+			for (const h of r.hits as Record<string, unknown>[]) {
+				if (isNode(h.node)) add(h.node);
+			}
+		}
+		const section = r.section as Record<string, unknown> | null;
+		if (section && isNode(section.node)) add(section.node);
+		const chapter = r.chapter as Record<string, unknown> | null;
+		if (chapter && isNode(chapter.node)) add(chapter.node);
+		if (chapter && Array.isArray(chapter.sections)) {
+			for (const n of chapter.sections) if (isNode(n)) add(n);
+		}
+		if (Array.isArray(r.candidates)) {
+			for (const n of r.candidates) if (isNode(n)) add(n);
+		}
+	}
+	return [...byId.values()];
 }
 
 // The Iowa reporter-cite core inside a canonical citation string
@@ -93,7 +113,7 @@ function collectNodes(trace: ToolCallTrace[]): ApiNode[] {
 // N.W.2d 368"). The model reliably reproduces this exact form even when it
 // abbreviates the party names, so it is the anchor for inline links.
 const REPORTER_CITE =
-  /\d{1,4}\s+(?:N\.W\.(?:2d|3d)?|Iowa(?:\s+App\.)?)\s+\d{1,4}/;
+	/\d{1,4}\s+(?:N\.W\.(?:2d|3d)?|Iowa(?:\s+App\.)?)\s+\d{1,4}/;
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -103,64 +123,63 @@ const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // would flicker as partial cites complete), and before the footer is appended
 // (so the footer's own links are never re-wrapped).
 export function linkifyCitations(
-  answer: string,
-  trace: ToolCallTrace[],
+	answer: string,
+	trace: ToolCallTrace[],
 ): string {
-  let out = answer;
-  for (const n of collectNodes(trace)) {
-    if (!isCase(n) || n.case_id == null) continue;
-    const cite = n.citation.match(REPORTER_CITE)?.[0];
-    if (!cite) continue;
-    // Skip occurrences already inside a markdown link ("[188 N.W.2d 368]" or
-    // a /url target) — the char just before is "[", "/" or part of a word.
-    const re = new RegExp(`(?<![\\[\\w/])${escapeRegExp(cite)}(?!\\])`, "g");
-    out = out.replace(re, `[${cite}](/cases/${n.case_id})`);
-  }
-  return out;
+	let out = answer;
+	for (const n of collectNodes(trace)) {
+		if (!isCase(n) || n.case_id == null) continue;
+		const cite = n.citation.match(REPORTER_CITE)?.[0];
+		if (!cite) continue;
+		// Skip occurrences already inside a markdown link ("[188 N.W.2d 368]" or
+		// a /url target) — the char just before is "[", "/" or part of a word.
+		const re = new RegExp(`(?<![\\[\\w/])${escapeRegExp(cite)}(?!\\])`, "g");
+		out = out.replace(re, `[${cite}](/cases/${n.case_id})`);
+	}
+	return out;
 }
 
 export function citationsMarkdown(
-  trace: ToolCallTrace[],
-  answer: string,
+	trace: ToolCallTrace[],
+	answer: string,
 ): string {
-  const all = collectNodes(trace);
-  if (all.length === 0) return "";
-  // What to look for in the answer to decide a source was actually cited: a
-  // code/rule node's canonical path ("714.16", "32:1.10") appears verbatim,
-  // but the model writes a case by its party name — so match on that instead.
-  const key = (n: ApiNode) =>
-    isCase(n)
-      ? n.citation.split(",")[0].trim()
-      : (n.path && n.path.trim()) || n.citation.trim().split(/\s+/).pop() || "";
-  const cited = all.filter((n) => key(n) && answer.includes(key(n)!));
-  const chosen = (cited.length ? cited : all).slice(0, 8);
+	const all = collectNodes(trace);
+	if (all.length === 0) return "";
+	// What to look for in the answer to decide a source was actually cited: a
+	// code/rule node's canonical path ("714.16", "32:1.10") appears verbatim,
+	// but the model writes a case by its party name — so match on that instead.
+	const key = (n: ApiNode) =>
+		isCase(n)
+			? n.citation.split(",")[0].trim()
+			: (n.path && n.path.trim()) || n.citation.trim().split(/\s+/).pop() || "";
+	const cited = all.filter((n) => key(n) && answer.includes(key(n)!));
+	const chosen = (cited.length ? cited : all).slice(0, 8);
 
-  const lines = chosen.map((n) => {
-    const label = SOURCE_LABELS[n.source_slug] ?? n.source_slug;
-    // Caselaw opens in the /cases/<decision id> reader; code/rules deep-link
-    // into the browse pane by their canonical path.
-    const url = isCase(n)
-      ? n.case_id != null
-        ? `/cases/${n.case_id}`
-        : `/browse#/${n.source_slug}`
-      : `/browse#/${n.source_slug}/${
-          (n.path && n.path.trim()) ||
-          n.citation.trim().split(/\s+/).pop() ||
-          ""
-        }`;
-    const tail = n.heading ? ` — ${n.heading}` : "";
-    const official = n.official_url ? ` · [official ↗](${n.official_url})` : "";
-    return `- [**${n.citation}**${tail}](${url}) · ${label}${official}`;
-  });
-  return `\n\n---\n\n**Sources**\n\n${lines.join("\n")}`;
+	const lines = chosen.map((n) => {
+		const label = SOURCE_LABELS[n.source_slug] ?? n.source_slug;
+		// Caselaw opens in the /cases/<decision id> reader; code/rules deep-link
+		// into the browse pane by their canonical path.
+		const url = isCase(n)
+			? n.case_id != null
+				? `/cases/${n.case_id}`
+				: `/browse#/${n.source_slug}`
+			: `/browse#/${n.source_slug}/${
+					(n.path && n.path.trim()) ||
+					n.citation.trim().split(/\s+/).pop() ||
+					""
+				}`;
+		const tail = n.heading ? ` — ${n.heading}` : "";
+		const official = n.official_url ? ` · [official ↗](${n.official_url})` : "";
+		return `- [**${n.citation}**${tail}](${url}) · ${label}${official}`;
+	});
+	return `\n\n---\n\n**Sources**\n\n${lines.join("\n")}`;
 }
 
 // Helpers to format args from the backend's tool schemas. Arg names mirror
 // the Python tool handlers in apps/api/chat.py — keep them in sync.
-const str = (v: unknown): string =>
-  typeof v === "string" ? v.trim() : "";
+const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 const num = (v: unknown): number | null =>
-  typeof v === "number" && Number.isFinite(v) ? v : null;
+	typeof v === "number" && Number.isFinite(v) ? v : null;
 
 // Friendly two-line progress label for an in-flight tool call. The first
 // element is the short label (verb + object); the second is the detail
@@ -168,79 +187,79 @@ const num = (v: unknown): number | null =>
 export type ToolStepText = { label: string; description?: string };
 
 export function toolLabel(
-  name: string,
-  args: Record<string, unknown>,
+	name: string,
+	args: Record<string, unknown>,
 ): ToolStepText {
-  if (name === "search_statutes") {
-    const q = str(args.query);
-    return {
-      label: q ? `Searching the corpus` : "Searching the corpus",
-      description: q ? `“${q}”` : undefined,
-    };
-  }
-  if (name === "lookup_citation") {
-    const c = str(args.citation);
-    return {
-      label: c ? "Reading section" : "Reading a section",
-      description: c || undefined,
-    };
-  }
-  if (name === "get_section_at_date") {
-    const id = num(args.section_id);
-    const date = str(args.on_date);
-    const parts = [
-      id ? `§${id}` : null,
-      date ? `as of ${date}` : null,
-    ].filter(Boolean) as string[];
-    return {
-      label: "Resolving section by date",
-      description: parts.length ? parts.join(" ") : undefined,
-    };
-  }
-  if (name === "get_version_history") {
-    const id = num(args.section_id);
-    return {
-      label: "Pulling amendment history",
-      description: id ? `§${id}` : undefined,
-    };
-  }
-  if (name === "get_cross_references") {
-    const id = num(args.section_id);
-    return {
-      label: "Following cross-references",
-      description: id ? `from §${id}` : undefined,
-    };
-  }
-  if (name === "get_definitions") {
-    const term = str(args.term);
-    const chapter = str(args.chapter);
-    return {
-      label: term ? "Looking up definition" : "Pulling definitions",
-      description: [term && `“${term}”`, chapter && `in ch. ${chapter}`]
-        .filter(Boolean)
-        .join(" ") || undefined,
-    };
-  }
-  if (name === "list_recent_amendments") {
-    const since = str(args.since);
-    return {
-      label: "Listing recent amendments",
-      description: since ? `since ${since}` : undefined,
-    };
-  }
-  return { label: `Running ${name}`, description: undefined };
+	if (name === "search_statutes") {
+		const q = str(args.query);
+		return {
+			label: q ? `Searching the corpus` : "Searching the corpus",
+			description: q ? `“${q}”` : undefined,
+		};
+	}
+	if (name === "lookup_citation") {
+		const c = str(args.citation);
+		return {
+			label: c ? "Reading section" : "Reading a section",
+			description: c || undefined,
+		};
+	}
+	if (name === "get_section_at_date") {
+		const id = num(args.section_id);
+		const date = str(args.on_date);
+		const parts = [id ? `§${id}` : null, date ? `as of ${date}` : null].filter(
+			Boolean,
+		) as string[];
+		return {
+			label: "Resolving section by date",
+			description: parts.length ? parts.join(" ") : undefined,
+		};
+	}
+	if (name === "get_version_history") {
+		const id = num(args.section_id);
+		return {
+			label: "Pulling amendment history",
+			description: id ? `§${id}` : undefined,
+		};
+	}
+	if (name === "get_cross_references") {
+		const id = num(args.section_id);
+		return {
+			label: "Following cross-references",
+			description: id ? `from §${id}` : undefined,
+		};
+	}
+	if (name === "get_definitions") {
+		const term = str(args.term);
+		const chapter = str(args.chapter);
+		return {
+			label: term ? "Looking up definition" : "Pulling definitions",
+			description:
+				[term && `“${term}”`, chapter && `in ch. ${chapter}`]
+					.filter(Boolean)
+					.join(" ") || undefined,
+		};
+	}
+	if (name === "list_recent_amendments") {
+		const since = str(args.since);
+		return {
+			label: "Listing recent amendments",
+			description: since ? `since ${since}` : undefined,
+		};
+	}
+	return { label: `Running ${name}`, description: undefined };
 }
 
 export async function fetchSources(): Promise<BrowseSource[]> {
-  try {
-    const r = await fetch(`${DJANGO_BASE}/api/browse/sources`, {
-      credentials: "include",
-    });
-    if (!r.ok) return [];
-    return (await r.json()) as BrowseSource[];
-  } catch {
-    return [];
-  }
+	try {
+		const r = await fetch(`${DJANGO_BASE}/api/browse/sources`, {
+			credentials: "include",
+		});
+		if (!r.ok) return [];
+		return (await r.json()) as BrowseSource[];
+	} catch {
+		return [];
+	}
 }
 
 // Result of the backend's deterministic verification gate (apps/api/chat.py
@@ -248,102 +267,101 @@ export async function fetchSources(): Promise<BrowseSource[]> {
 // citations" step, and — when problems are found — appended to the answer as
 // an advisory by the backend itself.
 export type VerificationReport = {
-  ok: boolean;
-  source_label: string;
-  citations_total: number;
-  citations_verified: number;
-  quotes_total: number;
-  quotes_verified: number;
-  citation_problems: { raw: string; status: string }[];
-  quote_problems: { quote: string; status: string }[];
+	ok: boolean;
+	source_label: string;
+	citations_total: number;
+	citations_verified: number;
+	quotes_total: number;
+	quotes_verified: number;
+	citation_problems: { raw: string; status: string }[];
+	quote_problems: { quote: string; status: string }[];
 };
 
 export type StreamEvent =
-  | { type: "tool_start"; name: string; arguments: Record<string, unknown> }
-  | { type: "delta"; text: string }
-  | { type: "verify_start" }
-  | { type: "verify_done"; report: VerificationReport }
-  | { type: "done"; tool_calls: ToolCallTrace[]; model: string }
-  | { type: "error"; message: string };
+	| { type: "tool_start"; name: string; arguments: Record<string, unknown> }
+	| { type: "delta"; text: string }
+	| { type: "verify_start" }
+	| { type: "verify_done"; report: VerificationReport }
+	| { type: "done"; tool_calls: ToolCallTrace[]; model: string }
+	| { type: "error"; message: string };
 
 // Generator that POSTs to /api/chat/stream and yields parsed NDJSON events.
 // Handles partial lines across chunk boundaries (the network can split a
 // JSON line anywhere, so we buffer until we see a newline).
 export async function* streamChat(
-  body: {
-    model: string;
-    messages: { role: "user" | "assistant" | "system"; content: string }[];
-    source_slug: string | null;
-    // Pin the turn to one document (statute section / rule / case decision
-    // node). The backend injects that document's text as context. Omitted for
-    // ordinary corpus-wide chat.
-    node_id?: number | null;
-  },
-  signal: AbortSignal,
+	body: {
+		model: string;
+		messages: { role: "user" | "assistant" | "system"; content: string }[];
+		source_slug: string | null;
+		// Pin the turn to one document (statute section / rule / case decision
+		// node). The backend injects that document's text as context. Omitted for
+		// ordinary corpus-wide chat.
+		node_id?: number | null;
+	},
+	signal: AbortSignal,
 ): AsyncGenerator<StreamEvent, void, void> {
-  const r = await fetch(`${DJANGO_BASE}/api/chat/stream`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await csrfHeaders()) },
-    credentials: "include",
-    signal,
-    body: JSON.stringify(body),
-  });
+	const r = await fetch(`${DJANGO_BASE}/api/chat/stream`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json", ...(await csrfHeaders()) },
+		credentials: "include",
+		signal,
+		body: JSON.stringify(body),
+	});
 
-  if (r.status === 401) {
-    yield {
-      type: "error",
-      message:
-        "Not signed in. Refresh the page to log back in.",
-    };
-    return;
-  }
-  if (!r.ok) {
-    let detail = `HTTP ${r.status}`;
-    try {
-      const j = (await r.json()) as { detail?: string };
-      if (j?.detail) detail = j.detail;
-    } catch {
-      /* not JSON */
-    }
-    yield { type: "error", message: detail };
-    return;
-  }
-  if (!r.body) {
-    yield { type: "error", message: "No response body from stream endpoint" };
-    return;
-  }
+	if (r.status === 401) {
+		yield {
+			type: "error",
+			message: "Not signed in. Refresh the page to log back in.",
+		};
+		return;
+	}
+	if (!r.ok) {
+		let detail = `HTTP ${r.status}`;
+		try {
+			const j = (await r.json()) as { detail?: string };
+			if (j?.detail) detail = j.detail;
+		} catch {
+			/* not JSON */
+		}
+		yield { type: "error", message: detail };
+		return;
+	}
+	if (!r.body) {
+		yield { type: "error", message: "No response body from stream endpoint" };
+		return;
+	}
 
-  const reader = r.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+	const reader = r.body.getReader();
+	const decoder = new TextDecoder();
+	let buffer = "";
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      let nl = buffer.indexOf("\n");
-      while (nl !== -1) {
-        const line = buffer.slice(0, nl).trim();
-        buffer = buffer.slice(nl + 1);
-        if (line) {
-          try {
-            yield JSON.parse(line) as StreamEvent;
-          } catch {
-            // ignore malformed lines defensively
-          }
-        }
-        nl = buffer.indexOf("\n");
-      }
-    }
-    if (buffer.trim()) {
-      try {
-        yield JSON.parse(buffer.trim()) as StreamEvent;
-      } catch {
-        /* trailing garbage */
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+			let nl = buffer.indexOf("\n");
+			while (nl !== -1) {
+				const line = buffer.slice(0, nl).trim();
+				buffer = buffer.slice(nl + 1);
+				if (line) {
+					try {
+						yield JSON.parse(line) as StreamEvent;
+					} catch {
+						// ignore malformed lines defensively
+					}
+				}
+				nl = buffer.indexOf("\n");
+			}
+		}
+		if (buffer.trim()) {
+			try {
+				yield JSON.parse(buffer.trim()) as StreamEvent;
+			} catch {
+				/* trailing garbage */
+			}
+		}
+	} finally {
+		reader.releaseLock();
+	}
 }

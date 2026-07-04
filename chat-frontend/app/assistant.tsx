@@ -26,7 +26,7 @@ import {
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { runChatTurnParts } from "@/lib/chat-run";
-import { type BrowseSource, fetchSources } from "@/lib/iowa-chat";
+import { type BrowseSource, CHAT_MODELS, fetchSources } from "@/lib/iowa-chat";
 import {
 	type CitationFinding,
 	streamVerify,
@@ -53,24 +53,7 @@ const TOOLS: readonly ComposerTool[] = [
 	},
 ];
 
-// Must stay in sync with ALLOWED_CHAT_MODELS in apps/api/chat.py.
-const CHAT_MODELS = [
-	{
-		id: "gpt-5-mini",
-		name: "GPT-5 Mini",
-		description: "Best accuracy on Iowa Court Rules. Reasoning model.",
-	},
-	{
-		id: "gpt-4o",
-		name: "GPT-4o",
-		description: "Fast, classic chat model.",
-	},
-	{
-		id: "gpt-4o-mini",
-		name: "GPT-4o Mini",
-		description: "Cheapest. Acceptable for simple lookups.",
-	},
-] as const;
+// Model list lives in lib/iowa-chat.ts (shared with the Carbon v2 assistant).
 
 // Radix's <Select.Item> rejects value="" (it reserves the empty string for
 // the cleared/placeholder state). Use a sentinel and translate at the API
