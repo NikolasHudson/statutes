@@ -906,6 +906,7 @@ def search(
         "query": q,
         "scope": effective_source,
         "count": 0,
+        "total": 0,
         "results": [],
         "offset": offset,
         "limit": limit,
@@ -1030,6 +1031,9 @@ def search(
             "offset": offset,
             "limit": limit,
             "count": len(page),
+            # Fused hits available across all pages (bounded by the retriever
+            # depths), so the UI can say "Showing 11–20 of 63".
+            "total": len(results),
             "has_more": has_more,
             "results": page,
         },

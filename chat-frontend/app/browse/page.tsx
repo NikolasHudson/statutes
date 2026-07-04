@@ -64,6 +64,11 @@ import {
 	type NodeDetail,
 	type SearchFilters,
 } from "@/lib/iowa-browse";
+import {
+	advancedFromParams,
+	buildSearchQuery,
+	searchFiltersFromParams,
+} from "@/lib/search-url";
 
 type Mode = "home" | "search" | "browse";
 
@@ -85,42 +90,8 @@ function parseHashTarget(): { slug: string; cite: string } | null {
 	};
 }
 
-// ---- URL <-> search-state adapters -------------------------------------
-// The search (and an opened section) live in the query string so the browser
-// back button restores them and a search is shareable. `from`/`to` are the
-// year inputs widened to full ISO bounds.
-function buildSearchQuery(q: string, sf: SearchFilters): string {
-	const p = new URLSearchParams();
-	p.set("q", q);
-	if (sf.doc_type) p.set("doc_type", sf.doc_type);
-	if (sf.court) p.set("court", sf.court);
-	if (sf.status) p.set("status", sf.status);
-	if (sf.date_from) p.set("from", sf.date_from);
-	if (sf.date_to) p.set("to", sf.date_to);
-	return p.toString();
-}
-
-function searchFiltersFromParams(sp: URLSearchParams): SearchFilters {
-	return {
-		doc_type: sp.get("doc_type"),
-		court: sp.get("court"),
-		status: sp.get("status"),
-		date_from: sp.get("from"),
-		date_to: sp.get("to"),
-	};
-}
-
-// Reconstruct the advanced-search panel inputs from the URL.
-function advancedFromParams(sp: URLSearchParams): AdvancedFilters {
-	const dt = sp.get("doc_type");
-	return {
-		docType: dt === "code" || dt === "rules" || dt === "cases" ? dt : "all",
-		court: sp.get("court") ?? "",
-		status: sp.get("status") ?? "",
-		yearFrom: (sp.get("from") ?? "").slice(0, 4),
-		yearTo: (sp.get("to") ?? "").slice(0, 4),
-	};
-}
+// URL <-> search-state adapters live in lib/search-url.ts, shared with the
+// Carbon v2 screens so a search URL means the same thing in both skins.
 
 // useSearchParams() must be read inside a Suspense boundary.
 export default function BrowsePage() {

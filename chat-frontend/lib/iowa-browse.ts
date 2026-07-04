@@ -192,6 +192,9 @@ export type BrowseSearchResponse = {
   query: string;
   scope: string | null;
   count: number;
+  // Fused hits available across all pages (bounded by the retriever depths).
+  // Optional: responses cached before the field shipped may omit it.
+  total?: number;
   offset: number;
   limit: number;
   has_more: boolean;

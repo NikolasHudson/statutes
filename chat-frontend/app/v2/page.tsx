@@ -1,120 +1,185 @@
 "use client";
 
-// Temporary v2 home: build-status index of the Carbon rebuild. Each card is a
-// real /v2 route; "wired" means the screen runs against live data. This page
-// is replaced by the real search-first Library home once search is wired.
+// v2 Library home — the search-first entry to the corpus, wired to the live
+// /api/browse/sources counts. Design from /browse-carbon-mockup; a search
+// routes to /v2/results, a source opens the legacy /browse reader until the
+// v2 browse screens land.
 
-import { ArrowRightIcon } from "lucide-react";
+import {
+	ArrowRightIcon,
+	GavelIcon,
+	LandmarkIcon,
+	type LucideIcon,
+	ScaleIcon,
+	SlidersHorizontalIcon,
+} from "lucide-react";
 import Link from "next/link";
-import { useAuth } from "@/components/auth-gate";
-import { Eyebrow, Tag } from "@/components/carbon/primitives";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import {
+	Eyebrow,
+	KVList,
+	LineTabs,
+	Notification,
+	Panel,
+} from "@/components/carbon/primitives";
+import { CarbonSearchBar } from "@/components/carbon/search-bar";
+import { type BrowseSource, browseSources } from "@/lib/iowa-browse";
 
-const SCREENS: {
-	href: string;
-	n: string;
-	name: string;
-	blurb: string;
-	wired: boolean;
-}[] = [
-	{
-		href: "/v2/assistant",
-		n: "01",
-		name: "Assistant",
-		blurb:
-			"Corpus-grounded chat: thread rail, scope + model controls, retrieval progress, verified answer with pinned authorities.",
-		wired: false,
-	},
-	{
-		href: "/v2/results",
-		n: "02",
-		name: "Search results",
-		blurb:
-			"Results list with refine rail: content type, court, status, decided-year histogram, cited authorities.",
-		wired: false,
-	},
-	{
-		href: "/v2/case",
-		n: "03",
-		name: "Case reader",
-		blurb:
-			"Three-pane decision reader: outline, opinion text with star pagination, citator treatment and cited authorities.",
-		wired: false,
-	},
-	{
-		href: "/v2/advanced",
-		n: "04",
-		name: "Advanced search",
-		blurb:
-			"Fielded query builder — terms and connectors, per-content-type document fields, date and jurisdiction.",
-		wired: false,
-	},
-	{
-		href: "/v2/compare",
-		n: "05",
-		name: "Compare editions",
-		blurb:
-			"Year-over-year Iowa Code diff: amended / added / repealed buckets, inline and side-by-side views.",
-		wired: false,
-	},
-	{
-		href: "/v2/account",
-		n: "06",
-		name: "Account settings",
-		blurb:
-			"Profile, practice, preferences, password, API keys, and MCP configuration.",
-		wired: false,
-	},
-];
+const SOURCE_ICON: Record<BrowseSource["kind"], LucideIcon> = {
+	caselaw: ScaleIcon,
+	statutes: LandmarkIcon,
+};
 
-export default function V2Home() {
-	const { user } = useAuth();
-	const firstName = user.first_name || user.full_name || user.email;
+// Rules are "statutes"-kind in the API; give them their own glyph by slug.
+const iconFor = (s: BrowseSource): LucideIcon =>
+	s.slug.includes("rules") ? GavelIcon : SOURCE_ICON[s.kind];
+
+type Scope = "all" | "state" | "federal";
+
+export default function V2LibraryHome() {
+	const router = useRouter();
+	const [sources, setSources] = useState<BrowseSource[] | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [tab, setTab] = useState<Scope>("all");
+
+	useEffect(() => {
+		browseSources()
+			.then(setSources)
+			.catch((e) => setError((e as Error).message));
+	}, []);
+
+	const totalDocs = (sources ?? []).reduce((n, s) => n + s.entries, 0);
+	// Everything in the corpus is Iowa (state) today; Federal is honestly empty.
+	const shown = tab === "federal" ? [] : (sources ?? []);
+
 	return (
 		<div className="px-5 py-10 sm:px-8 lg:py-14">
-			<Eyebrow>Hudson Corpus — v2 preview</Eyebrow>
-			<h1 className="mt-4 max-w-3xl font-light text-3xl sm:text-4xl">
-				Welcome back, {firstName}
-			</h1>
-			<p className="mt-3 max-w-2xl text-[15px] text-[var(--cds-text-2)] leading-relaxed">
-				The functional Carbon rebuild of the app, wired screen by screen against
-				the live corpus. The classic app stays untouched at{" "}
-				<Link href="/" className="text-[var(--cds-link)] hover:underline">
-					corpus.nick.law
-				</Link>{" "}
-				until this version has earned the swap; the static designs live at{" "}
-				<Link
-					href="/app-carbon-mockup"
-					className="text-[var(--cds-link)] hover:underline"
-				>
-					/app-carbon-mockup
-				</Link>
-				.
+			<Eyebrow>
+				{sources
+					? `Iowa corpus — ${totalDocs.toLocaleString()} documents`
+					: "Iowa corpus"}
+			</Eyebrow>
+			<h1 className="mt-4 font-light text-3xl sm:text-4xl">Library</h1>
+			<p className="mt-3 max-w-xl text-[15px] text-[var(--cds-text-2)] leading-relaxed">
+				Search Iowa case law, statutes, and court rules — one box.
 			</p>
 
-			<div className="mt-10 grid gap-px border border-[var(--cds-border)] bg-[var(--cds-border)] sm:grid-cols-2 xl:grid-cols-3">
-				{SCREENS.map((s) => (
+			<div className="mt-8">
+				<CarbonSearchBar
+					onSearch={(q) =>
+						router.push(`/v2/results?q=${encodeURIComponent(q)}`)
+					}
+				/>
+				<div className="mt-3">
 					<Link
-						key={s.href}
-						href={s.href}
-						className="group flex min-h-44 flex-col bg-[var(--cds-layer)] p-5 transition-colors hover:bg-[var(--cds-layer-hover)]"
+						href="/v2/advanced"
+						className="inline-flex items-center gap-1.5 font-medium text-[13px] text-[var(--cds-link)] hover:underline"
 					>
-						<div className="flex items-center justify-between">
-							<span className="font-mono text-[11px] text-[var(--cds-helper)]">
-								{s.n}
-							</span>
-							{s.wired ? (
-								<Tag kind="green">wired</Tag>
-							) : (
-								<Tag kind="outline">design only</Tag>
-							)}
-						</div>
-						<h2 className="mt-3 font-semibold text-sm">{s.name}</h2>
-						<p className="mt-1.5 text-[13px] text-[var(--cds-text-2)] leading-snug">
-							{s.blurb}
-						</p>
-						<ArrowRightIcon className="mt-auto size-4 self-end text-[var(--cds-link)] transition-transform group-hover:translate-x-0.5" />
+						<SlidersHorizontalIcon className="size-3.5" />
+						Advanced search
 					</Link>
-				))}
+				</div>
+			</div>
+
+			<div className="mt-10">
+				<LineTabs
+					tabs={[
+						{
+							id: "all" as Scope,
+							label: "All content",
+							count: sources?.length,
+						},
+						{ id: "state" as Scope, label: "State", count: sources?.length },
+						{ id: "federal" as Scope, label: "Federal", count: 0 },
+					]}
+					value={tab}
+					onChange={setTab}
+				/>
+			</div>
+
+			<div className="mt-8 grid gap-10 lg:grid-cols-[1fr_17rem] xl:grid-cols-[1fr_20rem]">
+				<div className="min-w-0">
+					{error ? (
+						<Notification kind="error" title="Couldn't load the library">
+							{error}
+						</Notification>
+					) : !sources ? (
+						<div className="border border-[var(--cds-border)] px-6 py-14 text-center text-[var(--cds-text-2)] text-sm">
+							Loading sources…
+						</div>
+					) : shown.length === 0 ? (
+						<div className="border border-[var(--cds-border)] px-6 py-14 text-center text-[var(--cds-text-2)] text-sm">
+							No federal sources yet.
+						</div>
+					) : (
+						<div className="divide-y divide-[var(--cds-border)] border border-[var(--cds-border)]">
+							{shown.map((s) => {
+								const Icon = iconFor(s);
+								return (
+									<Link
+										key={s.slug}
+										href={`/browse?source=${encodeURIComponent(s.slug)}`}
+										className="group flex w-full items-center gap-4 bg-[var(--cds-layer)] p-4 text-left transition-colors hover:bg-[var(--cds-layer-hover)] sm:p-5"
+									>
+										<Icon
+											className="size-5 shrink-0 text-[var(--cds-text-2)]"
+											strokeWidth={1.5}
+										/>
+										<span className="flex min-w-0 flex-1 flex-col">
+											<span className="truncate font-semibold text-sm">
+												{s.name}
+											</span>
+											<span className="truncate text-[var(--cds-text-2)] text-xs">
+												{s.jurisdiction}
+											</span>
+										</span>
+										<span className="shrink-0 whitespace-nowrap font-mono text-[var(--cds-helper)] text-xs tabular-nums">
+											{s.entries.toLocaleString()} {s.entry_label}
+										</span>
+										<ArrowRightIcon className="size-4 shrink-0 text-[var(--cds-link)] transition-transform group-hover:translate-x-0.5" />
+									</Link>
+								);
+							})}
+						</div>
+					)}
+					{shown.length > 0 && (
+						<p className="mt-3 text-[var(--cds-helper)] text-xs">
+							{shown.length} sources
+							{tab !== "all" && ` · ${tab} materials`}
+						</p>
+					)}
+				</div>
+
+				<aside className="space-y-6">
+					<Panel title="Coverage">
+						<KVList
+							rows={[
+								["Documents", sources ? totalDocs.toLocaleString() : "…"],
+								["Sources", sources ? String(sources.length) : "…"],
+								["Jurisdiction", "Iowa"],
+							]}
+						/>
+					</Panel>
+
+					<Panel title="Search tips">
+						<ul className="space-y-2 px-4 py-3 text-[12px] text-[var(--cds-text-2)] leading-snug">
+							<li>
+								Combine terms with <span className="font-mono">AND</span>,{" "}
+								<span className="font-mono">OR</span>, and{" "}
+								<span className="font-mono">-exclude</span>.
+							</li>
+							<li>
+								Quote an{" "}
+								<span className="font-mono">&ldquo;exact phrase&rdquo;</span>.
+							</li>
+							<li>
+								Paste a citation (e.g. <span className="font-mono">714.16</span>
+								) to jump straight to it.
+							</li>
+						</ul>
+					</Panel>
+				</aside>
 			</div>
 		</div>
 	);
