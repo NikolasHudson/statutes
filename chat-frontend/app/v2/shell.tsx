@@ -89,12 +89,17 @@ function UserChip() {
 
 export function V2Shell({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname() ?? "/v2";
+	// The onboarding wizard brings its own stepper rail — give it the full
+	// canvas instead of the app nav.
+	const bare = pathname === "/v2/onboarding";
 	return (
 		<>
 			<ShellHeader homeHref="/v2" note="v2 preview" right={<UserChip />} />
 			<div className="flex min-h-0 flex-1">
-				<SideNav groups={NAV} active={pathname} />
-				<main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+				{!bare && <SideNav groups={NAV} active={pathname} />}
+				<main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+					{children}
+				</main>
 			</div>
 		</>
 	);

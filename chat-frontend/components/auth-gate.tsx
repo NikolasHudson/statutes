@@ -121,11 +121,22 @@ export function AuthGate({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		if (status !== "signed-in" || !user) return;
 		if (user.onboarding_completed) return;
-		if (pathname === "/onboarding" || isPublicPath(pathname)) return;
+		if (
+			pathname === "/onboarding" ||
+			pathname === "/v2/onboarding" ||
+			isPublicPath(pathname)
+		)
+			return;
 		const key = onboardingRedirectKey(user.id);
 		if (sessionStorage.getItem(key)) return;
 		sessionStorage.setItem(key, "1");
-		router.replace("/onboarding");
+		// Each skin keeps its own wizard so the nudge doesn't yank a v2 user
+		// back into the legacy UI (or vice versa).
+		router.replace(
+			pathname === "/v2" || pathname.startsWith("/v2/")
+				? "/v2/onboarding"
+				: "/onboarding",
+		);
 	}, [status, user, pathname, router]);
 
 	const signOut = useCallback(async () => {

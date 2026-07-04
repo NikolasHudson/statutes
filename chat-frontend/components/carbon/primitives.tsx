@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useId, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const plexSans = IBM_Plex_Sans({
@@ -428,12 +428,15 @@ export function TextField({
 	label,
 	helper,
 	className,
-	id,
+	id: idProp,
 	...props
 }: React.InputHTMLAttributes<HTMLInputElement> & {
 	label?: string;
 	helper?: string;
 }) {
+	// Always associate the label with the input, generating an id if none given.
+	const autoId = useId();
+	const id = idProp ?? (label ? autoId : undefined);
 	return (
 		<div className={className}>
 			{label && <FieldLabel htmlFor={id}>{label}</FieldLabel>}
@@ -453,12 +456,14 @@ export function TextAreaField({
 	label,
 	helper,
 	className,
-	id,
+	id: idProp,
 	...props
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
 	label?: string;
 	helper?: string;
 }) {
+	const autoId = useId();
+	const id = idProp ?? (label ? autoId : undefined);
 	return (
 		<div className={className}>
 			{label && <FieldLabel htmlFor={id}>{label}</FieldLabel>}
@@ -478,12 +483,15 @@ export function SelectField({
 	label,
 	options,
 	className,
-	id,
+	id: idProp,
 	...props
 }: React.SelectHTMLAttributes<HTMLSelectElement> & {
 	label?: string;
-	options: string[];
+	// Plain strings (value === label) or value/label pairs.
+	options: (string | { value: string; label: string })[];
 }) {
+	const autoId = useId();
+	const id = idProp ?? (label ? autoId : undefined);
 	return (
 		<div className={className}>
 			{label && <FieldLabel htmlFor={id}>{label}</FieldLabel>}
@@ -493,9 +501,15 @@ export function SelectField({
 					{...props}
 					className="h-10 w-full appearance-none border-[var(--cds-border-strong)] border-b bg-[var(--cds-field)] px-4 pr-10 text-sm outline-none focus:outline-2 focus:-outline-offset-2 focus:outline-[#0f62fe]"
 				>
-					{options.map((o) => (
-						<option key={o}>{o}</option>
-					))}
+					{options.map((o) => {
+						const { value, label: l } =
+							typeof o === "string" ? { value: o, label: o } : o;
+						return (
+							<option key={value} value={value}>
+								{l}
+							</option>
+						);
+					})}
 				</select>
 				<ChevronDownIcon className="pointer-events-none absolute top-3 right-4 size-4 text-[var(--cds-text-2)]" />
 			</div>
