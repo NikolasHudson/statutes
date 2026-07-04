@@ -117,7 +117,9 @@ function ResultsScreen() {
 	const hasMore = data?.has_more ?? false;
 	const showPager = !!data && count > 0 && (page > 1 || hasMore);
 	const totalPages =
-		total !== undefined && total > 0 ? Math.ceil(total / SEARCH_PAGE_SIZE) : null;
+		total !== undefined && total > 0
+			? Math.ceil(total / SEARCH_PAGE_SIZE)
+			: null;
 
 	return (
 		<div className="px-5 py-8 sm:px-8">
@@ -573,11 +575,11 @@ function ResultRow({ r, query }: { r: BrowseSearchResult; query: string }) {
 			? `Chapter ${r.chapter.ordinal}${r.chapter.heading ? ` — ${r.chapter.heading}` : ""}`
 			: r.source;
 	const cite = isCase ? r.citations.join(" · ") : r.citation;
-	// Case hits open the /cases reader; statute/rule hits open the section in
-	// the legacy /browse reader (swaps to the v2 reader when it lands).
+	// Case hits open the v2 reader; statute/rule hits open the section in the
+	// legacy /browse reader (swaps to the v2 reader when it lands).
 	const href =
 		isCase && r.case_id != null
-			? `/cases/${r.case_id}`
+			? `/v2/case/${r.case_id}`
 			: `/browse?sec=${r.node_id}`;
 	const title = isCase
 		? r.case_name || r.heading || "(unnamed case)"
