@@ -575,12 +575,12 @@ function ResultRow({ r, query }: { r: BrowseSearchResult; query: string }) {
 			? `Chapter ${r.chapter.ordinal}${r.chapter.heading ? ` — ${r.chapter.heading}` : ""}`
 			: r.source;
 	const cite = isCase ? r.citations.join(" · ") : r.citation;
-	// Case hits open the v2 reader; statute/rule hits open the section in the
-	// legacy /browse reader (swaps to the v2 reader when it lands).
+	// Both hit kinds open v2 readers: decisions in /v2/case, sections in
+	// /v2/section.
 	const href =
 		isCase && r.case_id != null
 			? `/v2/case/${r.case_id}`
-			: `/browse?sec=${r.node_id}`;
+			: `/v2/section/${r.node_id}`;
 	const title = isCase
 		? r.case_name || r.heading || "(unnamed case)"
 		: r.heading || "(no heading)";

@@ -7,7 +7,8 @@
 // list rail, and the inline / side-by-side section diff.
 
 import { ArrowRightIcon, Columns2Icon, RowsIcon } from "lucide-react";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import {
 	Eyebrow,
 	LineTabs,
@@ -22,7 +23,28 @@ import {
 } from "@/lib/use-edition-diff";
 import { cn } from "@/lib/utils";
 
+// useSearchParams() (the ?node= deep link from the section reader) must be
+// read inside a Suspense boundary.
 export default function V2ComparePage() {
+	return (
+		<Suspense
+			fallback={
+				<p className="px-5 py-10 text-[var(--cds-text-2)] text-sm sm:px-8">
+					Loading…
+				</p>
+			}
+		>
+			<CompareScreen />
+		</Suspense>
+	);
+}
+
+function CompareScreen() {
+	const searchParams = useSearchParams();
+	// Seed the diff from a section-reader deep link (?node=<id>).
+	const nodeParam = Number(searchParams.get("node"));
+	const initialNodeId =
+		Number.isInteger(nodeParam) && nodeParam > 0 ? nodeParam : undefined;
 	const {
 		editions,
 		fromYear,
@@ -39,7 +61,7 @@ export default function V2ComparePage() {
 		setSelected,
 		diff,
 		diffLoading,
-	} = useEditionDiff({ source: "iowa-code" });
+	} = useEditionDiff({ source: "iowa-code", initialNodeId });
 	const [view, setView] = useState<"inline" | "split">("inline");
 
 	if (loadError) {
@@ -297,15 +319,10 @@ function DiffView({
 }
 
 function segNode(s: DiffSegment, i: number, side?: "from" | "to") {
-	if (s.op === "equal")
-		return (
-			// biome-ignore lint/suspicious/noArrayIndexKey: static, ordered diff segments
-			<span key={i}>{s.text}</span>
-		);
+	if (s.op === "equal") return <span key={i}>{s.text}</span>;
 	if (s.op === "insert") {
 		if (side === "from") return null;
 		return (
-			// biome-ignore lint/suspicious/noArrayIndexKey: static, ordered diff segments
 			<ins key={i} className="bg-[#24a148]/20 no-underline">
 				{s.text}
 			</ins>
@@ -313,7 +330,6 @@ function segNode(s: DiffSegment, i: number, side?: "from" | "to") {
 	}
 	if (side === "to") return null;
 	return (
-		// biome-ignore lint/suspicious/noArrayIndexKey: static, ordered diff segments
 		<del
 			key={i}
 			className={cn("bg-[#da1e28]/15", side === "from" && "no-underline")}

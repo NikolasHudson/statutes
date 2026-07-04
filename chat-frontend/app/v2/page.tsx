@@ -2,8 +2,8 @@
 
 // v2 Library home — the search-first entry to the corpus, wired to the live
 // /api/browse/sources counts. Design from /browse-carbon-mockup; a search
-// routes to /v2/results, a source opens the legacy /browse reader until the
-// v2 browse screens land.
+// routes to /v2/results, a source opens its v2 index (chapters for statutes,
+// recent decisions for caselaw).
 
 import {
 	ArrowRightIcon,
@@ -119,7 +119,7 @@ export default function V2LibraryHome() {
 								return (
 									<Link
 										key={s.slug}
-										href={`/browse?source=${encodeURIComponent(s.slug)}`}
+										href={`/v2/source/${encodeURIComponent(s.slug)}`}
 										className="group flex w-full items-center gap-4 bg-[var(--cds-layer)] p-4 text-left transition-colors hover:bg-[var(--cds-layer-hover)] sm:p-5"
 									>
 										<Icon

@@ -499,10 +499,17 @@ function ProgressCard({
 	);
 }
 
-// Markdown with Carbon styling. Case links produced by the shared chat lib
-// point at the legacy reader (/cases/<id>); rewrite them into the v2 reader.
-const rewriteHref = (href: string) =>
-	href.startsWith("/cases/") ? href.replace("/cases/", "/v2/case/") : href;
+// Markdown with Carbon styling. The shared chat lib emits legacy reader
+// links — /cases/<id> for decisions, /browse#/<slug>/<path> for statutes —
+// so rewrite both into their v2 equivalents (statute paths resolve to node
+// ids via /v2/goto).
+const rewriteHref = (href: string) => {
+	if (href.startsWith("/cases/")) return href.replace("/cases/", "/v2/case/");
+	const m = /^\/browse#\/([^/]+)\/(.+)$/.exec(href);
+	if (m)
+		return `/v2/goto?source=${encodeURIComponent(m[1])}&cite=${encodeURIComponent(m[2])}`;
+	return href;
+};
 
 function Answer({ text }: { text: string }) {
 	return (
