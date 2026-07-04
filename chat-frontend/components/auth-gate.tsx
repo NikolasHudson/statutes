@@ -67,6 +67,18 @@ function isPublicPath(pathname: string): boolean {
 	);
 }
 
+// Surfaces still on the legacy (shadcn) skin, kept as the fallback app after
+// the Carbon swap: the classic assistant + account/onboarding under /classic,
+// and the browse/case/verify readers that never moved. They get the legacy
+// sign-in screen and the legacy onboarding wizard.
+const LEGACY_PREFIXES = ["/classic", "/browse", "/cases", "/verify"];
+
+function isLegacyPath(pathname: string): boolean {
+	return LEGACY_PREFIXES.some(
+		(p) => pathname === p || pathname.startsWith(`${p}/`),
+	);
+}
+
 type AuthContextValue = {
 	user: AuthUser;
 	signOut: () => Promise<void>;
@@ -123,19 +135,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
 		if (user.onboarding_completed) return;
 		if (
 			pathname === "/onboarding" ||
-			pathname === "/v2/onboarding" ||
+			pathname === "/classic/onboarding" ||
 			isPublicPath(pathname)
 		)
 			return;
 		const key = onboardingRedirectKey(user.id);
 		if (sessionStorage.getItem(key)) return;
 		sessionStorage.setItem(key, "1");
-		// Each skin keeps its own wizard so the nudge doesn't yank a v2 user
-		// back into the legacy UI (or vice versa).
+		// Each skin keeps its own wizard so the nudge doesn't yank a user on
+		// the Carbon app back into the legacy UI (or vice versa).
 		router.replace(
-			pathname === "/v2" || pathname.startsWith("/v2/")
-				? "/v2/onboarding"
-				: "/onboarding",
+			isLegacyPath(pathname) ? "/classic/onboarding" : "/onboarding",
 		);
 	}, [status, user, pathname, router]);
 
@@ -169,13 +179,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
 			setUser(u);
 			setStatus("signed-in");
 		};
-		// The functional Carbon rebuild lives under /v2 and gets the Carbon
-		// sign-in skin; everything else keeps the legacy screen. Both render
-		// the same useCredentialsForm brain, so auth behavior stays identical.
-		if (pathname === "/v2" || pathname.startsWith("/v2/")) {
-			return <CarbonSignIn onSignedIn={onSignedIn} />;
+		// The Carbon sign-in is the default; the legacy surfaces keep the
+		// legacy screen. Both render the same useCredentialsForm brain, so
+		// auth behavior stays identical.
+		if (isLegacyPath(pathname)) {
+			return <SignInScreen onSignedIn={onSignedIn} />;
 		}
-		return <SignInScreen onSignedIn={onSignedIn} />;
+		return <CarbonSignIn onSignedIn={onSignedIn} />;
 	}
 
 	return (

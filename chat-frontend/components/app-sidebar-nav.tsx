@@ -5,60 +5,61 @@
 // pathname, so Chat / Browse / Account all stay one click apart no matter
 // where you are.
 
+import {
+	BookOpenIcon,
+	type LucideIcon,
+	MessagesSquareIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BookOpenIcon,
-  MessagesSquareIcon,
-  type LucideIcon,
-} from "lucide-react";
 
 import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
+	SidebarGroup,
+	SidebarGroupLabel,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
 type NavItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  // Treat the href as a prefix match so subroutes light up the parent.
-  // Special-cased for "/" since prefix-matching that would highlight all.
-  exact?: boolean;
+	href: string;
+	label: string;
+	icon: LucideIcon;
+	// Treat the href as a prefix match so subroutes light up the parent.
+	// Special-cased for "/" since prefix-matching that would highlight all.
+	exact?: boolean;
 };
 
 const ITEMS: NavItem[] = [
-  { href: "/", label: "Chat", icon: MessagesSquareIcon, exact: true },
-  { href: "/browse", label: "Browse the corpus", icon: BookOpenIcon },
+	// The classic assistant moved to /classic when the Carbon app took over
+	// the root routes; this sidebar only appears on classic surfaces.
+	{ href: "/classic", label: "Chat", icon: MessagesSquareIcon, exact: true },
+	{ href: "/browse", label: "Browse the corpus", icon: BookOpenIcon },
 ];
 
 export function AppSidebarNav() {
-  const pathname = usePathname() ?? "/";
-  return (
-    <SidebarGroup>
-      <SidebarGroupLabel>Navigate</SidebarGroupLabel>
-      <SidebarMenu>
-        {ITEMS.map((item) => {
-          const Icon = item.icon;
-          const active = item.exact
-            ? pathname === item.href
-            : pathname === item.href ||
-              pathname.startsWith(`${item.href}/`);
-          return (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton asChild isActive={active}>
-                <Link href={item.href}>
-                  <Icon className="size-4" />
-                  <span>{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          );
-        })}
-      </SidebarMenu>
-    </SidebarGroup>
-  );
+	const pathname = usePathname() ?? "/";
+	return (
+		<SidebarGroup>
+			<SidebarGroupLabel>Navigate</SidebarGroupLabel>
+			<SidebarMenu>
+				{ITEMS.map((item) => {
+					const Icon = item.icon;
+					const active = item.exact
+						? pathname === item.href
+						: pathname === item.href || pathname.startsWith(`${item.href}/`);
+					return (
+						<SidebarMenuItem key={item.href}>
+							<SidebarMenuButton asChild isActive={active}>
+								<Link href={item.href}>
+									<Icon className="size-4" />
+									<span>{item.label}</span>
+								</Link>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					);
+				})}
+			</SidebarMenu>
+		</SidebarGroup>
+	);
 }

@@ -209,7 +209,7 @@ export type NavGroup = {
 		icon: LucideIcon;
 		detail?: string;
 		// Match the href exactly instead of as a path prefix — for a group's
-		// root item (e.g. "/v2") that would otherwise swallow every subroute.
+		// root item (e.g. "/") that would otherwise swallow every subroute.
 		exact?: boolean;
 	}[];
 };
