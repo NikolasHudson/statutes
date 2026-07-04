@@ -79,7 +79,7 @@ export default function V2AdvancedPage() {
 			</p>
 
 			<form
-				className="mt-10 grid max-w-4xl gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]"
+				className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_17rem] xl:grid-cols-[minmax(0,1fr)_20rem]"
 				onSubmit={(e) => {
 					e.preventDefault();
 					run();
