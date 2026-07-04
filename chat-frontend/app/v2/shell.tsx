@@ -16,12 +16,14 @@ import {
 	SlidersHorizontalIcon,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-gate";
 import {
 	type NavGroup,
 	ShellHeader,
 	SideNav,
 } from "@/components/carbon/primitives";
+import { cn } from "@/lib/utils";
 
 const NAV: NavGroup[] = [
 	{
@@ -92,11 +94,52 @@ export function V2Shell({ children }: { children: React.ReactNode }) {
 	// The onboarding wizard brings its own stepper rail — give it the full
 	// canvas instead of the app nav.
 	const bare = pathname === "/v2/onboarding";
+
+	// The hamburger means different things per viewport: on md+ it collapses
+	// the nav column (more room to read); below md — where the column is
+	// hidden by default — it opens the nav as a drawer over the content.
+	const [desktopHidden, setDesktopHidden] = useState(false);
+	const [mobileOpen, setMobileOpen] = useState(false);
+	const onMenu = () => {
+		if (window.matchMedia("(min-width: 768px)").matches) {
+			setDesktopHidden((h) => !h);
+		} else {
+			setMobileOpen((o) => !o);
+		}
+	};
+	// Picking a destination closes the mobile drawer.
+	useEffect(() => setMobileOpen(false), [pathname]);
+
 	return (
 		<>
-			<ShellHeader homeHref="/v2" note="v2 preview" right={<UserChip />} />
+			<ShellHeader
+				homeHref="/v2"
+				note="v2 preview"
+				right={<UserChip />}
+				onMenu={bare ? undefined : onMenu}
+			/>
 			<div className="flex min-h-0 flex-1">
-				{!bare && <SideNav groups={NAV} active={pathname} />}
+				{!bare && (
+					<>
+						{mobileOpen && (
+							<button
+								type="button"
+								aria-label="Close navigation"
+								onClick={() => setMobileOpen(false)}
+								className="fixed inset-0 z-20 bg-black/40 md:hidden"
+							/>
+						)}
+						<SideNav
+							groups={NAV}
+							active={pathname}
+							className={cn(
+								mobileOpen &&
+									"fixed top-12 bottom-0 left-0 z-30 flex bg-[var(--cds-bg)] md:static",
+								desktopHidden && "md:hidden",
+							)}
+						/>
+					</>
+				)}
 				<main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
 					{children}
 				</main>

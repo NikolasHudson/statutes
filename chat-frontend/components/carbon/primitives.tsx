@@ -136,12 +136,15 @@ export function ShellHeader({
 	homeHref = "/",
 	note,
 	right,
+	onMenu,
 }: {
 	homeHref?: string;
 	note?: string;
 	// Trailing header content (avatar chip, sign-out …); rendered after the
 	// theme toggle.
 	right?: React.ReactNode;
+	// Hamburger click — toggles the side nav where the shell provides one.
+	onMenu?: () => void;
 }) {
 	const { theme, setTheme } = useTheme();
 	const next: ThemeName = theme === "g100" ? "white" : "g100";
@@ -149,7 +152,8 @@ export function ShellHeader({
 		<header className="flex h-12 shrink-0 items-center border-[#393939] border-b bg-[#161616] text-white">
 			<button
 				type="button"
-				aria-label="Menu"
+				aria-label="Toggle navigation"
+				onClick={onMenu}
 				className="flex size-12 items-center justify-center transition-colors hover:bg-[#353535]"
 			>
 				<MenuIcon className="size-4" />
@@ -214,13 +218,22 @@ export function SideNav({
 	groups,
 	active,
 	footer = "corpus.nick.law · beta",
+	className,
 }: {
 	groups: NavGroup[];
 	active: string;
 	footer?: React.ReactNode;
+	// Positioning/visibility overrides (e.g. the v2 shell's mobile drawer /
+	// desktop collapse) — merged after the defaults so they win conflicts.
+	className?: string;
 }) {
 	return (
-		<nav className="hidden w-64 shrink-0 flex-col overflow-y-auto border-[var(--cds-border)] border-r md:flex">
+		<nav
+			className={cn(
+				"hidden w-64 shrink-0 flex-col overflow-y-auto border-[var(--cds-border)] border-r md:flex",
+				className,
+			)}
+		>
 			<div className="flex-1">
 				{groups.map((g) => (
 					<div key={g.group}>
