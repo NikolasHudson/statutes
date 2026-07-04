@@ -1,0 +1,35 @@
+Done. Here's where things stand:
+
+  ✅ Stopped
+
+  The running acquire job (PID 152136, 33 min in) got a clean SIGTERM — confirmed gone, no acquire processes left. The leftover .partial files are harmless;
+  nothing was committed, and they'll be cleared on the next run.
+
+  ✅ lbzip2 support implemented
+
+  backend/apps/ingestion_caselaw/csv_stream.py now decompresses .bz2 through an external decompressor subprocess instead of the single-threaded stdlib bz2:
+  - Auto-picks the best tool on PATH: lbzip2 → pbzip2 → bzip2, falling back to in-process bz2 if none exist.
+  - All the careful dialect/decode logic moved into a source-agnostic _read_rows() helper — decompressed bytes are identical, so parsing behavior is unchanged.
+  - Fail-loud on corruption: a truncated/corrupt stream raises OSError (matching stdlib bz2), so a bad download can't silently yield a partial slice.
+  - Early-exit safe: closing the pipe SIGPIPEs the decompressor, and an upstream exception isn't masked by the subprocess exit code.
+
+  Verified:
+  - 35/35 ingestion_caselaw tests pass
+  - Subprocess vs in-process output byte-identical on a real .bz2 (3,360/3,360 rows)
+  - Corrupt .bz2 correctly raises OSError
+  
+  Right now it picks bzip2 (the free ~1.5×). On the resized box, apt install lbzip2 flips it to full multi-core automatically — no code change needed.
+
+  ✅ Turnkey relaunch script
+
+  /home/dev/cl-acquire-relaunch.sh (syntax-checked, executable) — run it after the resize + power-on and it: checks lbzip2 is installed (refuses with the install
+  command if not, so you don't waste the cores), clears stale partials, and launches the job detached (own session, survives the SSH/Claude session). Then python3 
+  /home/dev/cl-monitor.py to watch.
+
+  Your move (the resize, your call)
+
+  1. On the bigger box: sudo apt-get install -y lbzip2
+  2. bash /home/dev/cl-acquire-relaunch.sh
+  3. When cl-monitor.py shows it finished → power off → resize CPU/RAM only back down → power on.
+
+  The code change isn't committed — want me to commit it (on a branch, per your repo convention), or leave it in the working tree for now?

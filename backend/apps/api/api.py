@@ -105,6 +105,35 @@ def public_config(request):
     return {"mcp_host": None, "source": "unset"}
 
 
+@api.get("/branding", auth=None)
+def branding(request):
+    """Public, pre-login white-label config for the host's product front door.
+
+    The frontend fetches this at boot to theme the login screen before anyone
+    authenticates. ``request.product`` is set by ProductResolutionMiddleware from
+    the Host. A host with no pinned product (the flagship app at app.<domain> /
+    the apex) returns ``product: null`` and the frontend falls back to the
+    default HUDSON brand.
+    """
+    product = getattr(request, "product", None)
+    if product is None:
+        return {"product": None}
+    return {
+        "product": {
+            "slug": product.slug,
+            "name": product.name,
+            "scoped": product.is_scoped,
+        },
+        "brand_name": product.brand_name or product.name,
+        "logo_url": product.logo_url,
+        "primary_color": product.primary_color,
+        "accent_color": product.accent_color,
+        "login_tagline": product.login_tagline,
+        "support_email": product.support_email,
+        "disclaimer": product.disclaimer,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

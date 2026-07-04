@@ -44,7 +44,27 @@ const onboardingRedirectKey = (userId: number) =>
 // they render outside the AuthContext provider, and the onboarding nudge
 // skips them. /terms has to be public so the Terms of Service can be read
 // before account creation / acceptance; /privacy is its redirect alias.
+// Exact matches only — look-alikes like /privacy-policy must NOT be exposed.
 const PUBLIC_PATHS = ["/terms", "/privacy"];
+// Whole subtrees that are public. The marketing-site mockup lives under
+// /home-mockup (landing, articles, etc.) and is entirely public. The open
+// casebook reader mockup lives under /casebook-mockup and is shown the same
+// way — a public, signed-out-readable prototype for iteration, as are the
+// Carbon design explorations: the browse Library home (/browse-carbon-mockup)
+// and the full app-in-Carbon suite (/app-carbon-mockup).
+const PUBLIC_PREFIXES = [
+	"/home-mockup",
+	"/casebook-mockup",
+	"/browse-carbon-mockup",
+	"/app-carbon-mockup",
+];
+
+function isPublicPath(pathname: string): boolean {
+	if (PUBLIC_PATHS.includes(pathname)) return true;
+	return PUBLIC_PREFIXES.some(
+		(p) => pathname === p || pathname.startsWith(`${p}/`),
+	);
+}
 
 type AuthContextValue = {
 	user: AuthUser;
@@ -100,7 +120,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		if (status !== "signed-in" || !user) return;
 		if (user.onboarding_completed) return;
-		if (pathname === "/onboarding" || PUBLIC_PATHS.includes(pathname)) return;
+		if (pathname === "/onboarding" || isPublicPath(pathname)) return;
 		const key = onboardingRedirectKey(user.id);
 		if (sessionStorage.getItem(key)) return;
 		sessionStorage.setItem(key, "1");
@@ -120,7 +140,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 	// Public pages render outside the provider in every auth state, so they
 	// load instantly (no "Checking session…" flash) and never bounce to the
 	// sign-in screen.
-	if (PUBLIC_PATHS.includes(pathname)) {
+	if (isPublicPath(pathname)) {
 		return <>{children}</>;
 	}
 

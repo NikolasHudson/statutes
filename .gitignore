@@ -43,3 +43,7 @@ backend/data/raw/
 
 # Prod DB snapshot from clone_prod_db.sh — never commit
 prod.dump
+
+# Dev session logs / local tooling
+.devlogs/
+.screenshot-tool/

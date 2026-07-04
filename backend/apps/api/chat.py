@@ -28,6 +28,7 @@ from ninja.errors import HttpError
 from apps.api.accounts import _require_login
 from apps.api.session_auth import session_auth
 from apps.api.trace_capture import record_chat_trace
+from apps.tenancy.entitlement import is_entitled
 from apps.corpus.models import Node, NodeVersion, ReviewStatus, Source
 from apps.corpus.services.lookups import current_version
 from apps.corpus.services.corpus_tools import (
@@ -1496,6 +1497,49 @@ def _stream_ndjson_events(
         )
 
 
+def _enforce_product_scope(request, user, payload: ChatRequest) -> None:
+    """Server-side scope lock + entitlement gate for host-pinned products.
+
+    ``request.product`` is set by ProductResolutionMiddleware from the Host. On a
+    LOCKED product front door (e.g. ``clerk.<domain>`` -> the Ethics app) this:
+
+      * requires the user to be ENTITLED to the product (else 403) — a client
+        editing the request must not reach a scoped product they didn't pay for;
+      * CLAMPS the corpus scope to the product's allowed sources so the request
+        can't widen it. A single-source product is pinned to it; a multi-source
+        product honours a client pick within the set;
+      * drops a pinned ``node_id`` that lives outside the allowed sources, so a
+        document can't be injected past the source filter.
+
+    On the unlocked flagship app (no pinned product) it is a no-op and the
+    client's scope is honoured. This is the ONE server-side authority point for
+    scope; everything downstream keys off ``payload.source_slug`` / ``node_id``.
+    """
+    product = getattr(request, "product", None)
+    if product is None:
+        return
+
+    if not is_entitled(user, product):
+        raise HttpError(
+            403,
+            "Your account doesn't have access to this app. If it's provided by "
+            "your bar association or firm, sign in with that account; otherwise "
+            "contact support.",
+        )
+
+    allowed = product.allowed_source_slugs
+    if not allowed:  # full-corpus product (e.g. a firm everything-license)
+        return
+
+    if payload.source_slug not in allowed:
+        payload.source_slug = allowed[0]
+
+    if payload.node_id is not None and not Node.objects.filter(
+        id=payload.node_id, source__slug__in=allowed
+    ).exists():
+        payload.node_id = None
+
+
 @chat_router.post("/chat/stream", auth=session_auth)
 def chat_stream(request, payload: ChatRequest):
     """Streaming sibling of ``/api/chat``. Returns ``application/x-ndjson``;
@@ -1507,6 +1551,9 @@ def chat_stream(request, payload: ChatRequest):
         raise HttpError(400, "messages must not be empty")
     if payload.model not in ALLOWED_CHAT_MODELS:
         raise HttpError(400, f"unsupported model: {payload.model}")
+
+    # Lock scope + check entitlement BEFORE any OpenAI work (host-pinned apps).
+    _enforce_product_scope(request, user, payload)
 
     api_key = settings.OPENAI_API_KEY
     if not api_key:
@@ -1538,6 +1585,9 @@ def chat(request, payload: ChatRequest):
         raise HttpError(400, "messages must not be empty")
     if payload.model not in ALLOWED_CHAT_MODELS:
         raise HttpError(400, f"unsupported model: {payload.model}")
+
+    # Lock scope + check entitlement BEFORE any OpenAI work (host-pinned apps).
+    _enforce_product_scope(request, user, payload)
 
     api_key = settings.OPENAI_API_KEY
     if not api_key:

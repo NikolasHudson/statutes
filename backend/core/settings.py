@@ -105,6 +105,7 @@ INSTALLED_APPS = [
     "axes",
     "apps.accounts",
     "apps.corpus",
+    "apps.tenancy",
     "apps.api",
     "apps.citations",
     "apps.ingestion_iowa_code",
@@ -128,6 +129,10 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Resolve the scoped product from the Host (clerk.<domain> -> the Ethics
+    # app) and attach request.product. After auth so request.user is available
+    # downstream; before the views so /api/branding can read it pre-login.
+    "core.middleware.ProductResolutionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # AxesMiddleware must come LAST: it wraps the response so a lockout that
