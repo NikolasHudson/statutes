@@ -4,13 +4,17 @@
 // /api/chat/stream endpoint via lib/iowa-chat.ts (same brain as the legacy
 // assistant: tool progress labels, inline citation links, Sources footer).
 // Adds what the mockup promised: thread rail (localStorage), scope + model
-// controls, live retrieval progress, and a real "Verifying citations" step
-// fed by the backend's deterministic verification gate. The Verify Document
-// tool (docling uploads) stays on the legacy "/" assistant for now.
+// controls, live retrieval progress, a real "Verifying citations" step fed
+// by the backend's deterministic verification gate, and the composer tools
+// row — Verify Document runs pasted text or an uploaded file (docling)
+// through /api/verify/document and renders the citation checklist inline.
 
 import {
 	CheckIcon,
+	CircleAlertIcon,
+	FileCheckIcon,
 	Loader2Icon,
+	PaperclipIcon,
 	PlusIcon,
 	SendIcon,
 	SquareIcon,
@@ -24,6 +28,7 @@ import {
 	NavGroupLabel,
 	Notification,
 	SelectField,
+	Tag,
 } from "@/components/carbon/primitives";
 import {
 	type BrowseSource,
@@ -34,7 +39,32 @@ import {
 	streamChat,
 	toolLabel,
 } from "@/lib/iowa-chat";
+import {
+	type CitationFinding,
+	type CitationStatus,
+	streamVerify,
+	type VerifySummary,
+} from "@/lib/iowa-verify";
 import { cn } from "@/lib/utils";
+
+// File types the document verifier can ingest (PDF/DOCX parse server-side via
+// docling; text/markdown are read directly). MIME types AND extensions so the
+// picker matches regardless of what the browser reports. Mirrors the legacy
+// assistant's list.
+const VERIFY_ACCEPT = [
+	"application/pdf",
+	".pdf",
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	".docx",
+	"application/msword",
+	".doc",
+	"text/plain",
+	"text/markdown",
+	".txt",
+	".md",
+	".markdown",
+	".text",
+].join(",");
 
 // ---------------------------------------------------------------------------
 // Thread model — persisted to localStorage so chats survive a reload.
@@ -46,14 +76,25 @@ type Step = {
 	status: "in-progress" | "completed" | "failed";
 };
 
+type VerifyState = "running" | "done" | "error";
+
 type ChatMessage =
-	| { role: "user"; text: string }
+	| { role: "user"; text: string; attachment?: string }
 	| {
 			role: "assistant";
 			text: string;
 			steps: Step[];
 			elapsedMs?: number;
 			failed?: boolean;
+	  }
+	| {
+			role: "verify";
+			findings: CitationFinding[];
+			total: number | null;
+			summary: VerifySummary | null;
+			state: VerifyState;
+			errorMessage?: string;
+			elapsedMs?: number;
 	  };
 
 type ThreadData = {
@@ -153,12 +194,23 @@ export default function V2AssistantPage() {
 			setBusy(true);
 
 			// Seed the turn: user message + empty assistant message to stream into.
-			const history = [...active.messages, { role: "user" as const, text }];
+			// Only user/assistant text reaches the chat endpoint — verify cards and
+			// their trigger messages stay visual-only history.
+			const history = [
+				...active.messages.filter(
+					(m) => m.role === "user" || m.role === "assistant",
+				),
+				{ role: "user" as const, text },
+			];
 			patchThread(threadId, (t) => ({
 				...t,
 				title: t.messages.length === 0 ? text.slice(0, 60) : t.title,
 				updatedAt: Date.now(),
-				messages: [...history, { role: "assistant", text: "", steps: [] }],
+				messages: [
+					...t.messages,
+					{ role: "user", text },
+					{ role: "assistant", text: "", steps: [] },
+				],
 			}));
 
 			const startedAt = Date.now();
@@ -257,6 +309,118 @@ export default function V2AssistantPage() {
 		[active, busy, model, scope, patchThread],
 	);
 
+	// Verify Document turn: run pasted text or an uploaded file through
+	// /api/verify/document and stream the checklist card in place. One-shot —
+	// the composer drops back to chat afterwards, matching the legacy tool.
+	const sendVerify = useCallback(
+		async (text: string, file: File | null) => {
+			if (!active || busy) return;
+			if (!file && !text.trim()) return;
+			const threadId = active.id;
+			abortRef.current?.abort();
+			const controller = new AbortController();
+			abortRef.current = controller;
+			setBusy(true);
+
+			const userText =
+				text.trim() || (file ? `Verify the citations in ${file.name}.` : "");
+			patchThread(threadId, (t) => ({
+				...t,
+				title:
+					t.messages.length === 0
+						? `Verify: ${(file?.name ?? text).slice(0, 50)}`
+						: t.title,
+				updatedAt: Date.now(),
+				messages: [
+					...t.messages,
+					{ role: "user", text: userText, attachment: file?.name },
+					{
+						role: "verify",
+						findings: [],
+						total: null,
+						summary: null,
+						state: "running",
+					},
+				],
+			}));
+
+			const startedAt = Date.now();
+			let findings: CitationFinding[] = [];
+			let total: number | null = null;
+			let summary: VerifySummary | null = null;
+			let state: VerifyState = "running";
+			let errorMessage: string | undefined;
+
+			const flush = () => {
+				patchThread(threadId, (t) => ({
+					...t,
+					updatedAt: Date.now(),
+					messages: [
+						...t.messages.slice(0, -1),
+						{
+							role: "verify",
+							findings: findings.map((f) => ({ ...f })),
+							total,
+							summary,
+							state,
+							errorMessage,
+							elapsedMs: Date.now() - startedAt,
+						},
+					],
+				}));
+				requestAnimationFrame(scrollToEnd);
+			};
+
+			try {
+				for await (const ev of streamVerify(
+					file ? { file } : { text },
+					controller.signal,
+					model,
+				)) {
+					if (controller.signal.aborted) break;
+					switch (ev.type) {
+						case "start":
+							total = ev.citations_total;
+							break;
+						case "citation_done":
+							findings = [...findings, ev.finding];
+							break;
+						case "summary":
+							summary = {
+								total: ev.total,
+								green: ev.green,
+								yellow: ev.yellow,
+								red: ev.red,
+							};
+							break;
+						case "done":
+							state = "done";
+							break;
+						case "error":
+							state = "error";
+							errorMessage = ev.message;
+							break;
+					}
+					flush();
+				}
+				if (state === "running") {
+					state = controller.signal.aborted ? "error" : "done";
+					if (controller.signal.aborted) errorMessage = "Cancelled.";
+					flush();
+				}
+			} catch (e) {
+				if ((e as Error).name !== "AbortError") {
+					state = "error";
+					errorMessage = (e as Error).message ?? String(e);
+					flush();
+				}
+			} finally {
+				setBusy(false);
+			}
+		},
+		[active, busy, model, patchThread],
+	);
+
 	const stop = () => abortRef.current?.abort();
 
 	if (!threads || !active) {
@@ -331,8 +495,20 @@ export default function V2AssistantPage() {
 						) : (
 							active.messages.map((m, i) =>
 								m.role === "user" ? (
-									// biome-ignore lint/suspicious/noArrayIndexKey: append-only message list
-									<UserBubble key={i}>{m.text}</UserBubble>
+									<UserBubble
+										// biome-ignore lint/suspicious/noArrayIndexKey: append-only message list
+										key={i}
+										attachment={m.attachment}
+									>
+										{m.text}
+									</UserBubble>
+								) : m.role === "verify" ? (
+									<VerifyCard
+										// biome-ignore lint/suspicious/noArrayIndexKey: append-only message list
+										key={i}
+										message={m}
+										streaming={busy && i === active.messages.length - 1}
+									/>
 								) : (
 									<AssistantTurn
 										// biome-ignore lint/suspicious/noArrayIndexKey: append-only message list
@@ -346,7 +522,12 @@ export default function V2AssistantPage() {
 					</div>
 				</div>
 
-				<Composer busy={busy} onSend={send} onStop={stop} />
+				<Composer
+					busy={busy}
+					onSend={send}
+					onVerify={sendVerify}
+					onStop={stop}
+				/>
 			</div>
 		</div>
 	);
@@ -439,12 +620,134 @@ function ThreadRail({
 // Messages
 // ---------------------------------------------------------------------------
 
-function UserBubble({ children }: { children: React.ReactNode }) {
+function UserBubble({
+	children,
+	attachment,
+}: {
+	children: React.ReactNode;
+	attachment?: string;
+}) {
 	return (
 		<div className="mt-8 flex justify-end first:mt-0">
-			<div className="max-w-[85%] whitespace-pre-wrap border border-[var(--cds-border)] bg-[var(--cds-layer)] px-4 py-3 text-sm leading-relaxed">
-				{children}
+			<div className="max-w-[85%]">
+				{attachment && (
+					<p className="mb-1.5 flex items-center justify-end gap-1.5 font-mono text-[11px] text-[var(--cds-helper)]">
+						<PaperclipIcon className="size-3.5" />
+						{attachment}
+					</p>
+				)}
+				<div className="whitespace-pre-wrap border border-[var(--cds-border)] bg-[var(--cds-layer)] px-4 py-3 text-sm leading-relaxed">
+					{children}
+				</div>
 			</div>
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Verify Document checklist card
+// ---------------------------------------------------------------------------
+
+const VERIFY_STATUS: Record<CitationStatus, { label: string; cls: string }> = {
+	green: { label: "Verified", cls: "text-[var(--cds-success-text)]" },
+	yellow: { label: "Review", cls: "text-[#b28600]" },
+	red: { label: "Problem", cls: "text-[var(--cds-danger-text)]" },
+};
+
+function VerifyCard({
+	message: m,
+	streaming,
+}: {
+	message: Extract<ChatMessage, { role: "verify" }>;
+	streaming: boolean;
+}) {
+	// Live tallies while findings stream in; the summary event settles them.
+	const count = (s: CitationStatus) =>
+		m.summary?.[s] ?? m.findings.filter((f) => f.status === s).length;
+
+	return (
+		<div className="mt-6 border border-[var(--cds-border)]">
+			<header className="flex flex-wrap items-center gap-3 border-[var(--cds-border)] border-b px-4 py-2.5">
+				<FileCheckIcon className="size-4 text-[var(--cds-text-2)]" />
+				<span className="font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.18em]">
+					Verify document
+					{m.total !== null &&
+						` — ${m.total} citation${m.total === 1 ? "" : "s"}`}
+				</span>
+				<span className="ml-auto flex items-center gap-2">
+					{m.state === "running" && streaming ? (
+						<span className="flex items-center gap-2 font-mono text-[11px] text-[var(--cds-helper)]">
+							<Loader2Icon className="size-3.5 animate-spin text-[var(--cds-link)]" />
+							{m.total === null
+								? "Scanning document…"
+								: `${m.findings.length} of ${m.total} checked`}
+						</span>
+					) : (
+						<>
+							{count("green") > 0 && (
+								<Tag kind="green">{count("green")} verified</Tag>
+							)}
+							{count("yellow") > 0 && (
+								<Tag kind="yellow">{count("yellow")} review</Tag>
+							)}
+							{count("red") > 0 && (
+								<Tag kind="red">
+									{count("red")} problem{count("red") === 1 ? "" : "s"}
+								</Tag>
+							)}
+						</>
+					)}
+				</span>
+			</header>
+
+			{m.state === "error" && m.errorMessage ? (
+				<p className="px-4 py-3 text-[var(--cds-danger-text)] text-sm">
+					{m.errorMessage}
+				</p>
+			) : m.findings.length === 0 ? (
+				<p className="px-4 py-3 text-[var(--cds-text-2)] text-sm">
+					{m.state === "running"
+						? "Extracting and resolving citations…"
+						: "No citations found in the document."}
+				</p>
+			) : (
+				<ul className="divide-y divide-[var(--cds-border)]">
+					{m.findings.map((f, i) => {
+						const s = VERIFY_STATUS[f.status];
+						return (
+							// biome-ignore lint/suspicious/noArrayIndexKey: append-only findings stream
+							<li key={i} className="flex items-start gap-3 px-4 py-3">
+								{f.status === "green" ? (
+									<CheckIcon
+										className={cn("mt-0.5 size-4 shrink-0", s.cls)}
+										strokeWidth={2.5}
+									/>
+								) : (
+									<CircleAlertIcon
+										className={cn("mt-0.5 size-4 shrink-0", s.cls)}
+									/>
+								)}
+								<span className="min-w-0 flex-1">
+									<span className="block font-mono text-[13px]">{f.raw}</span>
+									{f.detail && (
+										<span className="block text-[var(--cds-text-2)] text-xs">
+											{f.detail}
+										</span>
+									)}
+								</span>
+								<span
+									className={cn(
+										"shrink-0 font-mono text-[11px] uppercase tracking-[0.14em]",
+										s.cls,
+									)}
+								>
+									{s.label}
+								</span>
+							</li>
+						);
+					})}
+				</ul>
+			)}
 		</div>
 	);
 }
@@ -624,22 +927,57 @@ function EmptyState({ onAsk }: { onAsk: (q: string) => void }) {
 function Composer({
 	busy,
 	onSend,
+	onVerify,
 	onStop,
 }: {
 	busy: boolean;
 	onSend: (text: string) => void;
+	onVerify: (text: string, file: File | null) => void;
 	onStop: () => void;
 }) {
 	const [draft, setDraft] = useState("");
+	// Verify mode is one-shot: the next send runs the citation verifier, then
+	// the composer drops back to chat. An attached file always verifies.
+	const [verifyMode, setVerifyMode] = useState(false);
+	const [file, setFile] = useState<File | null>(null);
+	const fileRef = useRef<HTMLInputElement>(null);
+
+	const verifying = verifyMode || !!file;
+	const canSubmit = !busy && (!!draft.trim() || !!file);
+
 	const submit = () => {
+		if (!canSubmit) return;
 		const t = draft.trim();
-		if (!t || busy) return;
 		setDraft("");
-		onSend(t);
+		if (verifying) {
+			onVerify(t, file);
+			setFile(null);
+			setVerifyMode(false);
+		} else {
+			onSend(t);
+		}
 	};
+
 	return (
 		<div className="shrink-0 border-[var(--cds-border)] border-t px-5 py-4 sm:px-8">
 			<div className="mx-auto max-w-3xl">
+				{file && (
+					<p className="mb-2 flex items-center gap-2 font-mono text-[11px] text-[var(--cds-helper)]">
+						<PaperclipIcon className="size-3.5" />
+						<span className="min-w-0 truncate">{file.name}</span>
+						<button
+							type="button"
+							aria-label="Remove attachment"
+							onClick={() => setFile(null)}
+							className="hover:text-[var(--cds-danger-text)]"
+						>
+							<XIcon className="size-3.5" />
+						</button>
+						<span className="text-[var(--cds-helper)]">
+							— will be run through the citation verifier
+						</span>
+					</p>
+				)}
 				<form
 					className="flex items-stretch border-[var(--cds-border-strong)] border-b bg-[var(--cds-field)] focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-[#0f62fe]"
 					onSubmit={(e) => {
@@ -650,10 +988,34 @@ function Composer({
 					<input
 						value={draft}
 						onChange={(e) => setDraft(e.target.value)}
-						placeholder="Message the assistant…"
+						placeholder={
+							verifying
+								? "Paste a document to verify its citations — or just send the attachment…"
+								: "Message the assistant…"
+						}
 						aria-label="Message the assistant"
 						className="h-12 w-full bg-transparent px-4 text-sm outline-none placeholder:text-[var(--cds-placeholder)]"
 					/>
+					<input
+						ref={fileRef}
+						type="file"
+						accept={VERIFY_ACCEPT}
+						className="hidden"
+						onChange={(e) => {
+							const f = e.target.files?.[0] ?? null;
+							if (f) setFile(f);
+							e.target.value = "";
+						}}
+					/>
+					<button
+						type="button"
+						aria-label="Attach a document to verify"
+						title="Attach a document to verify its citations"
+						onClick={() => fileRef.current?.click()}
+						className="flex w-12 shrink-0 items-center justify-center text-[var(--cds-text-2)] transition-colors hover:bg-[var(--cds-layer-hover)]"
+					>
+						<PaperclipIcon className="size-4" />
+					</button>
 					{busy ? (
 						<button
 							type="button"
@@ -668,17 +1030,38 @@ function Composer({
 						<button
 							type="submit"
 							aria-label="Send"
-							disabled={!draft.trim()}
+							disabled={!canSubmit}
 							className="flex w-12 shrink-0 items-center justify-center bg-[#0f62fe] text-white transition-colors hover:bg-[#0353e9] active:bg-[#002d9c] disabled:bg-[var(--cds-layer-selected)] disabled:text-[var(--cds-helper)]"
 						>
 							<SendIcon className="size-4" />
 						</button>
 					)}
 				</form>
-				<p className="mt-2.5 text-right text-[11px] text-[var(--cds-helper)]">
-					Answers are verified against source text before display. Verify
-					Document (uploads) lives in the classic assistant for now.
-				</p>
+
+				<div className="mt-2.5 flex flex-wrap items-center gap-2">
+					<span className="font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.14em]">
+						Tools
+					</span>
+					<button
+						type="button"
+						onClick={() => setVerifyMode((v) => !v)}
+						aria-pressed={verifyMode}
+						className={cn(
+							"flex h-7 items-center gap-1.5 border px-2.5 text-xs transition-colors",
+							verifyMode
+								? "border-[#0f62fe] bg-[#0f62fe]/10 font-semibold text-[var(--cds-link)]"
+								: "border-[var(--cds-border)] hover:bg-[var(--cds-layer-hover)]",
+						)}
+					>
+						<FileCheckIcon className="size-3.5" />
+						Verify Document
+					</button>
+					<span className="ml-auto hidden text-[11px] text-[var(--cds-helper)] sm:block">
+						{verifying
+							? "Next send checks every citation against the source text."
+							: "Answers are verified against source text before display."}
+					</span>
+				</div>
 			</div>
 		</div>
 	);
