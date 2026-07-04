@@ -55,7 +55,7 @@ export default function V2ChapterPage() {
 	}
 
 	return (
-		<div className="mx-auto max-w-3xl px-5 py-10 sm:px-8 lg:py-14">
+		<div className="px-5 py-10 sm:px-8 lg:py-14">
 			<nav className="text-sm">
 				<Link
 					href="/v2"

@@ -122,7 +122,7 @@ function ChapterIndex({ source }: { source: BrowseSource }) {
 	}, [source.slug]);
 
 	return (
-		<div className="mx-auto max-w-3xl px-5 py-10 sm:px-8 lg:py-14">
+		<div className="px-5 py-10 sm:px-8 lg:py-14">
 			<SourceHeader source={source} />
 
 			<p className="mt-10 border-[var(--cds-border)] border-t pt-5 font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.18em]">
@@ -228,7 +228,7 @@ function CaselawIndex({ source }: { source: BrowseSource }) {
 	};
 
 	return (
-		<div className="mx-auto max-w-3xl px-5 py-10 sm:px-8 lg:py-14">
+		<div className="px-5 py-10 sm:px-8 lg:py-14">
 			<SourceHeader source={source} />
 
 			<div className="mt-6">
