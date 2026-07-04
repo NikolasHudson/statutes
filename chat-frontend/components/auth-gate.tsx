@@ -10,16 +10,17 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import {
 	createContext,
-	type FormEvent,
 	type ReactNode,
 	useCallback,
 	useContext,
 	useEffect,
 	useState,
 } from "react";
+import { CarbonSignIn } from "@/components/carbon/sign-in";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { csrfHeaders } from "@/lib/csrf";
+import { useCredentialsForm } from "@/lib/use-credentials-form";
 
 export type AuthUser = {
 	id: number;
@@ -153,14 +154,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
 	}
 
 	if (status === "signed-out") {
-		return (
-			<SignInScreen
-				onSignedIn={(u) => {
-					setUser(u);
-					setStatus("signed-in");
-				}}
-			/>
-		);
+		const onSignedIn = (u: AuthUser) => {
+			setUser(u);
+			setStatus("signed-in");
+		};
+		// The functional Carbon rebuild lives under /v2 and gets the Carbon
+		// sign-in skin; everything else keeps the legacy screen. Both render
+		// the same useCredentialsForm brain, so auth behavior stays identical.
+		if (pathname === "/v2" || pathname.startsWith("/v2/")) {
+			return <CarbonSignIn onSignedIn={onSignedIn} />;
+		}
+		return <SignInScreen onSignedIn={onSignedIn} />;
 	}
 
 	return (
@@ -173,8 +177,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
 // ---------------------------------------------------------------------------
 // Sign-in / register screen — split layout mirroring the original Vite app
 // ---------------------------------------------------------------------------
-
-type Mode = "login" | "register";
 
 type Feature = { icon: LucideIcon; title: string; body: string };
 
@@ -197,53 +199,21 @@ const FEATURES: Feature[] = [
 ];
 
 function SignInScreen({ onSignedIn }: { onSignedIn: (u: AuthUser) => void }) {
-	const [mode, setMode] = useState<Mode>("login");
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
-	const [fullName, setFullName] = useState("");
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const onSubmit = async (e: FormEvent) => {
-		e.preventDefault();
-		setBusy(true);
-		setError(null);
-		try {
-			const path =
-				mode === "register" ? "/api/auth/register" : "/api/auth/login";
-			const body =
-				mode === "register"
-					? { email: email.trim().toLowerCase(), password, full_name: fullName }
-					: { email: email.trim().toLowerCase(), password };
-			const r = await fetch(path, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					...(await csrfHeaders()),
-				},
-				credentials: "include",
-				body: JSON.stringify(body),
-			});
-			if (!r.ok) {
-				const detail = await r
-					.json()
-					.then((j: { detail?: string }) => j.detail)
-					.catch(() => null);
-				throw new Error(
-					detail ||
-						(mode === "register"
-							? `Registration failed (${r.status})`
-							: `Login failed (${r.status})`),
-				);
-			}
-			const u = (await r.json()) as AuthUser;
-			onSignedIn(u);
-		} catch (err) {
-			setError((err as Error).message);
-		} finally {
-			setBusy(false);
-		}
-	};
+	// All submit/validation behavior lives in the shared hook (also used by
+	// the Carbon v2 sign-in); this component is only the legacy skin.
+	const {
+		mode,
+		toggleMode,
+		email,
+		setEmail,
+		password,
+		setPassword,
+		fullName,
+		setFullName,
+		busy,
+		error,
+		onSubmit,
+	} = useCredentialsForm(onSignedIn);
 
 	const title = mode === "register" ? "Create your account" : "Sign in";
 	const cta = mode === "register" ? "Create account" : "Sign in";
@@ -420,10 +390,7 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (u: AuthUser) => void }) {
 
 						<button
 							type="button"
-							onClick={() => {
-								setError(null);
-								setMode(mode === "register" ? "login" : "register");
-							}}
+							onClick={toggleMode}
 							className="self-center text-primary text-sm underline-offset-2 hover:underline"
 						>
 							{otherLabel}
