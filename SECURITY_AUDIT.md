@@ -1,5 +1,7 @@
 # Security & SOC 2 Readiness Audit
 
+> **⚠️ Superseded by a fresh audit — see [`SECURITY_AUDIT_2026-07.md`](SECURITY_AUDIT_2026-07.md) (2026-07-07).** That audit re-verified the June findings against current code and covers everything added since (MCP prod server, tenancy, v2 Carbon frontend, Verify-Document, EOL runtimes). This June document is retained for its remediation history, which the fresh audit references (e.g. still-open June #16/#22/#25/#13).
+
 **Date:** 2026-06-02  ·  **Method:** multi-agent workflow `security-audit-soc2` — parallel finders across 9 code/infra dimensions + 1 dedicated agent per YAML file, every finding adversarially re-verified by an independent skeptic agent (58 agents total).
 
 **Confirmed findings:** 41 — 1 high, 14 medium, 18 low, 8 info.  **Dropped as false-positive after verification:** 5.
