@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useAuth } from "@/components/auth-gate";
 import {
 	NavGroupLabel,
 	Notification,
@@ -45,6 +46,7 @@ import {
 	streamVerify,
 	type VerifySummary,
 } from "@/lib/iowa-verify";
+import { loadThreads, saveThreads } from "@/lib/thread-store";
 import { cn } from "@/lib/utils";
 
 // File types the document verifier can ingest (PDF/DOCX parse server-side via
@@ -104,28 +106,6 @@ type ThreadData = {
 	messages: ChatMessage[];
 };
 
-const STORE_KEY = "hlt-v2-threads";
-
-function loadThreads(): ThreadData[] {
-	try {
-		const raw = localStorage.getItem(STORE_KEY);
-		if (!raw) return [];
-		const parsed = JSON.parse(raw) as ThreadData[];
-		return Array.isArray(parsed) ? parsed : [];
-	} catch {
-		return [];
-	}
-}
-
-function saveThreads(threads: ThreadData[]) {
-	try {
-		// Cap storage: most recent 50 threads.
-		localStorage.setItem(STORE_KEY, JSON.stringify(threads.slice(0, 50)));
-	} catch {
-		/* storage full/unavailable — chat still works, just unsaved */
-	}
-}
-
 const newThread = (): ThreadData => ({
 	id: `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
 	title: "New chat",
@@ -140,6 +120,7 @@ const SCOPE_ALL = "all";
 // ---------------------------------------------------------------------------
 
 export default function V2AssistantPage() {
+	const { user } = useAuth();
 	const [threads, setThreads] = useState<ThreadData[] | null>(null);
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const [model, setModel] = useState<string>(CHAT_MODELS[0].id);
@@ -149,13 +130,15 @@ export default function V2AssistantPage() {
 	const abortRef = useRef<AbortController | null>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
 
-	// Hydrate threads from localStorage on the client only.
+	// Hydrate this user's threads from localStorage on the client only. The
+	// store is keyed by user id (see lib/thread-store.ts) so an account switch
+	// on the same browser can never surface someone else's chats.
 	useEffect(() => {
-		const loaded = loadThreads();
+		const loaded = loadThreads<ThreadData>(user.id);
 		const first = loaded[0] ?? newThread();
 		setThreads(loaded.length ? loaded : [first]);
 		setActiveId(first.id);
-	}, []);
+	}, [user.id]);
 
 	useEffect(() => {
 		fetchSources().then(setSources);
@@ -165,13 +148,16 @@ export default function V2AssistantPage() {
 	const active = threads?.find((t) => t.id === activeId) ?? null;
 
 	// All thread mutations flow through here so persistence can't be missed.
-	const mutate = useCallback((fn: (prev: ThreadData[]) => ThreadData[]) => {
-		setThreads((prev) => {
-			const next = fn(prev ?? []);
-			saveThreads(next);
-			return next;
-		});
-	}, []);
+	const mutate = useCallback(
+		(fn: (prev: ThreadData[]) => ThreadData[]) => {
+			setThreads((prev) => {
+				const next = fn(prev ?? []);
+				saveThreads(user.id, next);
+				return next;
+			});
+		},
+		[user.id],
+	);
 
 	const patchThread = useCallback(
 		(id: string, fn: (t: ThreadData) => ThreadData) =>
@@ -564,10 +550,12 @@ function ThreadRail({
 					<div
 						key={t.id}
 						className={cn(
-							"group flex w-full items-center border-l-[3px] transition-colors",
+							"group flex w-full items-center transition-colors",
+							// Selection is bg + weight only — the blue left bar stays
+							// exclusive to the main nav's "you are here".
 							t.id === activeId
-								? "border-[#0f62fe] bg-[var(--cds-layer-selected)]"
-								: "border-transparent hover:bg-[var(--cds-layer-hover)]",
+								? "bg-[var(--cds-layer-selected)]"
+								: "hover:bg-[var(--cds-layer-hover)]",
 						)}
 					>
 						<button
@@ -575,7 +563,7 @@ function ThreadRail({
 							disabled={disabled}
 							onClick={() => onPick(t.id)}
 							className={cn(
-								"min-w-0 flex-1 truncate px-3.5 py-2 text-left text-sm",
+								"min-w-0 flex-1 truncate px-4 py-2 text-left text-sm",
 								t.id === activeId
 									? "font-semibold"
 									: "text-[var(--cds-text-2)]",
@@ -596,13 +584,19 @@ function ThreadRail({
 			</div>
 		);
 
+	// A contextual panel of the chat workspace, not a second nav: layer
+	// background groups it with the content, and its header shares the chat
+	// header's height + bottom border so the line runs continuously across.
 	return (
-		<aside className="hidden w-64 shrink-0 flex-col border-[var(--cds-border)] border-r xl:flex">
-			<div className="p-4">
+		<aside className="hidden w-64 shrink-0 flex-col border-[var(--cds-border)] border-r bg-[var(--cds-layer)] xl:flex">
+			<div className="flex h-14 shrink-0 items-center justify-between border-[var(--cds-border)] border-b pr-2 pl-4">
+				<p className="font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.18em]">
+					Chats
+				</p>
 				<button
 					type="button"
 					onClick={onNew}
-					className="flex h-10 w-full items-center justify-between gap-3 bg-[#0f62fe] px-4 text-sm text-white transition-colors hover:bg-[#0353e9] active:bg-[#002d9c]"
+					className="flex h-8 items-center gap-1.5 px-2.5 text-[var(--cds-link)] text-sm transition-colors hover:bg-[var(--cds-layer-hover)]"
 				>
 					New chat
 					<PlusIcon className="size-4" />

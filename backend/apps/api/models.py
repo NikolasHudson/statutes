@@ -119,7 +119,9 @@ class VerificationRun(models.Model):
         related_name="verification_runs",
     )
 
-    # How the document arrived ("paste" or an uploaded filename) and its size.
+    # How the document arrived and its size. "paste", or "upload (.docx)" —
+    # the writer redacts the actual filename (often client-identifying) down
+    # to its extension; see trace_capture._redact_source_name.
     source_name = models.CharField(max_length=255, blank=True)
     char_count = models.PositiveIntegerField(default=0)
 

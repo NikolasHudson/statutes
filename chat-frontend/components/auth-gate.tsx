@@ -20,6 +20,7 @@ import { CarbonSignIn } from "@/components/carbon/sign-in";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { csrfHeaders } from "@/lib/csrf";
+import { clearThreadStores } from "@/lib/thread-store";
 import { useCredentialsForm } from "@/lib/use-credentials-form";
 
 export type AuthUser = {
@@ -155,6 +156,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
 			headers: await csrfHeaders(),
 			credentials: "include",
 		});
+		// Chat threads live only in localStorage, which outlives the session —
+		// on a shared machine "signed out" must mean the next person at the
+		// keyboard cannot read your research, so wipe them all.
+		clearThreadStores();
 		setStatus("signed-out");
 		setUser(null);
 	}, []);

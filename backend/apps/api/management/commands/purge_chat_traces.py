@@ -1,8 +1,10 @@
-"""Delete ChatTrace rows past the retention window.
+"""Delete ChatTrace and VerificationRun rows past the retention window.
 
-A trace holds the user's verbatim question and the full answer, so it is
-confidential and must not live forever. This command deletes every row older
-than ``settings.CHAT_TRACE_RETENTION_DAYS`` (default 7). Run it on a schedule
+A chat trace holds the user's verbatim question and the full answer, and a
+verification run holds quote fragments lifted from the user's uploaded
+document — both are confidential and must not live forever. This command
+deletes every row of either table older than
+``settings.CHAT_TRACE_RETENTION_DAYS`` (default 7). Run it on a schedule
 (cron / the platform scheduler); it is idempotent and safe to re-run.
 
     python manage.py purge_chat_traces             # one-shot, configured window
@@ -25,11 +27,14 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.api.models import ChatTrace
+from apps.api.models import ChatTrace, VerificationRun
 
 
 class Command(BaseCommand):
-    help = "Delete ChatTrace rows older than the retention window."
+    help = (
+        "Delete ChatTrace and VerificationRun rows older than the retention "
+        "window."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -89,20 +94,23 @@ class Command(BaseCommand):
             return
 
         cutoff = timezone.now() - timedelta(days=days)
-        stale = ChatTrace.objects.filter(created_at__lt=cutoff)
-        count = stale.count()
+        stale_traces = ChatTrace.objects.filter(created_at__lt=cutoff)
+        stale_runs = VerificationRun.objects.filter(created_at__lt=cutoff)
 
         if options["dry_run"]:
             self.stdout.write(
-                f"[dry-run] {count} trace(s) older than {days}d "
+                f"[dry-run] {stale_traces.count()} chat trace(s) and "
+                f"{stale_runs.count()} verification run(s) older than {days}d "
                 f"(before {cutoff.isoformat()}) would be deleted."
             )
             return
 
-        deleted, _ = stale.delete()
+        deleted_traces, _ = stale_traces.delete()
+        deleted_runs, _ = stale_runs.delete()
         self.stdout.write(
             self.style.SUCCESS(
-                f"Deleted {deleted} chat trace(s) older than {days}d "
+                f"Deleted {deleted_traces} chat trace(s) and {deleted_runs} "
+                f"verification run(s) older than {days}d "
                 f"(before {cutoff.isoformat()})."
             )
         )

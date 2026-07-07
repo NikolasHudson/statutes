@@ -18,7 +18,11 @@ from django.core.cache import cache
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 from apps.api.models import ChatTrace
-from apps.api.trace_capture import derive, record_chat_trace
+from apps.api.trace_capture import (
+    _redact_source_name,
+    derive,
+    record_chat_trace,
+)
 
 from ._factories import make_user
 
@@ -33,6 +37,33 @@ def _search_call(query: str, hits: list[dict]) -> dict:
 
 def _hit(path: str, heading: str = "", citation: str = "") -> dict:
     return {"node": {"path": path, "heading": heading, "citation": citation}}
+
+
+class RedactSourceNameTests(SimpleTestCase):
+    """Uploaded filenames are client-identifying — only the extension may be
+    persisted (2026-07 chat-history audit)."""
+
+    def test_paste_is_kept(self):
+        self.assertEqual(_redact_source_name("paste"), "paste")
+
+    def test_filename_reduced_to_extension(self):
+        self.assertEqual(
+            _redact_source_name("Smith v Jones motion.DOCX"),
+            "upload (.docx)",
+        )
+
+    def test_filename_without_extension(self):
+        self.assertEqual(_redact_source_name("confidential-memo"), "upload")
+
+    def test_weird_extension_not_leaked(self):
+        # A "suffix" that is long or non-alphanumeric is more likely to be
+        # content than a file type — drop it.
+        self.assertEqual(
+            _redact_source_name("In re Smith.exhibit-a"), "upload"
+        )
+
+    def test_empty_stays_empty(self):
+        self.assertEqual(_redact_source_name(""), "")
 
 
 class DeriveTests(SimpleTestCase):

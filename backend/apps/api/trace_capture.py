@@ -172,6 +172,20 @@ def record_chat_trace(
         logger.exception("chat trace capture failed")
 
 
+def _redact_source_name(source_name: str) -> str:
+    """Uploaded filenames are routinely client-identifying ("Smith v Jones
+    motion.docx"), which defeats the unattributed design of this table. Keep
+    only how the document arrived: "paste" stays, a file keeps its extension.
+    """
+    name = (source_name or "").strip()
+    if not name or name == "paste":
+        return name
+    _stem, _dot, ext = name.rpartition(".")
+    if _stem and ext and len(ext) <= 8 and ext.isalnum():
+        return f"upload (.{ext.lower()})"
+    return "upload"
+
+
 def record_verification_run(
     *,
     user,
@@ -194,7 +208,7 @@ def record_verification_run(
             # Unattributed, like ChatTrace — the run is kept for accuracy review
             # only, never to see who submitted which document.
             user=None,
-            source_name=source_name or "",
+            source_name=_redact_source_name(source_name),
             char_count=char_count or 0,
             findings=findings or [],
             citations_total=summary.get("total", 0),
