@@ -137,6 +137,8 @@ export function ShellHeader({
 	note,
 	right,
 	onMenu,
+	mobileMenuOnly = false,
+	themeToggle = true,
 }: {
 	homeHref?: string;
 	note?: string;
@@ -145,23 +147,48 @@ export function ShellHeader({
 	right?: React.ReactNode;
 	// Hamburger click — toggles the side nav where the shell provides one.
 	onMenu?: () => void;
+	// Show the hamburger below md only (shells that mount their own desktop
+	// toggle on the nav edge); the logo takes over its left spacing on md+.
+	mobileMenuOnly?: boolean;
+	// Hide the header sun/moon switch when the shell surfaces the theme
+	// control elsewhere (e.g. the v2 user menu).
+	themeToggle?: boolean;
 }) {
 	const { theme, setTheme } = useTheme();
 	const next: ThemeName = theme === "g100" ? "white" : "g100";
 	return (
 		<header className="flex h-12 shrink-0 items-center border-[#393939] border-b bg-[#161616] text-white">
-			<button
-				type="button"
-				aria-label="Toggle navigation"
-				onClick={onMenu}
-				className="flex size-12 items-center justify-center transition-colors hover:bg-[#353535]"
-			>
-				<MenuIcon className="size-4" />
-			</button>
+			{onMenu && (
+				<button
+					type="button"
+					aria-label="Toggle navigation"
+					onClick={onMenu}
+					className={cn(
+						"flex size-12 items-center justify-center transition-colors hover:bg-[#353535]",
+						mobileMenuOnly && "md:hidden",
+					)}
+				>
+					<MenuIcon className="size-4" />
+				</button>
+			)}
 
-			<Link href={homeHref} className="text-sm hover:underline">
+			<Link
+				href={homeHref}
+				className={cn(
+					"text-sm hover:underline",
+					// Whenever the hamburger isn't occupying the left edge, the
+					// logo carries the padding instead.
+					!onMenu && "pl-4",
+					onMenu && mobileMenuOnly && "md:pl-4",
+				)}
+			>
 				<span className="font-semibold">HUDSON</span>
 				<span className="ml-2 text-[#a8a8a8]">Corpus</span>
+				{/* inline-block keeps the link's hover underline from running
+				    through the tag */}
+				<span className="ml-2.5 inline-block border border-[#f1c21b] px-1.5 py-px align-[2px] font-mono text-[#f1c21b] text-[10px] uppercase tracking-[0.08em]">
+					Beta
+				</span>
 			</Link>
 
 			{note && (
@@ -171,22 +198,26 @@ export function ShellHeader({
 			)}
 
 			<div className="ml-auto flex items-center">
-				<span className="mr-1 hidden font-mono text-[#a8a8a8] text-[11px] sm:block">
-					theme: {theme}
-				</span>
-				<button
-					type="button"
-					onClick={() => setTheme(next)}
-					aria-label={`Switch to ${next} theme`}
-					title={`Switch to ${next} theme`}
-					className="flex size-12 items-center justify-center transition-colors hover:bg-[#353535]"
-				>
-					{theme === "g100" ? (
-						<SunIcon className="size-4" />
-					) : (
-						<MoonIcon className="size-4" />
-					)}
-				</button>
+				{themeToggle && (
+					<>
+						<span className="mr-1 hidden font-mono text-[#a8a8a8] text-[11px] sm:block">
+							theme: {theme}
+						</span>
+						<button
+							type="button"
+							onClick={() => setTheme(next)}
+							aria-label={`Switch to ${next} theme`}
+							title={`Switch to ${next} theme`}
+							className="flex size-12 items-center justify-center transition-colors hover:bg-[#353535]"
+						>
+							{theme === "g100" ? (
+								<SunIcon className="size-4" />
+							) : (
+								<MoonIcon className="size-4" />
+							)}
+						</button>
+					</>
+				)}
 				{right}
 			</div>
 		</header>
@@ -277,10 +308,14 @@ export function SideNav({
 				))}
 			</div>
 
-			<div className="border-[var(--cds-border)] border-t px-4 py-4">
-				<p className="font-mono text-[11px] text-[var(--cds-helper)]">
-					{footer}
-				</p>
+			<div className="border-[var(--cds-border)] border-t">
+				{typeof footer === "string" ? (
+					<p className="px-4 py-4 font-mono text-[11px] text-[var(--cds-helper)]">
+						{footer}
+					</p>
+				) : (
+					footer
+				)}
 			</div>
 		</nav>
 	);
