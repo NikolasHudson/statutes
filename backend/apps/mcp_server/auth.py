@@ -6,13 +6,20 @@ will dial into, so it has to be authenticated.
 
 We mirror the REST API's auth model: ``X-API-Key`` header → ``verify_key`` →
 401 if invalid. Successful requests get an ``mcp_api_key`` attribute on the
-ASGI scope so downstream code can read the user/tier off it later (rate
-limiting, audit logging — both deferred for now).
+ASGI scope so downstream code can read the user/tier off it.
+
+Beyond authentication we also apply the REST API's *authorization* and
+*rate-limiting* on this transport (see :mod:`apps.mcp_server.gating`): the
+JSON-RPC body is buffered so we can see which tool a ``tools/call`` targets,
+then the same ``require_feature`` / ``enforce_rate_limit`` primitives the REST
+API uses gate it (403 / 429) before the request reaches FastMCP. The buffered
+body is replayed to the inner app unchanged.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from typing import Awaitable, Callable
 
 from asgiref.sync import sync_to_async
@@ -24,9 +31,25 @@ ASGIApp = Callable[[dict, Callable, Callable], Awaitable[None]]
 HEADER_NAME = b"x-api-key"
 
 
+# Cap the buffered request body. We must buffer to inspect the JSON-RPC method,
+# and an unbounded buffer would itself be a memory-DoS vector, so we bound it.
+# The largest legitimate payload is a full brief passed to audit_brief; 1 MB is
+# comfortably above the corpus tools' 250k-char text ceiling while still capping
+# memory. Override per-environment with ``MCP_MAX_BODY_BYTES``.
+def _max_body_bytes() -> int:
+    raw = os.environ.get("MCP_MAX_BODY_BYTES", "").strip()
+    if raw.isdigit():
+        return int(raw)
+    return 1_000_000
+
+
+def _error(detail: str, status: int, code: str = "error") -> tuple[bytes, int]:
+    body = json.dumps({"error": code, "detail": detail}).encode("utf-8")
+    return body, status
+
+
 def _unauthorized(detail: str) -> tuple[bytes, int]:
-    body = json.dumps({"error": "unauthorized", "detail": detail}).encode("utf-8")
-    return body, 401
+    return _error(detail, 401, code="unauthorized")
 
 
 async def _send_json(send: Callable, body: bytes, status: int) -> None:
@@ -78,7 +101,58 @@ def api_key_middleware(app: ASGIApp) -> ASGIApp:
             await _send_json(send, body, status)
             return
 
+        # Buffer the request body so we can inspect the JSON-RPC method for the
+        # feature/quota gate, then replay it downstream unchanged.
+        limit = _max_body_bytes()
+        buffered = b""
+        more = True
+        while more:
+            message = await receive()
+            msg_type = message.get("type")
+            if msg_type == "http.request":
+                buffered += message.get("body", b"")
+                more = message.get("more_body", False)
+                if len(buffered) > limit:
+                    body, status = _error("request body too large", 413)
+                    await _send_json(send, body, status)
+                    return
+            elif msg_type == "http.disconnect":
+                return
+            else:
+                more = False
+
+        # Authorization + rate limiting, sharing the REST API's primitives.
+        # gate_request raises ninja HttpError (403 tier-gate / 429 quota); we're
+        # outside ninja's exception handler here, so translate it to JSON.
+        from ninja.errors import HttpError
+
+        from .gating import gate_request
+
+        try:
+            await sync_to_async(gate_request, thread_sensitive=True)(
+                api_key, buffered
+            )
+        except HttpError as exc:
+            body, status = _error(str(exc), exc.status_code, code="forbidden")
+            await _send_json(send, body, status)
+            return
+
+        # Replay the buffered body to the inner app: hand back the whole body in
+        # one message, then defer to the original receive for anything after.
+        replayed = False
+
+        async def replay_receive() -> dict:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {
+                    "type": "http.request",
+                    "body": buffered,
+                    "more_body": False,
+                }
+            return await receive()
+
         scope["mcp_api_key"] = api_key
-        await app(scope, receive, send)
+        await app(scope, replay_receive, send)
 
     return middleware

@@ -44,7 +44,9 @@ class _RecorderApp:
         await send({"type": "http.response.body", "body": b"", "more_body": False})
 
 
-async def _drive(app, headers: list[tuple[bytes, bytes]]) -> tuple[int, bytes]:
+async def _drive(
+    app, headers: list[tuple[bytes, bytes]], body: bytes = b""
+) -> tuple[int, bytes]:
     """Run one ASGI request and capture status + body."""
     scope = {
         "type": "http",
@@ -56,7 +58,15 @@ async def _drive(app, headers: list[tuple[bytes, bytes]]) -> tuple[int, bytes]:
         "headers": headers,
     }
 
+    sent = False
+
     async def receive():
+        nonlocal sent
+        if not sent:
+            sent = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        # A well-behaved ASGI server keeps returning empty/disconnect after the
+        # body is drained; mimic that so a double-read can't hang.
         return {"type": "http.request", "body": b"", "more_body": False}
 
     captured: dict = {"status": None, "body": b""}
@@ -69,6 +79,25 @@ async def _drive(app, headers: list[tuple[bytes, bytes]]) -> tuple[int, bytes]:
 
     await app(scope, receive, send)
     return captured["status"], captured["body"]
+
+
+class _BodyRecorderApp:
+    """ASGI app that drains the request body so we can assert the middleware
+    replayed it intact after buffering."""
+
+    def __init__(self):
+        self.bodies: list[bytes] = []
+
+    async def __call__(self, scope, receive, send):
+        body = b""
+        more = True
+        while more:
+            message = await receive()
+            body += message.get("body", b"")
+            more = message.get("more_body", False)
+        self.bodies.append(body)
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b"", "more_body": False})
 
 
 class _FakeAPIKey:
@@ -112,6 +141,61 @@ class ApiKeyMiddlewareTests(SimpleTestCase):
         self.assertEqual(status, 204)
         self.assertEqual(len(recorder.calls), 1)
         self.assertIs(recorder.calls[0]["mcp_api_key"], fake)
+
+    def test_valid_key_buffers_and_replays_body(self):
+        recorder = _BodyRecorderApp()
+        app = api_key_middleware(recorder)
+        fake = _FakeAPIKey(user_id=42)
+        payload = b'{"jsonrpc":"2.0","id":1,"method":"tools/call",' \
+                  b'"params":{"name":"search_statutes","arguments":{}}}'
+        with patch("apps.accounts.models.verify_key", return_value=fake), \
+                patch("apps.mcp_server.gating.gate_request", return_value=None) as g:
+            status, _ = _run(
+                _drive(app, headers=[(b"x-api-key", b"ok")], body=payload)
+            )
+        self.assertEqual(status, 204)
+        # The gate saw the raw body, and the inner app received it unchanged.
+        g.assert_called_once()
+        self.assertEqual(g.call_args.args[1], payload)
+        self.assertEqual(recorder.bodies, [payload])
+
+    def test_gate_rejection_is_translated_to_http_error(self):
+        from ninja.errors import HttpError
+
+        recorder = _RecorderApp()
+        app = api_key_middleware(recorder)
+        fake = _FakeAPIKey(user_id=7)
+        for status_code in (403, 429):
+            with self.subTest(status=status_code):
+                with patch("apps.accounts.models.verify_key", return_value=fake), \
+                        patch(
+                            "apps.mcp_server.gating.gate_request",
+                            side_effect=HttpError(status_code, "denied"),
+                        ):
+                    status, body = _run(
+                        _drive(
+                            app,
+                            headers=[(b"x-api-key", b"ok")],
+                            body=b'{"method":"tools/call"}',
+                        )
+                    )
+                self.assertEqual(status, status_code)
+                self.assertIn(b"denied", body)
+                self.assertEqual(recorder.calls, [])  # inner app never reached
+
+    def test_oversized_body_returns_413(self):
+        recorder = _RecorderApp()
+        app = api_key_middleware(recorder)
+        fake = _FakeAPIKey(user_id=9)
+        big = b"x" * 64
+        with patch("apps.accounts.models.verify_key", return_value=fake), \
+                patch.dict("os.environ", {"MCP_MAX_BODY_BYTES": "10"}):
+            status, body = _run(
+                _drive(app, headers=[(b"x-api-key", b"ok")], body=big)
+            )
+        self.assertEqual(status, 413)
+        self.assertIn(b"too large", body)
+        self.assertEqual(recorder.calls, [])
 
     def test_lifespan_passthrough(self):
         recorder = _RecorderApp()

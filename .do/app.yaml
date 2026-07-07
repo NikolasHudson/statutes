@@ -245,7 +245,9 @@ services:
 # MCP_ALLOWED_HOSTS / MCP_ALLOWED_ORIGINS, or set
 # MCP_DNS_REBINDING_PROTECTION=false as an escape hatch if the edge forwards an
 # unexpected Host and 421s every call (auth still gates every request).
-# Auth today is X-API-Key only (no rate-limit/audit yet — see plan P1).
+# Auth is X-API-Key + per-key tier feature-gate and daily quota (shared with
+# the REST API via apps.mcp_server.gating). Durable audit logging of MCP calls
+# is still pending — see plan P1.
 # NOTE: deploy_on_push couples MCP redeploys to every main commit (whole-app
 # deploy); that is accepted, not independent rollout.
 - name: mcp
