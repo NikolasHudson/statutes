@@ -51,6 +51,16 @@ envs:
 - key: DOCLING_INTERNAL_TOKEN
   scope: RUN_TIME
   type: SECRET
+# Email assistant (apps/mail). Postmark server token for outbound replies via
+# anymail; the webhook token authenticates Postmark's inbound POSTs to
+# /api/email/inbound?token=... (set the same value in the Postmark webhook
+# URL). Both set once in the App Platform UI — never plaintext here.
+- key: POSTMARK_SERVER_TOKEN
+  scope: RUN_TIME
+  type: SECRET
+- key: EMAIL_INBOUND_WEBHOOK_TOKEN
+  scope: RUN_TIME
+  type: SECRET
 - key: DATABASE_URL
   scope: RUN_AND_BUILD_TIME
   value: ${iowa-db.DATABASE_URL}
@@ -298,3 +308,18 @@ workers:
   # note above), so there's no reason to pay for a larger slug here.
   instance_size_slug: apps-s-1vcpu-0.5gb
   run_command: python manage.py purge_chat_traces --forever
+# Email assistant: drains the inbound-email queue (rows written by the
+# /api/email/inbound webhook), runs the chat pipeline headlessly, replies via
+# Postmark. Same shell-free-argv rule as trace-purge. 1GB (not 0.5) because a
+# turn exercises the full retrieval pipeline (Voyage HTTP embed/rerank — no
+# local torch, but the corpus code paths are heavier than the purger).
+- name: email-assistant
+  dockerfile_path: /Dockerfile
+  source_dir: /
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    deploy_on_push: true
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-1gb
+  run_command: python manage.py process_assistant_email --forever

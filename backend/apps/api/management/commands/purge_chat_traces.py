@@ -28,6 +28,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.api.models import ChatTrace, SearchLog, VerificationRun
+from apps.mail.models import InboundEmail, OutboundEmail
 
 
 class Command(BaseCommand):
@@ -97,23 +98,41 @@ class Command(BaseCommand):
         stale_traces = ChatTrace.objects.filter(created_at__lt=cutoff)
         stale_runs = VerificationRun.objects.filter(created_at__lt=cutoff)
         stale_searches = SearchLog.objects.filter(created_at__lt=cutoff)
+        # Email-assistant bodies are the same class of confidential material as
+        # a chat trace. SCRUB (not delete) so threading metadata — message ids,
+        # thread links, status — survives for reply matching and ops forensics,
+        # while the content itself honors the retention window. Thread history
+        # (EmailThread.messages) is intentionally kept while a thread is open:
+        # it IS the conversation state; a reply after the window still works.
+        stale_inbound = InboundEmail.objects.filter(
+            created_at__lt=cutoff
+        ).exclude(body_text="", raw_payload={})
+        stale_outbound = OutboundEmail.objects.filter(
+            created_at__lt=cutoff
+        ).exclude(body_text="")
 
         if options["dry_run"]:
             self.stdout.write(
                 f"[dry-run] {stale_traces.count()} chat trace(s), "
-                f"{stale_runs.count()} verification run(s) and "
-                f"{stale_searches.count()} search log(s) older than {days}d "
-                f"(before {cutoff.isoformat()}) would be deleted."
+                f"{stale_runs.count()} verification run(s), "
+                f"{stale_searches.count()} search log(s), "
+                f"{stale_inbound.count()} inbound email(s) and "
+                f"{stale_outbound.count()} outbound email(s) older than {days}d "
+                f"(before {cutoff.isoformat()}) would be deleted/scrubbed."
             )
             return
 
         deleted_traces, _ = stale_traces.delete()
         deleted_runs, _ = stale_runs.delete()
         deleted_searches, _ = stale_searches.delete()
+        scrubbed_inbound = stale_inbound.update(body_text="", raw_payload={})
+        scrubbed_outbound = stale_outbound.update(body_text="")
         self.stdout.write(
             self.style.SUCCESS(
                 f"Deleted {deleted_traces} chat trace(s), {deleted_runs} "
-                f"verification run(s) and {deleted_searches} search log(s) "
-                f"older than {days}d (before {cutoff.isoformat()})."
+                f"verification run(s) and {deleted_searches} search log(s); "
+                f"scrubbed {scrubbed_inbound} inbound and {scrubbed_outbound} "
+                f"outbound email bodies older than {days}d "
+                f"(before {cutoff.isoformat()})."
             )
         )

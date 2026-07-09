@@ -31,6 +31,10 @@ whitenoise>=6.8,<7
 # Backs Django's RedisCache: the per-user chat quota and API rate limiter
 # must share a durable store across processes/deploys.
 redis>=5.2,<9
+# Outbound email via Postmark (the email-assistant surface, apps/mail). Anymail
+# abstracts the ESP so a later SES/Mailgun move is a settings swap, not code.
+# Only the backend is used; inbound is our own webhook (apps/mail/api.py).
+django-anymail[postmark]>=13.0,<14
 # --- Auth hardening / observability (security findings #6,#15,#26) ---
 # Brute-force login throttle + lockout, keyed on IP+username against the shared
 # cache (Redis in prod). See AXES_* in core/settings.py.

@@ -53,6 +53,16 @@ env = environ.Env(
     # key. See apps/corpus/services/premise.py. This is the *fidelity* axis (is the
     # premise a faithful reading of the case?) — an LLM round-trip, hence opt-in.
     RAG_PREMISE_CHECK=(bool, False),
+    # Email assistant (apps/mail). POSTMARK_SERVER_TOKEN switches outbound mail
+    # from the dev console backend to Postmark via anymail. The webhook token
+    # authenticates Postmark's inbound POSTs (?token=... on the webhook URL,
+    # compared constant-time) — both unset means the email surface is dark.
+    POSTMARK_SERVER_TOKEN=(str, ""),
+    EMAIL_INBOUND_WEBHOOK_TOKEN=(str, ""),
+    # Require SPF-or-DKIM pass on inbound mail before acting on it. Replying to
+    # a spoofed From both leaks answers and creates backscatter, so this stays
+    # on everywhere real mail arrives; tests toggle it off explicitly.
+    EMAIL_REQUIRE_SENDER_AUTH=(bool, True),
     # PR7: the *currency* axis, orthogonal to fidelity — is the case the user's
     # premise rests on still GOOD LAW? Deterministic (reads the PR3 treatment flag
     # already on the retrieved passage; no LLM), so it ships ON by default: a
@@ -91,6 +101,20 @@ RAG_CURRENCY_CHECK = env("RAG_CURRENCY_CHECK")
 DOCLING_SERVICE_URL = env("DOCLING_SERVICE_URL")
 DOCLING_TIMEOUT = env("DOCLING_TIMEOUT")
 
+# ---------------------------------------------------------------------------
+# Email (the apps/mail assistant surface). With a Postmark token, outbound
+# goes through anymail's Postmark backend on the transactional stream; without
+# one (dev/tests) messages print to the console so the flow stays exercisable.
+# ---------------------------------------------------------------------------
+POSTMARK_SERVER_TOKEN = env("POSTMARK_SERVER_TOKEN")
+EMAIL_INBOUND_WEBHOOK_TOKEN = env("EMAIL_INBOUND_WEBHOOK_TOKEN")
+EMAIL_REQUIRE_SENDER_AUTH = env("EMAIL_REQUIRE_SENDER_AUTH")
+if POSTMARK_SERVER_TOKEN:
+    EMAIL_BACKEND = "anymail.backends.postmark.EmailBackend"
+    ANYMAIL = {"POSTMARK_SERVER_TOKEN": POSTMARK_SERVER_TOKEN}
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -103,10 +127,12 @@ INSTALLED_APPS = [
     # Brute-force login throttle / lockout (findings #6, #15). Keyed on
     # IP+username, cache-backed, configured in the AXES_* block below.
     "axes",
+    "anymail",
     "apps.accounts",
     "apps.corpus",
     "apps.tenancy",
     "apps.api",
+    "apps.mail",
     "apps.citations",
     "apps.ingestion_iowa_code",
     "apps.ingestion_iowa_rules",

@@ -29,6 +29,8 @@ from apps.corpus.services.lookups import (
 )
 from apps.corpus.services.search import hybrid_search
 
+from apps.mail.api import mail_router
+
 from .accounts import account_router, auth_router
 from .auth import api_key_auth, enforce_rate_limit, require_feature
 from .browse import browse_router
@@ -69,6 +71,9 @@ api.add_router("/auth", auth_router)
 api.add_router("/account", account_router)
 api.add_router("/browse", browse_router)
 api.add_router("/research", research_router)
+# Postmark inbound webhook (apps/mail). Shared-secret ?token= auth inside the
+# view; no session/API-key auth — the caller is Postmark, not a user.
+api.add_router("/email", mail_router)
 
 
 # ---------------------------------------------------------------------------
