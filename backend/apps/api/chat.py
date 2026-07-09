@@ -1003,6 +1003,11 @@ class ChatTurnError(Exception):
     def __init__(self, message: str, *, trace: list[ToolCallTrace]):
         super().__init__(message)
         self.trace = trace
+        # Messages are operator-authored (constants or exception type names —
+        # never raw upstream error text), so the views may surface this to
+        # the client. Kept as a separate field so that stays a deliberate
+        # contract rather than an accident of str(exc).
+        self.client_message = message
 
 
 def run_chat_turn(
@@ -1495,7 +1500,7 @@ def _stream_ndjson_events(
                 continue
             yield json.dumps(line, default=str) + "\n"
     except ChatTurnError as exc:
-        error = str(exc)
+        error = exc.client_message
         # The generator owns the same `trace` list, so partial state is
         # already in `trace` by the time it raises — no need to copy.
         yield json.dumps({"type": "error", "message": error}) + "\n"
@@ -1658,7 +1663,7 @@ def chat(request, payload: ChatRequest):
             latency_ms=_elapsed_ms(),
             error=str(exc),
         )
-        raise HttpError(502, str(exc)) from exc
+        raise HttpError(502, exc.client_message) from exc
 
     record_chat_trace(
         user=user,
