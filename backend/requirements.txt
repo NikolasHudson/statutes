@@ -855,10 +855,12 @@ langsmith==0.8.18 \
     --hash=sha256:32dde9c0e67e053e0fb738921fc8ced768af7b8fa83d7a0e3fd63597cf8776dd \
     --hash=sha256:3940183349993faef48e6c7d08e4822ee9cefd906b362d0e3c2d650314d2f282
     # via langchain-core
-markdown-it-py==4.2.0 \
-    --hash=sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49 \
-    --hash=sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a
-    # via rich
+markdown-it-py==3.0.0 \
+    --hash=sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1 \
+    --hash=sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb
+    # via
+    #   -r requirements.in
+    #   rich
 mcp[cli]==1.27.2 \
     --hash=sha256:8e02db104096d1c25b28e64bde29a5c32b31bc241710213e12fd4d84985bdfef \
     --hash=sha256:d6ff5160c6ca65d93013626efb3fc249de683c30b2d8570755ceddd490344de5

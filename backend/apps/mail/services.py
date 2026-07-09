@@ -19,13 +19,14 @@ one per sender per day.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from datetime import timedelta
 from email.utils import make_msgid
 from types import SimpleNamespace
 
 from django.core.cache import cache
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.utils import timezone
 from ninja.errors import HttpError
@@ -42,6 +43,7 @@ from apps.api.trace_capture import record_chat_trace
 from apps.tenancy.entitlement import is_entitled
 from django.conf import settings as django_settings
 
+from . import render
 from .models import AssistantAddress, EmailThread, InboundEmail, OutboundEmail
 
 logger = logging.getLogger(__name__)
@@ -150,14 +152,11 @@ def _process(inbound: InboundEmail) -> None:
         return
 
     # -- Thread + body -------------------------------------------------------
-    body = (inbound.body_text or "").strip()
-    if not body:
-        _finish(inbound, InboundEmail.Status.IGNORED, "empty body")
-        return
-
     thread = _resolve_thread(inbound, address, user)
 
-    if body.upper() == "STOP":
+    # STOP is judged on the stripped text: it's a bare reply action, and a
+    # quoted chain containing the word STOP must not trip it.
+    if (inbound.body_text or "").strip().upper() == "STOP":
         if thread.pk:
             thread.status = EmailThread.Status.SUPPRESSED
             thread.save(update_fields=["status", "last_activity"])
@@ -166,6 +165,12 @@ def _process(inbound: InboundEmail) -> None:
     if thread.status != EmailThread.Status.OPEN:
         _finish(inbound, InboundEmail.Status.IGNORED, f"thread {thread.status}")
         return
+
+    body = _turn_body(inbound, thread_is_new=thread.pk is None)
+    if not body:
+        _finish(inbound, InboundEmail.Status.IGNORED, "empty body")
+        return
+
     if thread.pk is None:
         thread.save()
 
@@ -223,7 +228,12 @@ def _process(inbound: InboundEmail) -> None:
     _record_trace(user, messages, source_slug, content, trace, actual_model, started)
 
     # -- Reply + persist state ------------------------------------------------
-    _send_reply(inbound, address, thread, user, content)
+    # Official PDFs attach only when the sender EXPRESSLY asked ("send me the
+    # pdf of § 714.16") — links are always offered, attachments are opt-in.
+    attachments = (
+        render.official_pdf_attachments(body) if render.wants_pdf(body) else []
+    )
+    _send_reply(inbound, address, thread, user, content, attachments=attachments)
 
     # New list, not append: run_chat_turn's caller-visible contract is that
     # `messages` is the turn INPUT; mutating it afterwards would surprise any
@@ -242,6 +252,33 @@ def _process(inbound: InboundEmail) -> None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+# Forward indicators: "Fwd:"/"FW:" subjects and the separator lines Gmail,
+# Outlook, and Apple Mail insert above forwarded material.
+_FORWARD_RE = re.compile(
+    r"(?im)^\s*(?:fwd?|fw)\s*:|-{2,}\s*Forwarded message\s*-{2,}|^Begin forwarded message"
+)
+
+
+def _turn_body(inbound: InboundEmail, *, thread_is_new: bool) -> str:
+    """The text handed to the model as this turn's user message.
+
+    Postmark's StrippedTextReply removes everything below a reply/forward
+    separator. That's right for a reply inside our thread (our own previous
+    answer is quoted there, and it's already in the thread history) — but a
+    FORWARDED email is the payload, not noise: an attorney forwarding a
+    client's message wants THAT analyzed, and stripping it leaves only their
+    one-line cover note. So: new conversations and anything forward-shaped
+    get the full body; only in-thread replies get the stripped form."""
+    payload = inbound.raw_payload or {}
+    stripped = str(payload.get("StrippedTextReply") or "").strip()
+    full = str(payload.get("TextBody") or "").strip() or (inbound.body_text or "").strip()
+    if thread_is_new:
+        return full or stripped
+    if _FORWARD_RE.search(inbound.subject or "") or _FORWARD_RE.search(full):
+        return full or stripped
+    return stripped or full
 
 
 def _resolve_thread(
@@ -286,9 +323,9 @@ def _reply_subject(inbound: InboundEmail, thread: EmailThread) -> str:
     return f"Re: {subject}"
 
 
-def _footer(address: AssistantAddress, thread: EmailThread) -> str:
+def _footer_lines(address: AssistantAddress, thread: EmailThread) -> list[str]:
     today = timezone.localdate().isoformat()
-    lines = ["", "--"]
+    lines = []
     if address.signature:
         lines.append(address.signature)
     lines += [
@@ -301,7 +338,16 @@ def _footer(address: AssistantAddress, thread: EmailThread) -> str:
     ]
     if address.disclaimer:
         lines.append(address.disclaimer)
-    return "\n".join(lines)
+    return lines
+
+
+def _link_base_url(address: AssistantAddress) -> str:
+    """Citation links point at the product's own front door when it has one
+    (a scoped app keeps its users on its domain); else the flagship."""
+    product = address.product
+    if product is not None and product.hostname:
+        return f"https://{product.hostname}"
+    return django_settings.EMAIL_LINK_BASE_URL
 
 
 def _plus_address(address: AssistantAddress, thread: EmailThread) -> str:
@@ -315,14 +361,27 @@ def _send_reply(
     thread: EmailThread,
     user,
     content: str,
+    *,
+    attachments: list[tuple[str, bytes]] | None = None,
 ) -> None:
     """Send one reply and record it. To/Reply-To discipline: the reply goes
     ONLY to the registered account email (which the SPF/DKIM gate authenticated
-    as the actual sender) — never to a Reply-To the message asked for."""
+    as the actual sender) — never to a Reply-To the message asked for.
+
+    The text/plain part is the untouched answer plus a Sources list; the
+    text/html alternative carries inline citation links. Both are built by
+    apps/mail/render from the same linkify pass, so they can't disagree."""
     if thread.pk is None:  # failure notices can arrive before the thread saved
         thread.save()
     subject = _reply_subject(inbound, thread)
-    body = content + _footer(address, thread)
+    linked = render.linkify(content, base_url=_link_base_url(address))
+    footer_lines = _footer_lines(address, thread)
+    text_body = (
+        content + linked.sources_text() + "\n\n--\n" + "\n".join(footer_lines)
+    )
+    html_body = render.render_html_body(
+        linked.markdown + linked.sources_markdown(), footer_lines
+    )
     local, _, domain = address.address.partition("@")
     message_id = make_msgid(domain=domain or None)
 
@@ -332,21 +391,24 @@ def _send_reply(
         refs = (inbound.references or "").split()
         headers["References"] = " ".join([*refs, inbound.rfc_message_id][-10:])
 
-    email = EmailMessage(
+    email = EmailMultiAlternatives(
         subject=subject,
-        body=body,
+        body=text_body,
         from_email=f'"{address.display_name}" <{address.address}>',
         to=[user.email],
         reply_to=[_plus_address(address, thread)],
         headers=headers,
     )
+    email.attach_alternative(html_body, "text/html")
+    for filename, blob in attachments or []:
+        email.attach(filename, blob, "application/pdf")
     email.send(fail_silently=False)
     OutboundEmail.objects.create(
         thread=thread,
         in_reply_to_inbound=inbound,
         message_id=message_id,
         subject=subject,
-        body_text=body,
+        body_text=text_body,
     )
 
 

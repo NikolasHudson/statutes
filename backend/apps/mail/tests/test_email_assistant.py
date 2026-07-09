@@ -429,3 +429,115 @@ class ProcessingTests(TestCase):
         inbound = self.process(self.make_inbound(body_text="   "))
         self.assertEqual(inbound.status, InboundEmail.Status.IGNORED)
         turn.assert_not_called()
+
+    # -- Body selection (forwards vs replies) -----------------------------------
+
+    @mock.patch("apps.mail.services.run_chat_turn", return_value=ANSWER)
+    def test_forwarded_email_uses_full_body_not_stripped(self, turn):
+        """An attorney forwarding a client email types a one-line cover note;
+        Postmark's StrippedTextReply strips the forwarded material as if it
+        were a quoted chain. The model must see the whole thing."""
+        full = (
+            "Can we help? What claims do they have if anything?\n\n"
+            "---------- Forwarded message ---------\n"
+            "From: Sarah Jenkins\n\n"
+            "A pipe burst and black mold has grown all over the drywall..."
+        )
+        inbound = self.process(
+            self.make_inbound(
+                subject="Fwd: need legal help",
+                body_text="Can we help? What claims do they have if anything?",
+                raw_payload={
+                    "StrippedTextReply": "Can we help? What claims do they have if anything?",
+                    "TextBody": full,
+                },
+            )
+        )
+        self.assertEqual(inbound.status, InboundEmail.Status.ANSWERED)
+        sent_body = turn.call_args.kwargs["messages"][-1]["content"]
+        self.assertIn("black mold", sent_body)
+
+    @mock.patch("apps.mail.services.run_chat_turn", return_value=ANSWER)
+    def test_forward_with_no_cover_note_still_answered(self, turn):
+        """Forward without typing anything: StrippedTextReply is empty, but
+        the message must not be dropped as 'empty body'."""
+        inbound = self.process(
+            self.make_inbound(
+                body_text="",
+                raw_payload={
+                    "StrippedTextReply": "",
+                    "TextBody": "Begin forwarded message\nclient facts here",
+                },
+            )
+        )
+        self.assertEqual(inbound.status, InboundEmail.Status.ANSWERED)
+        self.assertIn(
+            "client facts",
+            turn.call_args.kwargs["messages"][-1]["content"],
+        )
+
+    @mock.patch("apps.mail.services.run_chat_turn", return_value=ANSWER)
+    def test_in_thread_reply_still_uses_stripped_text(self, turn):
+        """Replies inside a thread keep the stripped form so our own quoted
+        answer isn't re-fed (it's already in the thread history)."""
+        thread = EmailThread.objects.create(
+            address=self.address, user=self.user,
+            messages=[{"role": "user", "content": "q1"},
+                      {"role": "assistant", "content": "a1"}],
+        )
+        self.process(
+            self.make_inbound(
+                mailbox_hash=thread.token,
+                body_text="What about an LLC?",
+                raw_payload={
+                    "StrippedTextReply": "What about an LLC?",
+                    "TextBody": "What about an LLC?\n\n> On Jul 9 the assistant wrote:\n> a1",
+                },
+            )
+        )
+        self.assertEqual(
+            turn.call_args.kwargs["messages"][-1]["content"], "What about an LLC?"
+        )
+
+    # -- Rich rendering ---------------------------------------------------------
+
+    @mock.patch("apps.mail.services.run_chat_turn")
+    def test_reply_carries_linked_html_alternative(self, turn):
+        from apps.api.tests._factories import make_iowa_corpus_minimal
+
+        _, section, _ = make_iowa_corpus_minimal()
+        turn.return_value = ("See Iowa Code § 714.16 for the rule.", "gpt-5-mini")
+        self.process(self.make_inbound())
+
+        sent = mail.outbox[0]
+        # Plaintext part: untouched prose + a Sources list with raw URLs.
+        self.assertIn("See Iowa Code § 714.16 for the rule.", sent.body)
+        self.assertIn(f"https://corpus.nick.law/section/{section.id}", sent.body)
+        self.assertIn("official PDF: https://www.legis.iowa.gov", sent.body)
+        # HTML part: inline anchor on the citation.
+        ((html_body, mimetype),) = sent.alternatives
+        self.assertEqual(mimetype, "text/html")
+        self.assertIn(f'href="https://corpus.nick.law/section/{section.id}"', html_body)
+
+    @mock.patch("apps.mail.services.render.requests.get")
+    @mock.patch("apps.mail.services.run_chat_turn", return_value=ANSWER)
+    def test_pdf_attached_only_on_express_request(self, turn, get):
+        from apps.api.tests._factories import make_iowa_corpus_minimal
+
+        make_iowa_corpus_minimal()
+        get.return_value = mock.Mock(status_code=200, content=b"%PDF-1.7 fake")
+
+        # No "pdf" in the question: no attachment, no fetch.
+        self.process(self.make_inbound(body_text="What does Iowa Code § 714.16 say?"))
+        self.assertEqual(mail.outbox[0].attachments, [])
+        get.assert_not_called()
+
+        # Express request: the official PDF rides along.
+        self.process(
+            self.make_inbound(
+                body_text="Please send the PDF of Iowa Code § 714.16."
+            )
+        )
+        (attachment,) = mail.outbox[1].attachments
+        self.assertEqual(attachment[0], "Iowa Code 714.16.pdf")
+        self.assertEqual(attachment[2], "application/pdf")

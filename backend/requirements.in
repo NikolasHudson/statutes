@@ -35,6 +35,11 @@ redis>=5.2,<9
 # abstracts the ESP so a later SES/Mailgun move is a settings swap, not code.
 # Only the backend is used; inbound is our own webhook (apps/mail/api.py).
 django-anymail[postmark]>=13.0,<14
+# Markdown -> HTML for the email-assistant's rich-text alternative part
+# (apps/mail/render.py). CommonMark implementation: LLM answers use "1)"
+# ordered lists and 2-space-nested bullets, which python-markdown mishandles.
+# Rendered with html=False so model output cannot inject raw HTML.
+markdown-it-py>=3.0,<4
 # --- Auth hardening / observability (security findings #6,#15,#26) ---
 # Brute-force login throttle + lockout, keyed on IP+username against the shared
 # cache (Redis in prod). See AXES_* in core/settings.py.

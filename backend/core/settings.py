@@ -63,6 +63,9 @@ env = environ.Env(
     # a spoofed From both leaks answers and creates backscatter, so this stays
     # on everywhere real mail arrives; tests toggle it off explicitly.
     EMAIL_REQUIRE_SENDER_AUTH=(bool, True),
+    # Where emailed citation links point for the flagship assistant address
+    # (a scoped product's address uses its own Product.hostname instead).
+    EMAIL_LINK_BASE_URL=(str, "https://corpus.nick.law"),
     # PR7: the *currency* axis, orthogonal to fidelity — is the case the user's
     # premise rests on still GOOD LAW? Deterministic (reads the PR3 treatment flag
     # already on the retrieved passage; no LLM), so it ships ON by default: a
@@ -109,6 +112,7 @@ DOCLING_TIMEOUT = env("DOCLING_TIMEOUT")
 POSTMARK_SERVER_TOKEN = env("POSTMARK_SERVER_TOKEN")
 EMAIL_INBOUND_WEBHOOK_TOKEN = env("EMAIL_INBOUND_WEBHOOK_TOKEN")
 EMAIL_REQUIRE_SENDER_AUTH = env("EMAIL_REQUIRE_SENDER_AUTH")
+EMAIL_LINK_BASE_URL = env("EMAIL_LINK_BASE_URL")
 if POSTMARK_SERVER_TOKEN:
     EMAIL_BACKEND = "anymail.backends.postmark.EmailBackend"
     ANYMAIL = {"POSTMARK_SERVER_TOKEN": POSTMARK_SERVER_TOKEN}
