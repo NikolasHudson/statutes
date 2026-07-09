@@ -1,0 +1,51 @@
+{
+  "_": [
+    "Domain-fit eval: does the assistant anchor answers in the body of law",
+    "that actually GOVERNS the fact pattern, instead of a real-but-wrong-",
+    "domain authority that would pass existence/quote verification?",
+    "",
+    "Born from a real failure (2026-07-09): a residential landlord-tenant",
+    "question (mold, rent withholding, deposit kept as 'liquidated damages')",
+    "was answered with Iowa Code § 554.2718 — the UCC Article 2 sale-of-goods",
+    "liquidated-damages rule — instead of ch. 562A's own provisions",
+    "(§ 562A.11 prohibited provisions, § 562A.12 deposits). The citation was",
+    "real, quoted accurately, and current, so the deterministic gate passed",
+    "it; the error is DOMAIN misapplication.",
+    "",
+    "New field vs the other eval sets: forbidden_paths — Node.path values",
+    "the answer must NOT cite. Scored as 'domain-fit clean' in the summary.",
+    "",
+    "Run against the full corpus (562A lives in iowa-code):",
+    "  python manage.py probe_chat --queries apps/api/data/chat_eval_domain_fit.json --source iowa-code"
+  ],
+  "queries": [
+    {
+      "question": "My client rents a residential apartment in Des Moines under a 12-month lease with a $3,100 security deposit. A pipe burst on May 10; the landlord did nothing for four days and black mold has made the unit uninhabitable, so the family moved to a hotel. After my client sent a certified letter demanding remediation and withheld one month's rent, the landlord declared breach, said he is keeping the entire deposit as 'liquidated damages,' and threatened eviction by text message. The lease has a clause saying the landlord is not liable for mold. Can my client terminate the lease and recover the deposit and hotel costs, and is the mold clause enforceable?",
+      "expected_paths": ["562A.11", "562A.21", "562A.12"],
+      "forbidden_paths": ["554.2718"],
+      "kind": "scenario",
+      "tags": ["landlord-tenant", "domain-fit", "regression-2026-07-09"]
+    },
+    {
+      "question": "Is a clause in a residential lease saying the landlord isn't liable for mold enforceable in Iowa?",
+      "expected_paths": ["562A.11", "562A.15"],
+      "forbidden_paths": ["554.2718"],
+      "kind": "search_substantive",
+      "tags": ["landlord-tenant", "domain-fit"]
+    },
+    {
+      "question": "An Iowa residential landlord wants to keep the tenant's whole security deposit as liquidated damages for early termination. What can a security deposit lawfully be applied to, and can it be kept as liquidated damages?",
+      "expected_paths": ["562A.12"],
+      "forbidden_paths": ["554.2718"],
+      "kind": "search_substantive",
+      "tags": ["landlord-tenant", "deposits", "domain-fit"]
+    },
+    {
+      "question": "Does an Iowa landlord have a duty to mitigate damages by re-renting after a tenant abandons a residential unit?",
+      "expected_paths": ["562A.29"],
+      "forbidden_paths": ["562A.27"],
+      "kind": "search_substantive",
+      "tags": ["landlord-tenant", "mitigation", "domain-fit", "critic-miscite-2026-07-09"]
+    }
+  ]
+}

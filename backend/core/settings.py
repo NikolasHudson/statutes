@@ -47,6 +47,12 @@ env = environ.Env(
     # (apps/corpus/services/query_rewrite.py). Both no-op without an OpenAI key.
     RAG_CLAIM_NLI=(bool, False),
     RAG_QUERY_REWRITE=(bool, False),
+    # PR8: domain-applicability check — one LLM call per answer classifying
+    # each cited authority as governs/analogy/inapplicable for the fact
+    # pattern (catches "real statute, wrong body of law": UCC § 554.2718
+    # applied to a residential lease). OFF by default like the other LLM
+    # layers; no-op without an OpenAI key. See apps/corpus/services/applicability.py.
+    RAG_APPLICABILITY_CHECK=(bool, False),
     # PR6: before answering, verify case-holding premises the USER asserts in the
     # question against the retrieved opinion, and inject a pre-answer caution so
     # the model doesn't anchor on a wrong premise. OFF by default; no-op without a
@@ -99,6 +105,7 @@ RAG_ABSTAIN_BLOCKING = env("RAG_ABSTAIN_BLOCKING")
 RAG_STALE_BLOCK_SEVERITY = env("RAG_STALE_BLOCK_SEVERITY")
 RAG_CLAIM_NLI = env("RAG_CLAIM_NLI")
 RAG_QUERY_REWRITE = env("RAG_QUERY_REWRITE")
+RAG_APPLICABILITY_CHECK = env("RAG_APPLICABILITY_CHECK")
 RAG_PREMISE_CHECK = env("RAG_PREMISE_CHECK")
 RAG_CURRENCY_CHECK = env("RAG_CURRENCY_CHECK")
 DOCLING_SERVICE_URL = env("DOCLING_SERVICE_URL")

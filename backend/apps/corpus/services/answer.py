@@ -31,7 +31,7 @@ from typing import Any
 from django.conf import settings
 
 from apps.corpus.models import Source
-from apps.corpus.services import semantic_support
+from apps.corpus.services import applicability, semantic_support
 from apps.corpus.services.lookups import validate_citations, verify_quotes
 from apps.corpus.services.retrieval import RetrievedContext, RetrievedPassage
 
@@ -328,6 +328,7 @@ def verify_answer(
     source_slug: str | None = None,
     context: RetrievedContext | None = None,
     claim_checker: "semantic_support.SemanticChecker | None" = None,
+    applicability_checker: "applicability.ApplicabilityChecker | None" = None,
     premise_problems: list[dict[str, Any]] | None = None,
     question: str | None = None,
 ) -> dict[str, Any] | None:
@@ -382,6 +383,10 @@ def verify_answer(
 
     citation_problems: list[dict[str, str]] = []
     grounding_parts: list[str] = []
+    # PR8: the distinct authorities the answer cites (raw cite + resolved
+    # section heading), fed to the domain-applicability check below.
+    cited_authorities: list[dict[str, str]] = []
+    cited_seen: set[str] = set()
     confident_total = 0
     for idx, base in enumerate(base_items):
         items_here = [rep.items[idx] for rep in reports]
@@ -400,6 +405,13 @@ def verify_answer(
         best = max(items_here, key=lambda it: _STATUS_RANK.get(it.status, 0))
         if best.status in ("not_found", "repealed"):
             citation_problems.append({"raw": best.raw.strip(), "status": best.status})
+        elif best.status == "valid" and best.node is not None:
+            key = (cit.section or best.raw).strip().lower()
+            if key not in cited_seen:
+                cited_seen.add(key)
+                cited_authorities.append(
+                    {"raw": best.raw.strip(), "heading": best.node.heading or ""}
+                )
 
     # Quote check. We reuse ``verify_quotes`` purely to extract the quoted spans;
     # its own source-scoped citation pairing is ignored. A quote verifies when it
@@ -455,11 +467,27 @@ def verify_answer(
         if checker is not None:
             misgrounded = _misgrounded_claims(content, context, checker)
 
+    # PR8: domain applicability — a citation can be real, accurately quoted,
+    # and current, yet drawn from the wrong body of law (UCC § 554.2718
+    # applied to a residential lease). Same opt-in posture as PR5: runs when a
+    # checker is injected (tests) or ``RAG_APPLICABILITY_CHECK`` is on and a
+    # key resolves the default checker; otherwise a no-op. Only
+    # ``inapplicable`` verdicts (wrong domain presented as governing) are
+    # problems — a candid analogy is fine.
+    domain_problems: list[dict[str, Any]] = []
+    app_checker = applicability_checker
+    if app_checker is None and getattr(settings, "RAG_APPLICABILITY_CHECK", False):
+        app_checker = applicability.default_checker()
+    if app_checker is not None and question and cited_authorities:
+        verdicts = app_checker.check(question, cited_authorities)
+        domain_problems = [v for v in verdicts if v.get("fit") == "inapplicable"]
+
     premise_problems = premise_problems or []
     return {
         "ok": (
             not citation_problems and not quote_problems
             and not stale_silent and not misgrounded and not premise_problems
+            and not domain_problems
         ),
         "source_label": primary.name if primary else "any loaded source",
         "citations_total": confident_total,
@@ -473,6 +501,9 @@ def verify_answer(
         "stale_used": stale_used,
         # Additive (PR5): caselaw claims the retrieved opinion contradicts.
         "misgrounded": misgrounded,
+        # Additive (PR8): cited authorities whose body of law does not govern
+        # the fact pattern (real cite, wrong domain).
+        "domain_problems": domain_problems,
         # Additive (PR6): the USER's case-holding premises the opinion doesn't
         # support (computed pre-answer by the chat layer; passed through here so
         # the trace + advisory carry one unified report).
@@ -523,6 +554,19 @@ def render_advisory(report: dict[str, Any]) -> str:
             f"- The characterization of **{cite}** (“{claim_txt}”) is not "
             f"supported by — and may conflict with — the retrieved opinion text. "
             f"Re-read the case before relying on this point."
+        )
+    for d in report.get("domain_problems", []):
+        heading = d.get("heading") or ""
+        heading_txt = f" (“{heading}”)" if heading else ""
+        reason = (d.get("reason") or "").strip().rstrip(".")
+        reason_txt = (
+            f": {reason}" if reason
+            else " — its chapter addresses a different subject matter"
+        )
+        lines.append(
+            f"- **{d['raw']}**{heading_txt} may not govern this fact "
+            f"pattern{reason_txt}. Check whether an on-domain provision "
+            f"controls before relying on it."
         )
     for pp in report.get("premise_problems", []):
         # Currency axis (PR7): the premise rests on a case that is no longer good

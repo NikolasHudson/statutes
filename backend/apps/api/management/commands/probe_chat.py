@@ -90,6 +90,11 @@ class TurnOutcome:
     # For out_of_scope: True if the answer abstained from citing any rule
     # (the right behaviour), False if it cited something.
     abstained: bool | None
+    # Domain-fit scoring: paths the answer must NOT cite (the wrong-body-of-
+    # law trap, e.g. UCC 554.2718 on a residential-lease question). None when
+    # the entry declared none; else the offending paths found in the answer.
+    forbidden_paths: list[str] | None = None
+    forbidden_cited: list[str] | None = None
 
 
 class Command(BaseCommand):
@@ -248,6 +253,7 @@ class Command(BaseCommand):
                 {
                     "question": q,
                     "expected_paths": list(entry.get("expected_paths") or []),
+                    "forbidden_paths": list(entry.get("forbidden_paths") or []),
                     "tags": list(entry.get("tags") or []),
                     "kind": entry.get("kind") or DEFAULT_KIND,
                 }
@@ -289,6 +295,15 @@ class Command(BaseCommand):
 
         retrieved_paths = _all_retrieved_paths(trace)
         cited_paths = sorted(p for p in retrieved_paths if p and p in content)
+        # Forbidden paths are scanned against the ANSWER TEXT directly (not
+        # cited_paths): the failure mode is the model writing the citation
+        # from memory, whether or not it retrieved the section.
+        forbidden_paths = list(entry.get("forbidden_paths") or [])
+        forbidden_cited = (
+            sorted(p for p in forbidden_paths if p and p in content)
+            if forbidden_paths
+            else None
+        )
         abstained: bool | None = None
         if expected_paths:
             expected_in_corpus = sorted(set(expected_paths) & loaded_paths)
@@ -326,6 +341,8 @@ class Command(BaseCommand):
             retrieval_hit=retrieval_hit,
             cite_hit=cite_hit,
             abstained=abstained,
+            forbidden_paths=forbidden_paths or None,
+            forbidden_cited=forbidden_cited,
         )
 
     # ------------------------------------------------------------------
@@ -403,6 +420,20 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"  {word}  cited={o.cited_paths or []}"
             )
+
+        if o.forbidden_paths:
+            self.stdout.write("")
+            self.stdout.write(
+                self.style.HTTP_INFO(
+                    f"Domain fit vs forbidden_paths={o.forbidden_paths!r}:"
+                )
+            )
+            word = (
+                self.style.ERROR("CITED FORBIDDEN")
+                if o.forbidden_cited
+                else self.style.SUCCESS("CLEAN")
+            )
+            self.stdout.write(f"  {word}  offending={o.forbidden_cited or []}")
 
     def _render_call(self, n: int, call: dict, answer: str) -> None:
         name = call.get("name", "?")
@@ -538,6 +569,15 @@ class Command(BaseCommand):
                 f"({abst / len(oos):.0%})"
             )
 
+        guarded = [o for o in outcomes if o.forbidden_paths]
+        if guarded:
+            clean = sum(1 for o in guarded if not o.forbidden_cited)
+            self.stdout.write("")
+            self.stdout.write(
+                f"  domain-fit clean (no forbidden):  {clean}/{len(guarded)} "
+                f"({clean / len(guarded):.0%})"
+            )
+
         # Per-kind breakdown — useful for spotting "scenarios are weak even
         # though lookups are 100%" without re-reading every block.
         by_kind: dict[str, list[TurnOutcome]] = {}
@@ -597,6 +637,8 @@ class Command(BaseCommand):
                     "retrieval_hit": o.retrieval_hit,
                     "cite_hit": o.cite_hit,
                     "abstained": o.abstained,
+                    "forbidden_paths": o.forbidden_paths,
+                    "forbidden_cited": o.forbidden_cited,
                     "tool_calls": o.trace,
                 }
                 for o in outcomes
