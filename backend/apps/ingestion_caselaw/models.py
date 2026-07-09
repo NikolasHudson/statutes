@@ -59,6 +59,7 @@ class IngestionRun(models.Model):
     PHASE_CHOICES = [
         ("acquire", "Acquire"),
         ("write", "Write"),
+        ("update", "Incremental update"),
     ]
 
     raw = models.ForeignKey(
@@ -77,6 +78,14 @@ class IngestionRun(models.Model):
     nodes_repealed = models.PositiveIntegerField(default=0)
     nodes_unchanged = models.PositiveIntegerField(default=0)
     last_cluster_id = models.PositiveBigIntegerField(null=True, blank=True)
+    cursor_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Incremental-update high-water mark: everything CL added "
+        "(date_created) before this instant has been swept. Set only on "
+        "phase='update' runs; the next run resumes from the latest approved "
+        "cursor minus an overlap window.",
+    )
     validation_errors = models.JSONField(default=list, blank=True)
     log = models.TextField(blank=True)
 

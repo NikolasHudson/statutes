@@ -182,10 +182,30 @@ trigger still drives it, just at the chunk grain. Independently runnable/resumab
 search lights up after this pass. `body_text` is preserved at ingestion so this needs no
 re-ingest.
 
-### Phase 5 — Ongoing updates (free)
+### Phase 5 — Ongoing updates (free) — BUILT 2026-07-07
 
-Weekly: API `GET /clusters?court=iowa&court=iowactapp&date_filed__gte=<last_run>` →
-same Parse→Write→Embed path. Well under the free 125/day rate limit.
+`manage.py update_iowa_caselaw --out-dir <base>` (cron wrapper:
+`deploy/update_caselaw_daily.sh`). Differs from the original sketch in three
+API realities (verified against the live v4 API):
+
+- Cursor is **`date_created`** (when CL added the row), not `date_filed` — CL
+  harvests cases late, so a filed-date cursor would skip them forever. The
+  cursor (run-start time) is stored on a `phase="update"` `IngestionRun` and
+  only advances when the whole pipeline succeeds; each sweep backs off
+  `--overlap-days` (default 2), which idempotent re-ingest makes free.
+- `docket__court__in` is a 400; one sweep per court. Opinions come from a bulk
+  `/opinions/?cluster__docket__court=…` sweep (not per-cluster fetches) to fit
+  the 5/min–50/hr–125/day default token budget.
+- The v4 API inlines cluster citations without their bulk ids, and fresh cases
+  have none anyway; any that appear get stable *negative* synthetic
+  `cl_citation_id`s (real positive ids arrive with the quarterly bulk reload).
+
+The command writes the standard 4-file JSONL slice to a timestamped dir, then
+chains ingest → load_case_citations → build_caselaw_display →
+backfill_caselaw_cross_references → chunk_caselaw → embed_chunks (skipped
+with a warning if `VOYAGE_API_KEY` is unset). Depth-weighted citation-graph
+edges (`build_caselaw_citation_graph`) remain quarterly-bulk-only; new cases
+get day-one inline-link edges from the xref backfill.
 
 ## Resumability summary
 
