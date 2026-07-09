@@ -1160,12 +1160,18 @@ def run_chat_turn(
                     if ctx is not None:
                         search_contexts.append(ctx)
                 except Exception as exc:  # don't kill the loop on a bad arg
-                    result = {"error": f"{type(exc).__name__}: {exc}"}
+                    # Tool results are client-visible (trace in the response /
+                    # done event), so expose the type only; detail to the log.
+                    logger.exception("chat tool call failed")
+                    result = {"error": f"tool call failed: {type(exc).__name__}"}
             else:
                 try:
                     result = handler(args)
                 except Exception as exc:  # don't kill the loop on a bad arg
-                    result = {"error": f"{type(exc).__name__}: {exc}"}
+                    # Tool results are client-visible (trace in the response /
+                    # done event), so expose the type only; detail to the log.
+                    logger.exception("chat tool call failed")
+                    result = {"error": f"tool call failed: {type(exc).__name__}"}
 
             trace.append(
                 ToolCallTrace(
@@ -1392,12 +1398,18 @@ def run_chat_turn_stream(
                     if ctx is not None:
                         search_contexts.append(ctx)
                 except Exception as exc:  # don't kill the loop on a bad arg
-                    result = {"error": f"{type(exc).__name__}: {exc}"}
+                    # Tool results are client-visible (trace in the response /
+                    # done event), so expose the type only; detail to the log.
+                    logger.exception("chat tool call failed")
+                    result = {"error": f"tool call failed: {type(exc).__name__}"}
             else:
                 try:
                     result = handler(args)
                 except Exception as exc:  # don't kill the loop on a bad arg
-                    result = {"error": f"{type(exc).__name__}: {exc}"}
+                    # Tool results are client-visible (trace in the response /
+                    # done event), so expose the type only; detail to the log.
+                    logger.exception("chat tool call failed")
+                    result = {"error": f"tool call failed: {type(exc).__name__}"}
 
             trace.append(
                 ToolCallTrace(
