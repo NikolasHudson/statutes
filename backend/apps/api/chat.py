@@ -15,6 +15,7 @@ processes and deploys.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any
 
@@ -240,6 +241,8 @@ def _premise_guard(
 
 
 chat_router = Router()
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -1483,8 +1486,15 @@ def _stream_ndjson_events(
         error = "client disconnected"
         raise
     except Exception as exc:
+        # Full detail goes to the server log and the ChatTrace error row
+        # (via `error` in the finally block); the client only gets a generic
+        # line so internals (paths, SQL, upstream error bodies) never cross
+        # the wire.
         error = f"unexpected: {type(exc).__name__}: {exc}"
-        yield json.dumps({"type": "error", "message": error}) + "\n"
+        logger.exception("chat stream failed")
+        yield json.dumps(
+            {"type": "error", "message": "unexpected server error"}
+        ) + "\n"
     finally:
         record_chat_trace(
             user=user,
