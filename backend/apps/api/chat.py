@@ -1086,8 +1086,12 @@ def run_chat_turn(
                 token_state,
             )
         except Exception as exc:
+            # ChatTurnError text reaches the client (502 body / stream error
+            # line), so carry only the exception type; the full message stays
+            # in the server log.
+            logger.exception("OpenAI call failed")
             raise ChatTurnError(
-                f"OpenAI call failed: {exc}", trace=trace
+                f"OpenAI call failed: {type(exc).__name__}", trace=trace
             ) from exc
 
         choice = completion.choices[0]
@@ -1269,8 +1273,10 @@ def run_chat_turn_stream(
                 client, kwargs, _token_budget(model), token_state
             )
         except Exception as exc:
+            # Client-visible (see run_chat_turn): type name only.
+            logger.exception("OpenAI call failed")
             raise ChatTurnError(
-                f"OpenAI call failed: {exc}", trace=trace
+                f"OpenAI call failed: {type(exc).__name__}", trace=trace
             ) from exc
 
         content_parts: list[str] = []
@@ -1309,8 +1315,10 @@ def run_chat_turn_stream(
                 if getattr(chunk, "model", None):
                     actual_model = chunk.model
         except Exception as exc:
+            # Client-visible (see run_chat_turn): type name only.
+            logger.exception("OpenAI stream interrupted")
             raise ChatTurnError(
-                f"OpenAI stream interrupted: {exc}", trace=trace
+                f"OpenAI stream interrupted: {type(exc).__name__}", trace=trace
             ) from exc
 
         content = "".join(content_parts)
