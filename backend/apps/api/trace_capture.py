@@ -220,3 +220,47 @@ def record_verification_run(
         )
     except Exception:  # noqa: BLE001 — capture must not break verification
         logger.exception("verification run capture failed")
+
+
+def record_search_log(
+    *,
+    user,
+    query: str,
+    mode: str,
+    mode_source: str,
+    detection: dict,
+    filters: dict,
+    offset: int,
+    limit: int,
+    result_count: int,
+    total: int,
+    total_exact: bool,
+    latency_ms: int | None = None,
+    error: str = "",
+) -> None:
+    """Persist one research-search call. Never raises (same contract as
+    :func:`record_chat_trace`), gated by the same ``CHAT_TRACE_CAPTURE``
+    switch. ``user`` is accepted for signature symmetry but — like every
+    table in this module — deliberately not persisted."""
+    if not getattr(settings, "CHAT_TRACE_CAPTURE", True):
+        return
+    try:
+        from apps.api.models import SearchLog
+
+        SearchLog.objects.create(
+            user=None,  # unattributed by design; see ChatTrace
+            query=query or "",
+            mode=mode,
+            mode_source=mode_source,
+            detection=detection or {},
+            filters={k: v for k, v in (filters or {}).items() if v},
+            offset=max(0, offset),
+            limit=max(0, limit),
+            result_count=max(0, result_count),
+            total=max(0, total),
+            total_exact=bool(total_exact),
+            latency_ms=latency_ms,
+            error=error or "",
+        )
+    except Exception:  # noqa: BLE001 — logging must not break search
+        logger.exception("search log capture failed")

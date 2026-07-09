@@ -7,7 +7,12 @@
 import type { AdvancedFilters } from "@/components/browse/advanced-search";
 import type { SearchFilters } from "@/lib/iowa-browse";
 
-export function buildSearchQuery(q: string, sf: SearchFilters): string {
+export function buildSearchQuery(
+	q: string,
+	sf: SearchFilters,
+	mode?: string | null,
+	sort?: string | null,
+): string {
 	const p = new URLSearchParams();
 	p.set("q", q);
 	if (sf.doc_type) p.set("doc_type", sf.doc_type);
@@ -15,7 +20,21 @@ export function buildSearchQuery(q: string, sf: SearchFilters): string {
 	if (sf.status) p.set("status", sf.status);
 	if (sf.date_from) p.set("from", sf.date_from);
 	if (sf.date_to) p.set("to", sf.date_to);
+	if (mode) p.set("mode", mode);
+	if (sort && sort !== "relevance") p.set("sort", sort);
 	return p.toString();
+}
+
+// The explicit search-mode override ("tc" | "natural"); null = auto-detect.
+export function modeFromParams(sp: URLSearchParams): string | null {
+	const m = sp.get("mode");
+	return m === "tc" || m === "natural" ? m : null;
+}
+
+// The sort order; "relevance" is the default and never appears in the URL.
+export function sortFromParams(sp: URLSearchParams): string {
+	const s = sp.get("sort");
+	return s === "date_desc" || s === "date_asc" ? s : "relevance";
 }
 
 export function searchFiltersFromParams(sp: URLSearchParams): SearchFilters {

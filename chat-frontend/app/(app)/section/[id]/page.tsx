@@ -15,8 +15,15 @@ import {
 	PrinterIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import {
+	type ReactNode,
+	Suspense,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import {
 	KVList,
 	Notification,
@@ -31,9 +38,28 @@ import {
 	type NodeDetail,
 } from "@/lib/iowa-browse";
 import { parseStatuteBlocks, statuteIndentRem } from "@/lib/statute-format";
+import { useSearchHighlight } from "@/lib/use-search-highlight";
 
+// useSearchParams() must be read inside a Suspense boundary.
 export default function V2SectionPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="px-5 py-10 text-[var(--cds-text-2)] text-sm sm:px-8">
+					Loading…
+				</div>
+			}
+		>
+			<SectionPageInner />
+		</Suspense>
+	);
+}
+
+function SectionPageInner() {
 	const params = useParams<{ id: string }>();
+	// The query that led here (results-page click-through) — highlighted in
+	// the section body, same contract as the case reader.
+	const searchQuery = (useSearchParams().get("q") ?? "").trim();
 	const nodeId = /^\d+$/.test(params.id) ? Number(params.id) : Number.NaN;
 
 	const [node, setNode] = useState<NodeDetail | null>(null);
@@ -93,17 +119,24 @@ export default function V2SectionPage() {
 		);
 	}
 
-	return <SectionReader node={node} chapter={chapter} />;
+	return (
+		<SectionReader node={node} chapter={chapter} searchQuery={searchQuery} />
+	);
 }
 
 function SectionReader({
 	node,
 	chapter,
+	searchQuery,
 }: {
 	node: NodeDetail;
 	chapter: ChapterDetail | null;
+	searchQuery: string;
 }) {
+	const router = useRouter();
+	const articleRef = useRef<HTMLElement>(null);
 	const [copied, setCopied] = useState(false);
+	const highlightMatches = useSearchHighlight(articleRef, searchQuery, true);
 	const tail = node.citation.trim().split(/\s+/).pop() || node.citation;
 
 	const copyCitation = async () => {
@@ -158,6 +191,23 @@ function SectionReader({
 					<span className="font-semibold">{tail}</span>
 				</p>
 				<div className="ml-auto flex shrink-0 items-center gap-1">
+					{searchQuery && highlightMatches !== null && (
+						<span className="mr-1 hidden items-center gap-2 sm:flex">
+							<Tag kind={highlightMatches > 0 ? "blue" : "gray"}>
+								{highlightMatches > 0
+									? `${highlightMatches.toLocaleString()} match${highlightMatches === 1 ? "" : "es"}`
+									: "No matches"}
+							</Tag>
+							<button
+								type="button"
+								onClick={() => router.replace(`/section/${node.id}`)}
+								className="text-[11px] text-[var(--cds-helper)] transition-colors hover:text-[var(--cds-text)] hover:underline"
+								title="Clear search highlighting"
+							>
+								Clear
+							</button>
+						</span>
+					)}
 					<ToolbarButton onClick={copyCitation}>
 						{copied ? (
 							<CheckIcon className="size-4 text-[var(--cds-success-text)]" />
@@ -185,6 +235,7 @@ function SectionReader({
 			<div className="flex min-h-0 flex-1">
 				{/* Center — the section */}
 				<article
+					ref={articleRef}
 					aria-label={node.citation}
 					className="min-w-0 flex-1 overflow-y-auto print:overflow-visible"
 				>

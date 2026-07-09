@@ -152,3 +152,62 @@ class VerificationRun(models.Model):
             f"· {self.citations_total} cites "
             f"({self.green}/{self.yellow}/{self.red})"
         )
+
+
+class SearchLog(models.Model):
+    """One row per /api/research/search call.
+
+    Sibling of :class:`ChatTrace`: write-mostly, read-for-triage. This is the
+    only record of what attorneys actually type into the search box — it
+    drives ranking work (which modes run, which queries fail) and sequences
+    connector support (``detection.unsupported`` frequencies decide whether
+    /s and /p are worth building). Same confidentiality posture: unattributed
+    (``user`` stays null), writer never raises, purged on the ChatTrace
+    retention schedule.
+    """
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    # Unattributed, exactly like ChatTrace — SET_NULL so a user delete never
+    # cascades into the log; the writer always persists null.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="search_logs",
+    )
+
+    query = models.TextField()
+    # Intent routing: citation | boolean | natural, and whether the mode was
+    # auto-detected or a user override ("auto" | "user").
+    mode = models.CharField(max_length=16)
+    mode_source = models.CharField(max_length=8, default="auto")
+    # The classifier's evidence: {"operators": [...], "phrases": [...],
+    # "unsupported": [{"token", "treated_as", "message"}, ...]}.
+    detection = models.JSONField(default=dict, blank=True)
+    # Fielded filters as sent: doc_type/court/status/date_from/date_to/sort.
+    # No PII — these are corpus facets, never user data.
+    filters = models.JSONField(default=dict, blank=True)
+
+    offset = models.PositiveIntegerField(default=0)
+    limit = models.PositiveIntegerField(default=0)
+    result_count = models.PositiveIntegerField(default=0)
+    total = models.PositiveIntegerField(default=0)
+    # True when `total` is an exact match-set count (boolean mode), False for
+    # the reranked-pool ceiling (natural mode).
+    total_exact = models.BooleanField(default=False)
+
+    latency_ms = models.PositiveIntegerField(null=True, blank=True)
+    error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("-created_at",)),
+            models.Index(fields=("mode",)),
+        ]
+
+    def __str__(self) -> str:
+        q = (self.query or "").strip().replace("\n", " ")
+        return f"{self.created_at:%Y-%m-%d %H:%M} · [{self.mode}] {q[:60]}"

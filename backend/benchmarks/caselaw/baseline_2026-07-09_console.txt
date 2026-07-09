@@ -1,0 +1,29 @@
+    #18 State v. Short  (rank 10)
+        ↑ State of Iowa v. Isaac Andrew Baldon I…
+        ↑ State of Iowa v. Donald Joseph King
+        ↑ State Of Iowa Vs. James Maximiliano Oc…
+    #20 Berger v. Amana Society  (rank 10)
+        ↑ Berger v. Amana Society
+        ↑ Berger v. Amana Society
+        ↑ Berger v. Amana Society
+
+------------------------------------------------------------------------------
+latency (ms):
+  embed     p50=154  p90=165  max=170
+  vector    p50=806  p90=998  max=1467
+  fts       p50=18  p90=35  max=201
+  hybrid    p50=1821  p90=3490  max=3833
+  rc        p50=2172  p90=3836  max=6409
+
+Snapshot written: /tmp/claude-1000/-home-dev-statutes/6f37dbe5-5baf-41d0-9441-672a5f3968f5/scratchpad/evals/after_caselaw.json
+===SEARCH===
+Eval @ K=10
+  scored queries:    30
+  hit@10:           29/30 (97%)
+  mean precision@10: 0.103
+  mean recall@10:    0.956
+
+  by tag:
+    keyword              n= 18  hit@10=18/18  mean p@10=0.106
+    natural-language     n=  3  hit@10=2/3  mean p@10=0.067
+    paraphrase           n=  9  hit@10=9/9  mean p@10=0.111

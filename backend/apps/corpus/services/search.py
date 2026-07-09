@@ -33,8 +33,9 @@ from django.db import connection, transaction
 
 from apps.corpus.models import NodeVersion, ReviewStatus
 
+from .embedding_cache import embed_query_cached
 from .query_expansion import QueryExpander
-from .voyage import INPUT_TYPE_QUERY, EmbeddingClient, default_client
+from .voyage import EmbeddingClient
 
 
 # RRF k constant. 60 is the value from the original Cormack et al. 2009 paper
@@ -198,6 +199,256 @@ def fts_search(
     with connection.cursor() as cur:
         cur.execute(sql, [query, query, *vis_params, *src_params, limit])
         return [(int(row[0]), float(row[1])) for row in cur.fetchall()]
+
+
+_PAGED_FTS_FUNCS = {"websearch_to_tsquery", "to_tsquery"}
+_PAGED_FTS_ORDERS = {
+    "rank": "score DESC, id",
+    "date_desc": "date_filed DESC NULLS LAST, score DESC, id",
+    "date_asc": "date_filed ASC NULLS LAST, score DESC, id",
+}
+
+
+def _paged_fts_ctes(
+    tsquery: str,
+    *,
+    tsquery_func: str,
+    include_pending: bool,
+    source_slug: str | None,
+    metadata_contains: dict | None,
+    date_from: str | None,
+    date_to: str | None,
+    rank: bool = True,
+) -> tuple[str, list]:
+    """The shared CTE chain for the exhaustive boolean-mode queries:
+    ``matches`` (every FTS hit, opinion rolled up to its decision as
+    ``cluster_id``) → ``best`` (one best-scoring row per cluster) → ``scoped``
+    (decision-level attributes + date bounds). ``fts_search_paged`` appends a
+    page SELECT, ``search_facets_fts`` a GROUPING SETS aggregate — same match
+    set by construction, so page totals and facet counts can never disagree.
+
+    ``tsquery_func`` must already be whitelisted by the caller (it is
+    interpolated). Returns ``(sql_text, params)``.
+
+    ``rank=False`` skips ``ts_rank_cd`` (score fixed at 0): computing rank
+    detoasts every matching tsvector, which dominates cost on broad match
+    sets (measured 6.9s → 2.0s over a 78K-match term). Facet aggregation and
+    date-ordered pages never read the score, so they never pay for it."""
+    visibility, vis_params = _approved_filter_clause(include_pending)
+    src_join, src_where, src_params = _source_filter_clause(
+        source_slug, metadata_contains
+    )
+    date_wheres: list[str] = []
+    date_params: list = []
+    if date_from:
+        date_wheres.append("AND (c.source_metadata->>'date_filed') >= %s")
+        date_params.append(date_from)
+    if date_to:
+        date_wheres.append("AND (c.source_metadata->>'date_filed') <= %s")
+        date_params.append(date_to)
+
+    score_expr = (
+        f"ts_rank_cd(nv.search_vector, {tsquery_func}('english', %s))"
+        if rank
+        else "0.0"
+    )
+    ctes = f"""
+        WITH matches AS (
+            SELECT nv.id,
+                   nv.node_id,
+                   {score_expr} AS score,
+                   CASE WHEN nt.key = 'opinion' AND n.parent_id IS NOT NULL
+                        THEN n.parent_id ELSE n.id END AS cluster_id
+            FROM corpus_nodeversion nv
+            JOIN corpus_node n ON n.id = nv.node_id
+            JOIN corpus_nodetype nt ON nt.id = n.node_type_id
+            {src_join}
+            WHERE nv.effective_to IS NULL
+              AND nv.search_vector @@ {tsquery_func}('english', %s)
+              {visibility}
+              {src_where}
+        ),
+        best AS (
+            SELECT DISTINCT ON (m.cluster_id) m.*
+            FROM matches m
+            ORDER BY m.cluster_id, m.score DESC, m.id
+        ),
+        scoped AS (
+            SELECT b.*,
+                   c.source_metadata->>'date_filed' AS date_filed,
+                   c.source_metadata->>'court_id' AS court_id,
+                   c.source_metadata->>'precedential_status' AS status,
+                   s.slug AS source_slug
+            FROM best b
+            JOIN corpus_node c ON c.id = b.cluster_id
+            JOIN corpus_source s ON s.id = c.source_id
+            WHERE TRUE {' '.join(date_wheres)}
+        )
+    """
+    # The score expression only binds a param when ranking is on.
+    params = [
+        *([tsquery] if rank else []),
+        tsquery, *vis_params, *src_params, *date_params,
+    ]
+    return ctes, params
+
+
+def search_facets_fts(
+    tsquery: str,
+    *,
+    tsquery_func: str = "websearch_to_tsquery",
+    include_pending: bool = False,
+    source_slug: str | None = None,
+    metadata_contains: dict | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> dict:
+    """Exact facet counts over the boolean-mode match set, in one scan.
+
+    Returns ``{"sources": {slug: n}, "courts": {court_id: n},
+    "statuses": {status: n}, "decades": {"1990": n, ...}}`` computed with
+    GROUPING SETS over the same CTE chain as ``fts_search_paged`` (all current
+    filters applied). Decade buckets come from the decision's ``date_filed``
+    year; rows with no date (statutes/rules) simply don't appear in the
+    caselaw dimensions. A NULL group key within a set (e.g. court of a
+    statute row) is skipped on read."""
+    if tsquery_func not in _PAGED_FTS_FUNCS:
+        raise ValueError(f"unsupported tsquery func: {tsquery_func!r}")
+    if not tsquery.strip():
+        return {"sources": {}, "courts": {}, "statuses": {}, "decades": {}}
+
+    ctes, params = _paged_fts_ctes(
+        tsquery,
+        tsquery_func=tsquery_func,
+        include_pending=include_pending,
+        source_slug=source_slug,
+        metadata_contains=metadata_contains,
+        date_from=date_from,
+        date_to=date_to,
+        rank=False,  # aggregation never reads the score
+    )
+    sql = f"""
+        {ctes}
+        SELECT GROUPING(source_slug, court_id, status, decade) AS gmask,
+               source_slug, court_id, status, decade,
+               count(*) AS n
+        FROM (
+            SELECT source_slug, court_id, status,
+                   CASE WHEN date_filed ~ '^\\d{{4}}'
+                        THEN substr(date_filed, 1, 3) || '0'
+                   END AS decade
+            FROM scoped
+        ) dims
+        GROUP BY GROUPING SETS ((source_slug), (court_id), (status), (decade));
+    """
+    out: dict[str, dict] = {
+        "sources": {}, "courts": {}, "statuses": {}, "decades": {}
+    }
+    # GROUPING() bitmask over (source_slug, court_id, status, decade):
+    # 0 = grouped-by. 0b0111 → the (source_slug) set, etc.
+    by_mask = {
+        0b0111: ("sources", 1),
+        0b1011: ("courts", 2),
+        0b1101: ("statuses", 3),
+        0b1110: ("decades", 4),
+    }
+    with connection.cursor() as cur:
+        cur.execute(sql, params)
+        for row in cur.fetchall():
+            entry = by_mask.get(int(row[0]))
+            if entry is None:
+                continue
+            bucket, col = entry
+            key = row[col]
+            if key:
+                out[bucket][str(key)] = int(row[5])
+    return out
+
+
+def fts_search_paged(
+    tsquery: str,
+    *,
+    tsquery_func: str = "websearch_to_tsquery",
+    limit: int = 10,
+    offset: int = 0,
+    include_pending: bool = False,
+    source_slug: str | None = None,
+    metadata_contains: dict | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    order: str = "rank",
+) -> tuple[list[SearchHit], int]:
+    """Exhaustive FTS for the boolean (terms-and-connectors) search mode.
+
+    Unlike ``fts_search`` (a fixed-depth retriever feeding RRF), this is a
+    *complete* match-set query: an attorney typing connectors is asking for a
+    deterministic, auditable result set, so it returns the exact deduped total
+    (``count(*) OVER ()``) and supports true deep pagination — no candidate-pool
+    cap. Caselaw rows are deduped to one per decision (best-scoring opinion
+    wins) so the count means "cases", mirroring the browse search behavior.
+
+    ``tsquery`` is the pre-compiled query text for ``tsquery_func`` (see
+    ``search_intent.compile_boolean_tsquery``); the function name is whitelisted
+    here because it is interpolated into SQL. Date bounds live in-SQL (on the
+    decision's ``date_filed``, ISO strings compare lexicographically) so the
+    total stays honest under filtering; a date bound necessarily excludes
+    undated rows (statutes), matching the endpoint rule that any caselaw-only
+    filter forces the cases scope."""
+
+    if tsquery_func not in _PAGED_FTS_FUNCS:
+        raise ValueError(f"unsupported tsquery func: {tsquery_func!r}")
+    order_clause = _PAGED_FTS_ORDERS.get(order)
+    if order_clause is None:
+        raise ValueError(f"unsupported order: {order!r}")
+    if not tsquery.strip():
+        return [], 0
+
+    ctes, params = _paged_fts_ctes(
+        tsquery,
+        tsquery_func=tsquery_func,
+        include_pending=include_pending,
+        source_slug=source_slug,
+        metadata_contains=metadata_contains,
+        date_from=date_from,
+        date_to=date_to,
+        # Date-ordered pages never read the score; skipping ts_rank_cd is the
+        # difference between ~2s and ~7s on broad match sets.
+        rank=(order == "rank"),
+    )
+    sql = f"""
+        {ctes}
+        SELECT id, score, count(*) OVER () AS total
+        FROM scoped
+        ORDER BY {order_clause}
+        LIMIT %s OFFSET %s;
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql, [*params, limit, offset])
+        rows = cur.fetchall()
+
+    total = int(rows[0][2]) if rows else 0
+    ordered = [(int(r[0]), float(r[1])) for r in rows]
+    by_id = {
+        nv.id: nv
+        for nv in NodeVersion.objects.filter(
+            id__in=[i for i, _ in ordered]
+        ).select_related("node")
+    }
+    hits = [
+        SearchHit(
+            node_version_id=nv_id,
+            node_id=by_id[nv_id].node_id,
+            path=by_id[nv_id].node.path,
+            heading=by_id[nv_id].node.heading,
+            body_text=by_id[nv_id].body_text,
+            score=score,
+            component_scores={"fts": score},
+            chunk_id=None,
+        )
+        for nv_id, score in ordered
+        if nv_id in by_id
+    ]
+    return hits, total
 
 
 def trigram_search(
@@ -554,8 +805,7 @@ def vector_search(
 
     if not query.strip():
         return ([], {}) if with_chunks else []
-    client = client or default_client()
-    [vector] = client.embed_texts([query], input_type=INPUT_TYPE_QUERY)
+    vector = embed_query_cached(query, client=client)
     vector_literal = "[" + ",".join(f"{x:.7f}" for x in vector) + "]"
 
     version_hits = _vector_search_versions(

@@ -329,6 +329,101 @@ export const browseSearch = (
   return json<BrowseSearchResponse>(`/api/browse/search?${params.toString()}`);
 };
 
+// --- Authed research search (/api/research/search) -------------------------
+
+// How the server routed the query. "boolean" = terms-and-connectors (pure
+// keyword, exhaustive, exact total); "natural" = ranked best-results;
+// "citation" = pinned exact document. Never say "vector"/"semantic" in UI.
+export type SearchMode = "citation" | "boolean" | "natural";
+
+export type SearchDetection = {
+  operators: string[];
+  phrases: string[];
+  unsupported: { token: string; treated_as: string; message: string }[];
+};
+
+// Server-highlighted snippet: rendered as text nodes, never HTML. `hit`
+// spans are the terms the search engine actually matched (ts_headline for
+// boolean mode, query-term marking on the winning chunk for natural mode).
+export type SnippetSegment = { text: string; hit: boolean };
+
+// Good-law flag from the citator (only present when a real signal exists).
+export type TreatmentInfo = {
+  status: "good" | "caution" | "negative" | "unknown";
+  severity: number;
+  label: string;
+  by_citation: string;
+  excerpt: string;
+  source: string;
+  confidence: number;
+};
+
+export type SearchFacets = {
+  // "all_matches" = exact counts over the full match set (boolean mode);
+  // "top_results" = counts within the ranked pool (natural mode).
+  basis: "all_matches" | "top_results";
+  doc_types: { slug: string; count: number }[];
+  courts: {
+    court_id: string;
+    court_name: string;
+    court_level: number | null;
+    count: number;
+  }[];
+  statuses: { status: string; count: number }[];
+  decades: { decade: string; count: number }[];
+};
+
+export type ResearchSearchResult = BrowseSearchResult & {
+  snippet_segments?: SnippetSegment[];
+  treatment?: TreatmentInfo | null;
+  // Distinct citing decisions (citation graph; refreshed with the quarterly
+  // bulk reload, so very recent cases legitimately show none).
+  cited_by?: number | null;
+};
+
+export type SearchSort = "relevance" | "date_desc" | "date_asc";
+
+export type ResearchSearchResponse = Omit<BrowseSearchResponse, "results"> & {
+  results: ResearchSearchResult[];
+  mode: SearchMode;
+  // "auto" = detected from the query; "user" = explicit ?mode= override.
+  mode_source: "auto" | "user";
+  detection: SearchDetection;
+  // True when `total` is an exact match-set count (boolean/citation modes);
+  // false when it is the reranked-pool ceiling ("top N", natural mode).
+  total_exact: boolean;
+  facets: SearchFacets | null;
+  sort: SearchSort;
+  // "keyword" when the deterministic path ran (boolean, citation, or a
+  // date-sorted natural query); "ranked" for the reranked pipeline.
+  sort_path: "ranked" | "keyword";
+  error?: string;
+};
+
+// Intent-routed search for the signed-in app: natural-language queries get
+// the full ranked pipeline, terms-and-connectors get exhaustive keyword with
+// honest counts. `mode` forces a route ("tc" | "natural"); omit for auto.
+export const researchSearch = (
+  q: string,
+  filters: SearchFilters = {},
+  page = 1,
+  mode?: string | null,
+  sort?: string | null,
+) => {
+  const params = new URLSearchParams({ q });
+  for (const [k, v] of Object.entries(filters)) {
+    if (v) params.set(k, v);
+  }
+  if (mode) params.set("mode", mode);
+  if (sort && sort !== "relevance") params.set("sort", sort);
+  params.set("facets", "true");
+  params.set("limit", String(SEARCH_PAGE_SIZE));
+  params.set("offset", String((Math.max(1, page) - 1) * SEARCH_PAGE_SIZE));
+  return json<ResearchSearchResponse>(
+    `/api/research/search?${params.toString()}`,
+  );
+};
+
 // Caselaw browse list — recent decisions, optionally filtered by
 // court/status/year/date and faceted. Powers the search-first caselaw index.
 export type CaseListFilters = {

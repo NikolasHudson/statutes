@@ -23,6 +23,7 @@ import datetime as dt
 from types import SimpleNamespace
 from unittest import mock
 
+from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase, tag
 
 from apps.corpus.models import (
@@ -148,13 +149,17 @@ class RetrievePipelineTests(TestCase):
     on the pipeline's structure, not on opaque embedding/cross-encoder scores."""
 
     def setUp(self):
-        # retrieve_context -> hybrid_search -> vector_search -> default_client().
+        # retrieve_context -> hybrid_search -> vector_search ->
+        # embed_query_cached -> default_client(). The query-embedding cache
+        # is cleared so no vector leaks between tests.
         patcher = mock.patch(
-            "apps.corpus.services.search.default_client",
+            "apps.corpus.services.embedding_cache.default_client",
             return_value=FakeEmbeddingClient(),
         )
         patcher.start()
         self.addCleanup(patcher.stop)
+        cache.clear()
+        self.addCleanup(cache.clear)
 
         j = Jurisdiction.objects.create(slug="ia", name="Iowa", abbreviation="IA")
         self.caselaw = Source.objects.create(

@@ -27,7 +27,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.api.models import ChatTrace, VerificationRun
+from apps.api.models import ChatTrace, SearchLog, VerificationRun
 
 
 class Command(BaseCommand):
@@ -96,21 +96,24 @@ class Command(BaseCommand):
         cutoff = timezone.now() - timedelta(days=days)
         stale_traces = ChatTrace.objects.filter(created_at__lt=cutoff)
         stale_runs = VerificationRun.objects.filter(created_at__lt=cutoff)
+        stale_searches = SearchLog.objects.filter(created_at__lt=cutoff)
 
         if options["dry_run"]:
             self.stdout.write(
-                f"[dry-run] {stale_traces.count()} chat trace(s) and "
-                f"{stale_runs.count()} verification run(s) older than {days}d "
+                f"[dry-run] {stale_traces.count()} chat trace(s), "
+                f"{stale_runs.count()} verification run(s) and "
+                f"{stale_searches.count()} search log(s) older than {days}d "
                 f"(before {cutoff.isoformat()}) would be deleted."
             )
             return
 
         deleted_traces, _ = stale_traces.delete()
         deleted_runs, _ = stale_runs.delete()
+        deleted_searches, _ = stale_searches.delete()
         self.stdout.write(
             self.style.SUCCESS(
-                f"Deleted {deleted_traces} chat trace(s) and {deleted_runs} "
-                f"verification run(s) older than {days}d "
-                f"(before {cutoff.isoformat()})."
+                f"Deleted {deleted_traces} chat trace(s), {deleted_runs} "
+                f"verification run(s) and {deleted_searches} search log(s) "
+                f"older than {days}d (before {cutoff.isoformat()})."
             )
         )

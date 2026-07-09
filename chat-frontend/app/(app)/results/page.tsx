@@ -33,17 +33,31 @@ import {
 } from "@/components/carbon/primitives";
 import { CarbonSearchBar } from "@/components/carbon/search-bar";
 import {
-	type BrowseSearchResponse,
 	type BrowseSearchResult,
-	browseSearch,
+	type ResearchSearchResponse,
+	type ResearchSearchResult,
+	researchSearch,
 	SEARCH_PAGE_SIZE,
+	type SearchFacets,
 } from "@/lib/iowa-browse";
 import {
 	advancedFromParams,
 	buildSearchQuery,
+	modeFromParams,
 	searchFiltersFromParams,
+	sortFromParams,
 } from "@/lib/search-url";
 import { cn } from "@/lib/utils";
+
+// Session-lifetime response cache keyed by the full serialized query string.
+// Back/forward navigation (results → case → back) re-mounts this page with
+// the same URL; serving the cached response makes that instant and skips
+// re-paying the embed/rerank cost for a search the user already ran. The
+// corpus only changes via the daily ingest, so within-session staleness is a
+// non-issue. Module scope survives client-side route changes; a hard reload
+// clears it.
+const RESULTS_CACHE = new Map<string, ResearchSearchResponse>();
+const RESULTS_CACHE_MAX = 30;
 
 // useSearchParams() must be read inside a Suspense boundary.
 export default function V2ResultsPage() {
@@ -68,14 +82,17 @@ function ResultsScreen() {
 	const query = (searchParams.get("q") ?? "").trim();
 	const page = Math.max(1, Number(searchParams.get("page")) || 1);
 	const filters = advancedFromParams(searchParams);
+	const modeOverride = modeFromParams(searchParams);
+	const sort = sortFromParams(searchParams);
 
-	const [data, setData] = useState<BrowseSearchResponse | null>(null);
+	const [data, setData] = useState<ResearchSearchResponse | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	// The URL is the single source of truth: any change (new query, filter,
-	// page) lands here and re-runs the server search. Everything the effect
-	// needs is re-derived from the serialized params, so spStr is the one dep.
+	// page, mode override) lands here and re-runs the server search. Everything
+	// the effect needs is re-derived from the serialized params, so spStr is
+	// the one dep.
 	useEffect(() => {
 		const sp = new URLSearchParams(spStr);
 		const q = (sp.get("q") ?? "").trim();
@@ -83,15 +100,32 @@ function ResultsScreen() {
 			setData(null);
 			return;
 		}
+		const cached = RESULTS_CACHE.get(spStr);
+		if (cached) {
+			setData(cached);
+			setError(null);
+			setLoading(false);
+			return;
+		}
 		let cancelled = false;
 		setLoading(true);
 		setError(null);
-		browseSearch(
+		researchSearch(
 			q,
 			searchFiltersFromParams(sp),
 			Math.max(1, Number(sp.get("page")) || 1),
+			modeFromParams(sp),
+			sortFromParams(sp),
 		)
-			.then((d) => !cancelled && setData(d))
+			.then((d) => {
+				if (cancelled) return;
+				setData(d);
+				RESULTS_CACHE.set(spStr, d);
+				if (RESULTS_CACHE.size > RESULTS_CACHE_MAX) {
+					const oldest = RESULTS_CACHE.keys().next().value;
+					if (oldest !== undefined) RESULTS_CACHE.delete(oldest);
+				}
+			})
 			.catch((e) => !cancelled && setError((e as Error).message))
 			.finally(() => !cancelled && setLoading(false));
 		return () => {
@@ -100,15 +134,31 @@ function ResultsScreen() {
 	}, [spStr]);
 
 	const pushSearch = useCallback(
-		(q: string, f: AdvancedFilters, nextPage = 1) => {
-			const p = new URLSearchParams(buildSearchQuery(q, toSearchFilters(f)));
+		(
+			q: string,
+			f: AdvancedFilters,
+			nextPage = 1,
+			nextMode: string | null = modeOverride,
+			nextSort: string = sort,
+		) => {
+			const p = new URLSearchParams(
+				buildSearchQuery(q, toSearchFilters(f), nextMode, nextSort),
+			);
 			if (nextPage > 1) p.set("page", String(nextPage));
 			router.push(`/results?${p.toString()}`);
 		},
-		[router],
+		[router, modeOverride, sort],
 	);
 
 	const onFilters = (f: AdvancedFilters) => pushSearch(query, f);
+	// A new query drops the mode override — the classifier should get first say.
+	const onQuery = (q: string) => pushSearch(q, filters, 1, null);
+	const onSort = (s: string) => pushSearch(query, filters, 1, modeOverride, s);
+
+	// Stale = the data on screen answers a different query than the URL asks
+	// for. A new query shows skeletons; a refinement of the same query (page,
+	// filter, sort) keeps the old rows dimmed, which reads as less jarring.
+	const stale = !data || data.query !== query;
 
 	const count = data?.results.length ?? 0;
 	const offset = data?.offset ?? 0;
@@ -123,10 +173,7 @@ function ResultsScreen() {
 
 	return (
 		<div className="px-5 py-8 sm:px-8">
-			<CarbonSearchBar
-				initial={query}
-				onSearch={(q) => pushSearch(q, filters)}
-			/>
+			<CarbonSearchBar initial={query} onSearch={onQuery} />
 
 			<div className="mt-6 flex flex-wrap items-baseline gap-x-4 gap-y-1">
 				<h1 className="font-light text-2xl sm:text-3xl">
@@ -139,18 +186,60 @@ function ResultsScreen() {
 							? "Enter a query above."
 							: count === 0
 								? "No results"
-								: `Showing ${offset + 1}–${offset + count}${
-										total !== undefined ? ` of ${total.toLocaleString()}` : ""
-									}`}
+								: data?.total_exact === false
+									? `Top ${total?.toLocaleString() ?? count} results · showing ${offset + 1}–${offset + count}`
+									: `Showing ${offset + 1}–${offset + count}${
+											total !== undefined ? ` of ${total.toLocaleString()}` : ""
+										}`}
 				</p>
+				{data && query && (
+					<ModeChip
+						data={data}
+						override={modeOverride}
+						onMode={(m) => pushSearch(query, filters, 1, m)}
+					/>
+				)}
 			</div>
+
+			{data && data.detection?.unsupported?.length > 0 && (
+				<div className="mt-4 max-w-2xl">
+					<Notification kind="warning" title="Connector not supported yet">
+						{data.detection.unsupported.map((u) => u.message).join(" ")}
+					</Notification>
+				</div>
+			)}
 
 			<FilterChips filters={filters} onChange={onFilters} />
 
 			<div className="mt-6 grid gap-10 lg:grid-cols-[17rem_1fr] xl:grid-cols-[19rem_1fr]">
-				<RefineRail filters={filters} onChange={onFilters} loading={loading} />
+				<RefineRail
+					filters={filters}
+					onChange={onFilters}
+					loading={loading}
+					facets={data?.facets ?? null}
+				/>
 
 				<div className="min-w-0">
+					{data && count > 0 && (
+						<div className="mb-3 flex items-center justify-end gap-2">
+							<label
+								htmlFor="results-sort"
+								className="text-[11px] text-[var(--cds-helper)]"
+							>
+								Sort
+							</label>
+							<select
+								id="results-sort"
+								value={sort}
+								onChange={(e) => onSort(e.target.value)}
+								className="h-8 border-[var(--cds-border-strong)] border-b bg-[var(--cds-field)] px-2 text-[13px] outline-none focus:outline-2 focus:-outline-offset-2 focus:outline-[#0f62fe]"
+							>
+								<option value="relevance">Relevance</option>
+								<option value="date_desc">Newest first</option>
+								<option value="date_asc">Oldest first</option>
+							</select>
+						</div>
+					)}
 					{error ? (
 						<Notification kind="error" title="Search failed">
 							{error}
@@ -159,10 +248,8 @@ function ResultsScreen() {
 						<div className="border border-[var(--cds-border)] px-6 py-14 text-center text-[var(--cds-text-2)] text-sm">
 							Type a query to search {`case law, statutes, and rules`}.
 						</div>
-					) : loading && !data ? (
-						<div className="border border-[var(--cds-border)] px-6 py-14 text-center text-[var(--cds-text-2)] text-sm">
-							Searching the corpus…
-						</div>
+					) : loading && stale ? (
+						<SkeletonResults />
 					) : !data || data.results.length === 0 ? (
 						<div className="border border-[var(--cds-border)] px-6 py-14 text-center text-[var(--cds-text-2)] text-sm">
 							No matches for <span className="font-mono">“{query}”</span>.
@@ -224,6 +311,93 @@ function ResultsScreen() {
 				</div>
 			</div>
 		</div>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton rows — shown while a NEW query is in flight (a refinement of the
+// same query keeps the previous rows dimmed instead). Shapes mirror
+// ResultRow: tag line, title, citation line, two snippet lines.
+// ---------------------------------------------------------------------------
+
+function SkeletonResults() {
+	return (
+		<output
+			aria-label="Searching the corpus"
+			className="block divide-y divide-[var(--cds-border)] border border-[var(--cds-border)]"
+		>
+			{Array.from({ length: 5 }, (_, i) => (
+				// biome-ignore lint/suspicious/noArrayIndexKey: static placeholder list
+				<div key={i} className="animate-pulse bg-[var(--cds-layer)] p-4 sm:p-5">
+					<div className="flex items-center gap-2">
+						<div className="h-5 w-14 bg-[var(--cds-layer-hover)]" />
+						<div className="h-3 w-20 bg-[var(--cds-layer-hover)]" />
+					</div>
+					<div className="mt-3 h-4 w-3/5 bg-[var(--cds-layer-hover)]" />
+					<div className="mt-2 h-3 w-2/5 bg-[var(--cds-layer-hover)]" />
+					<div className="mt-3 h-3 w-full max-w-3xl bg-[var(--cds-layer-hover)]" />
+					<div className="mt-1.5 h-3 w-4/5 max-w-3xl bg-[var(--cds-layer-hover)]" />
+				</div>
+			))}
+		</output>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Mode chip — shows how the server routed the query (terms & connectors vs
+// natural language vs citation), with a one-click override. Westlaw-Precision
+// style: auto-detect by default, the chip makes the routing visible and
+// reversible. Implementation words ("vector", "semantic") never appear.
+// ---------------------------------------------------------------------------
+
+const MODE_LABEL: Record<string, { label: string; kind: TagKind }> = {
+	boolean: { label: "Terms & connectors", kind: "blue" },
+	natural: { label: "Natural language", kind: "gray" },
+	citation: { label: "Citation", kind: "green" },
+};
+
+function ModeChip({
+	data,
+	override,
+	onMode,
+}: {
+	data: ResearchSearchResponse;
+	override: string | null;
+	onMode: (mode: string | null) => void;
+}) {
+	const spec = MODE_LABEL[data.mode];
+	if (!spec) return null;
+	// The sensible alternate route for one click. Citation mode offers none —
+	// overriding a pinned exact lookup is never what the user wants.
+	const alternate =
+		data.mode === "boolean"
+			? { mode: "natural", label: "Search as natural language" }
+			: data.mode === "natural"
+				? { mode: "tc", label: "Search as terms & connectors" }
+				: null;
+	return (
+		<span className="flex items-baseline gap-2">
+			<Tag kind={spec.kind}>{spec.label}</Tag>
+			{alternate && (
+				<button
+					type="button"
+					onClick={() => onMode(alternate.mode)}
+					className="text-[var(--cds-link)] text-xs transition-colors hover:underline"
+				>
+					{alternate.label}
+				</button>
+			)}
+			{override && (
+				<button
+					type="button"
+					onClick={() => onMode(null)}
+					className="text-[var(--cds-helper)] text-xs transition-colors hover:underline"
+					title="Let the query decide the mode"
+				>
+					Auto
+				</button>
+			)}
+		</span>
 	);
 }
 
@@ -321,16 +495,41 @@ function caselawScoped(docType: AdvancedFilters["docType"]): boolean {
 	return docType === "all" || docType === "cases";
 }
 
+// doc_type facet slugs (backend counts by source slug) → rail option ids.
+const SLUG_TO_DOC_TYPE: Record<string, AdvancedFilters["docType"]> = {
+	"iowa-caselaw": "cases",
+	"iowa-code": "code",
+	"iowa-court-rules": "rules",
+};
+
 function RefineRail({
 	filters,
 	onChange,
 	loading,
+	facets,
 }: {
 	filters: AdvancedFilters;
 	onChange: (f: AdvancedFilters) => void;
 	loading: boolean;
+	facets: SearchFacets | null;
 }) {
 	const casesScoped = caselawScoped(filters.docType);
+	const docTypeCounts: Partial<Record<string, number>> = {};
+	if (facets) {
+		let all = 0;
+		for (const d of facets.doc_types) {
+			const id = SLUG_TO_DOC_TYPE[d.slug];
+			if (id) docTypeCounts[id] = d.count;
+			all += d.count;
+		}
+		docTypeCounts.all = all;
+	}
+	const courtCounts = Object.fromEntries(
+		(facets?.courts ?? []).map((c) => [c.court_id, c.count]),
+	);
+	const statusCounts = Object.fromEntries(
+		(facets?.statuses ?? []).map((s) => [s.status, s.count]),
+	);
 	// Switching to code/rules clears the caselaw-only fields so a stale court
 	// or year can't linger behind a disabled control and re-scope the search.
 	const setDocType = (v: AdvancedFilters["docType"]) =>
@@ -353,12 +552,18 @@ function RefineRail({
 				<ListFilterIcon className="size-4 text-[var(--cds-text-2)]" />
 				<h2 className="font-semibold text-sm">Refine results</h2>
 			</div>
+			{facets?.basis === "top_results" && (
+				<p className="pt-2 text-[11px] text-[var(--cds-helper)] leading-snug">
+					Counts reflect the top results.
+				</p>
+			)}
 
 			<RailSection title="Content type">
 				{DOC_TYPES.map((d) => (
 					<FacetRow
 						key={d.id}
 						label={d.label}
+						count={docTypeCounts[d.id]}
 						active={filters.docType === d.id}
 						onClick={() => setDocType(d.id)}
 					/>
@@ -370,6 +575,7 @@ function RefineRail({
 					<FacetRow
 						key={c.value || "any-court"}
 						label={c.label}
+						count={c.value ? courtCounts[c.value] : undefined}
 						active={(filters.court || "") === c.value}
 						disabled={!casesScoped}
 						onClick={() => onChange({ ...filters, court: c.value })}
@@ -382,6 +588,7 @@ function RefineRail({
 					<FacetRow
 						key={s.value || "any-status"}
 						label={s.label}
+						count={s.value ? statusCounts[s.value] : undefined}
 						active={(filters.status || "") === s.value}
 						disabled={!casesScoped}
 						onClick={() => onChange({ ...filters, status: s.value })}
@@ -395,11 +602,63 @@ function RefineRail({
 					onChange={onChange}
 					disabled={!casesScoped}
 				/>
+				{casesScoped && (facets?.decades?.length ?? 0) > 0 && (
+					<DecadeHistogram
+						decades={facets?.decades ?? []}
+						onPick={(decade) =>
+							onChange({
+								...filters,
+								yearFrom: decade,
+								yearTo: String(Number(decade) + 9),
+							})
+						}
+					/>
+				)}
 				<p className="mt-2 pl-3 text-[11px] text-[var(--cds-helper)] leading-snug">
 					Court, status, and year apply to cases.
 				</p>
 			</RailSection>
 		</aside>
+	);
+}
+
+// Decade bars under the year inputs — the results-v2 mockup's date histogram,
+// fed by real facet counts. Clicking a bar sets the year range to that decade.
+function DecadeHistogram({
+	decades,
+	onPick,
+}: {
+	decades: { decade: string; count: number }[];
+	onPick: (decade: string) => void;
+}) {
+	const max = Math.max(...decades.map((d) => d.count), 1);
+	// Most recent first — that's where the action is.
+	const rows = [...decades].sort((a, b) => b.decade.localeCompare(a.decade));
+	return (
+		<div className="mt-3 space-y-1">
+			{rows.map((d) => (
+				<button
+					key={d.decade}
+					type="button"
+					onClick={() => onPick(d.decade)}
+					title={`${d.count.toLocaleString()} in the ${d.decade}s`}
+					className="group flex w-full items-center gap-2 text-left"
+				>
+					<span className="w-10 shrink-0 font-mono text-[11px] text-[var(--cds-text-2)] tabular-nums group-hover:text-[var(--cds-text)]">
+						{d.decade}s
+					</span>
+					<span className="h-3 flex-1 overflow-hidden">
+						<span
+							className="block h-full bg-[#0f62fe]/30 transition-colors group-hover:bg-[#0f62fe]/60"
+							style={{ width: `${Math.max(2, (d.count / max) * 100)}%` }}
+						/>
+					</span>
+					<span className="w-9 shrink-0 text-right font-mono text-[10px] text-[var(--cds-helper)] tabular-nums">
+						{d.count.toLocaleString()}
+					</span>
+				</button>
+			))}
+		</div>
 	);
 }
 
@@ -422,11 +681,13 @@ function RailSection({
 
 function FacetRow({
 	label,
+	count,
 	active,
 	disabled,
 	onClick,
 }: {
 	label: string;
+	count?: number;
 	active?: boolean;
 	disabled?: boolean;
 	onClick?: () => void;
@@ -446,6 +707,11 @@ function FacetRow({
 			)}
 		>
 			<span className="min-w-0 flex-1 truncate">{label}</span>
+			{count !== undefined && (
+				<span className="shrink-0 font-mono text-[11px] text-[var(--cds-helper)] tabular-nums">
+					{count.toLocaleString()}
+				</span>
+			)}
 		</button>
 	);
 }
@@ -566,21 +832,56 @@ const KIND_LABEL: Record<BrowseSearchResult["kind"], string> = {
 	rule: "Court Rules",
 };
 
-function ResultRow({ r, query }: { r: BrowseSearchResult; query: string }) {
+// Treatment badge styling by citator status. Labels arrive kebab-case
+// ("superseded-by-statute") — prettify for display.
+function treatmentTag(t: NonNullable<ResearchSearchResult["treatment"]>) {
+	const kind: TagKind = t.status === "negative" ? "red" : "yellow";
+	const label = (t.label || t.status).replace(/-/g, " ");
+	return (
+		<Tag kind={kind}>
+			<span className="capitalize">{label}</span>
+		</Tag>
+	);
+}
+
+// Server-provided highlight segments (the terms the engine actually matched)
+// rendered as plain text nodes — no HTML ever crosses this boundary.
+function renderSegments(segments: { text: string; hit: boolean }[]): ReactNode {
+	return segments.map((s, i) =>
+		s.hit ? (
+			// biome-ignore lint/suspicious/noArrayIndexKey: static server output
+			<mark key={i} className="bg-[#0f62fe]/20 text-inherit">
+				{s.text}
+			</mark>
+		) : (
+			s.text
+		),
+	);
+}
+
+function ResultRow({ r, query }: { r: ResearchSearchResult; query: string }) {
 	const isCase = r.kind === "case";
 	const year = isCase ? (r.date_filed || "").slice(0, 4) : "";
 	const context = isCase
-		? [r.court_name, year].filter(Boolean).join(" · ")
+		? [
+				r.court_name,
+				year,
+				r.cited_by ? `Cited by ${r.cited_by.toLocaleString()}` : "",
+			]
+				.filter(Boolean)
+				.join(" · ")
 		: r.chapter
 			? `Chapter ${r.chapter.ordinal}${r.chapter.heading ? ` — ${r.chapter.heading}` : ""}`
 			: r.source;
 	const cite = isCase ? r.citations.join(" · ") : r.citation;
 	// Both hit kinds open in-app readers: decisions in /case, sections in
-	// /section.
+	// /section. The query rides along so the reader can highlight the terms
+	// that produced this hit and jump to the first match.
+	const hl = query ? `?q=${encodeURIComponent(query)}` : "";
 	const href =
 		isCase && r.case_id != null
-			? `/case/${r.case_id}`
-			: `/section/${r.node_id}`;
+			? `/case/${r.case_id}${hl}`
+			: `/section/${r.node_id}${hl}`;
 	const title = isCase
 		? r.case_name || r.heading || "(unnamed case)"
 		: r.heading || "(no heading)";
@@ -595,6 +896,7 @@ function ResultRow({ r, query }: { r: BrowseSearchResult; query: string }) {
 					{r.type}
 				</span>
 				{r.exact && <Tag kind="blue">Exact match</Tag>}
+				{r.treatment && treatmentTag(r.treatment)}
 			</div>
 
 			<h3 className="mt-2.5">
@@ -618,9 +920,11 @@ function ResultRow({ r, query }: { r: BrowseSearchResult; query: string }) {
 				{context}
 			</p>
 
-			{r.snippet && (
+			{(r.snippet_segments?.length || r.snippet) && (
 				<p className="mt-2 line-clamp-3 max-w-3xl text-[var(--cds-text-2)] text-sm leading-relaxed">
-					{highlight(r.snippet, query)}
+					{r.snippet_segments?.length
+						? renderSegments(r.snippet_segments)
+						: highlight(r.snippet, query)}
 				</p>
 			)}
 		</article>

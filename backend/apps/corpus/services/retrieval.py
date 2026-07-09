@@ -336,6 +336,7 @@ def retrieve_context(
     u_order: bool = True,
     chunk_excerpts: bool = True,
     protect_citations: bool = True,
+    require_phrases: list[str] | None = None,
 ) -> RetrievedContext:
     """Retrieve, rerank, dedup, diversify, and assemble a surface-agnostic context.
 
@@ -357,6 +358,11 @@ def retrieve_context(
     opinion-head prefix (statutes always keep the prefix); ``u_order`` applies the
     lost-in-the-middle reorder; ``protect_citations`` keeps exact-cite hits from
     being demoted by the reranker.
+
+    ``require_phrases`` hard-filters the pool to documents literally containing
+    every phrase (case-insensitive) BEFORE reranking — the search surface's
+    'quoted phrase inside a natural query' contract: rank semantically, but
+    only among documents that actually contain the phrase.
     """
     as_of = _today()
     if not query or not query.strip():
@@ -380,6 +386,17 @@ def retrieve_context(
         source_slug=source_slug,
         metadata_contains=metadata_contains,
     )
+    phrase_filtered_out = 0
+    if require_phrases:
+        needles = [p.lower() for p in require_phrases if p.strip()]
+        if needles:
+            kept = [
+                h
+                for h in hits
+                if all(p in h.body_text.lower() for p in needles)
+            ]
+            phrase_filtered_out = len(hits) - len(kept)
+            hits = kept
     if not hits:
         return RetrievedContext(query=query, passages=[], as_of_date=as_of)
 
@@ -389,6 +406,8 @@ def retrieve_context(
         "display_limit": display_limit,
         "reranked": bool(rerank),
     }
+    if phrase_filtered_out:
+        diagnostics["phrase_filtered_out"] = phrase_filtered_out
     if search_query != query:
         diagnostics["query_rewritten"] = search_query
 

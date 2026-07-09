@@ -19,10 +19,11 @@ import {
 } from "lucide-react";
 import { IBM_Plex_Serif } from "next/font/google";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
 	Fragment,
 	type ReactNode,
+	Suspense,
 	useEffect,
 	useMemo,
 	useRef,
@@ -51,6 +52,7 @@ import {
 	type CaseSegment,
 	fmtEffective,
 } from "@/lib/iowa-browse";
+import { useSearchHighlight } from "@/lib/use-search-highlight";
 import { cn } from "@/lib/utils";
 
 const plexSerif = IBM_Plex_Serif({
@@ -60,8 +62,26 @@ const plexSerif = IBM_Plex_Serif({
 	variable: "--font-plex-serif",
 });
 
+// useSearchParams() must be read inside a Suspense boundary.
 export default function V2CasePage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="px-5 py-10 text-[var(--cds-text-2)] text-sm sm:px-8">
+					Loading…
+				</div>
+			}
+		>
+			<CasePageInner />
+		</Suspense>
+	);
+}
+
+function CasePageInner() {
 	const params = useParams<{ id: string }>();
+	// The query that led here (results-page click-through) — the reader
+	// highlights its terms and jumps to the first match.
+	const searchQuery = (useSearchParams().get("q") ?? "").trim();
 	// Strict integer id — a malformed segment becomes NaN, caught below.
 	const nodeId = /^\d+$/.test(params.id) ? Number(params.id) : Number.NaN;
 
@@ -112,13 +132,21 @@ export default function V2CasePage() {
 		);
 	}
 
-	return <CaseReader data={data} />;
+	return <CaseReader data={data} searchQuery={searchQuery} />;
 }
 
-function CaseReader({ data }: { data: CaseDetail }) {
+function CaseReader({
+	data,
+	searchQuery,
+}: {
+	data: CaseDetail;
+	searchQuery: string;
+}) {
+	const router = useRouter();
 	const scrollRef = useRef<HTMLElement>(null);
 	const [fontSize, setFontSize] = useState(16);
 	const [copied, setCopied] = useState(false);
+	const highlightMatches = useSearchHighlight(scrollRef, searchQuery, true);
 
 	const sections = useMemo(() => caseSections(data), [data]);
 	const ids = useMemo(() => sections.map((s) => s.id), [sections]);
@@ -170,6 +198,23 @@ function CaseReader({ data }: { data: CaseDetail }) {
 					<span className="font-semibold">{data.case_name}</span>
 				</p>
 				<div className="ml-auto flex shrink-0 items-center gap-1">
+					{searchQuery && highlightMatches !== null && (
+						<span className="mr-1 hidden items-center gap-2 sm:flex">
+							<Tag kind={highlightMatches > 0 ? "blue" : "gray"}>
+								{highlightMatches > 0
+									? `${highlightMatches.toLocaleString()} match${highlightMatches === 1 ? "" : "es"}`
+									: "No matches"}
+							</Tag>
+							<button
+								type="button"
+								onClick={() => router.replace(`/case/${data.id}`)}
+								className="text-[11px] text-[var(--cds-helper)] transition-colors hover:text-[var(--cds-text)] hover:underline"
+								title="Clear search highlighting"
+							>
+								Clear
+							</button>
+						</span>
+					)}
 					<div className="mr-2 hidden items-center border border-[var(--cds-border)] sm:flex">
 						<button
 							type="button"
