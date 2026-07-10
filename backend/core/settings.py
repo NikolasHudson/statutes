@@ -181,6 +181,7 @@ INSTALLED_APPS = [
     "apps.ingestion_iowa_code",
     "apps.ingestion_iowa_rules",
     "apps.ingestion_iowa_admin_code",
+    "apps.ingestion_iowa_acts",
     "apps.ingestion_caselaw",
     "apps.mcp_server",
 ]
