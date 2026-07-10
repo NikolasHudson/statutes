@@ -51,7 +51,10 @@ export function searchFiltersFromParams(sp: URLSearchParams): SearchFilters {
 export function advancedFromParams(sp: URLSearchParams): AdvancedFilters {
 	const dt = sp.get("doc_type");
 	return {
-		docType: dt === "code" || dt === "rules" || dt === "cases" ? dt : "all",
+		docType:
+			dt === "code" || dt === "admin" || dt === "rules" || dt === "cases"
+				? dt
+				: "all",
 		court: sp.get("court") ?? "",
 		status: sp.get("status") ?? "",
 		yearFrom: (sp.get("from") ?? "").slice(0, 4),

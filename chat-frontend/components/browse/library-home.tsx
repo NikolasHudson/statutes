@@ -40,6 +40,10 @@ const TABS: { id: Scope; label: string }[] = [
 const SOURCE_VIEW: Record<string, { icon: LucideIcon; blurb: string }> = {
 	"iowa-caselaw": { icon: ScaleIcon, blurb: "Reported & unreported decisions" },
 	"iowa-code": { icon: LandmarkIcon, blurb: "Codified Iowa statutes" },
+	"iowa-admin-code": {
+		icon: BookOpenIcon,
+		blurb: "Administrative rules of Iowa agencies",
+	},
 	"iowa-court-rules": {
 		icon: GavelIcon,
 		blurb: "Rules of procedure & evidence",

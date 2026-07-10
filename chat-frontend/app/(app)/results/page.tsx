@@ -474,6 +474,7 @@ const DOC_TYPES: { id: AdvancedFilters["docType"]; label: string }[] = [
 	{ id: "all", label: "All content" },
 	{ id: "cases", label: "Cases" },
 	{ id: "code", label: "Iowa Code" },
+	{ id: "admin", label: "Iowa Admin. Code" },
 	{ id: "rules", label: "Court Rules" },
 ];
 
@@ -499,6 +500,7 @@ function caselawScoped(docType: AdvancedFilters["docType"]): boolean {
 const SLUG_TO_DOC_TYPE: Record<string, AdvancedFilters["docType"]> = {
 	"iowa-caselaw": "cases",
 	"iowa-code": "code",
+	"iowa-admin-code": "admin",
 	"iowa-court-rules": "rules",
 };
 
@@ -824,12 +826,14 @@ const KIND_TAG: Record<BrowseSearchResult["kind"], TagKind> = {
 	case: "blue",
 	code: "gray",
 	rule: "gray",
+	admin: "gray",
 };
 
 const KIND_LABEL: Record<BrowseSearchResult["kind"], string> = {
 	case: "Case",
 	code: "Iowa Code",
 	rule: "Court Rules",
+	admin: "Iowa Admin. Code",
 };
 
 // Treatment badge styling by citator status. Labels arrive kebab-case

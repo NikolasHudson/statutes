@@ -32,6 +32,11 @@ SEARCH_FUSED_MAX = 200
 
 def _citation(node: Node) -> str:
     abbr = node.source.citation_abbreviation
+    if node.source.slug == "iowa-admin-code":
+        # IAC cites carry a tier sigil: rules "Iowa Admin. Code r. 441—65.2",
+        # chapters "ch. 441—65"; the agency tier is just the bare number.
+        sigil = {"rule": "r. ", "chapter": "ch. "}.get(node.node_type.key, "")
+        return f"{abbr} {sigil}{node.path}"
     return f"{abbr} {node.path}".strip()
 
 
@@ -91,7 +96,10 @@ def _search_row(
         date_filed = dmd.get("date_filed", "")
         citations = list(dmd.get("citations", []))
     else:
-        kind = "rule" if slug == "iowa-court-rules" else "code"
+        kind = {
+            "iowa-court-rules": "rule",
+            "iowa-admin-code": "admin",
+        }.get(slug, "code")
         case_id = None
         case_name = None
         court_name = ""
@@ -114,7 +122,14 @@ def _search_row(
         "chapter": (
             None
             if kind == "case"
-            else {"ordinal": parent.ordinal or parent.path, "heading": parent.heading}
+            # IAC chapter ordinals ("1") are meaningless without their agency
+            # prefix — show the full path ("441—65") instead.
+            else {
+                "ordinal": parent.path
+                if slug == "iowa-admin-code"
+                else (parent.ordinal or parent.path),
+                "heading": parent.heading,
+            }
             if parent is not None
             else None
         ),
@@ -171,4 +186,7 @@ _DOC_TYPE_SLUG = {
     "rules": "iowa-court-rules",
     "cases": "iowa-caselaw",
     "caselaw": "iowa-caselaw",
+    "admin": "iowa-admin-code",
+    "admin_code": "iowa-admin-code",
+    "regulations": "iowa-admin-code",
 }

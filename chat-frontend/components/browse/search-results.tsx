@@ -506,6 +506,10 @@ const KIND: Record<
 		label: "Case",
 		tint: "bg-blue-600/10 text-blue-700 dark:text-blue-300",
 	},
+	admin: {
+		label: "Iowa Admin. Code",
+		tint: "bg-primary/10 text-primary",
+	},
 	code: {
 		label: "Iowa Code",
 		tint: "bg-primary/10 text-primary",

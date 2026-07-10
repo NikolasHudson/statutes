@@ -14,6 +14,7 @@ import {
 	Notification,
 } from "@/components/carbon/primitives";
 import {
+	type BrowseAgency,
 	type BrowseChapter,
 	type BrowseSource,
 	browseCases,
@@ -108,25 +109,33 @@ function SourceHeader({ source }: { source: BrowseSource }) {
 // ---------------------------------------------------------------------------
 
 function ChapterIndex({ source }: { source: BrowseSource }) {
-	const [chapters, setChapters] = useState<BrowseChapter[] | null>(null);
+	const [data, setData] = useState<{
+		chapters: BrowseChapter[];
+		agencies?: BrowseAgency[];
+	} | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
 		browseChapters(source.slug)
-			.then((r) => !cancelled && setChapters(r.chapters))
+			.then((r) => !cancelled && setData(r))
 			.catch((e) => !cancelled && setError((e as Error).message));
 		return () => {
 			cancelled = true;
 		};
 	}, [source.slug]);
 
+	// 3-level sources (Iowa Admin. Code) group chapters under agencies; the
+	// top-level index is then agencies, not a 1,800-row flat chapter list.
+	const agencies = data?.agencies;
+	const chapters = data?.chapters ?? null;
+
 	return (
 		<div className="px-5 py-10 sm:px-8 lg:py-14">
 			<SourceHeader source={source} />
 
 			<p className="mt-10 border-[var(--cds-border)] border-t pt-5 font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.18em]">
-				Chapters
+				{agencies ? "Agencies" : "Chapters"}
 			</p>
 			{error ? (
 				<Notification
@@ -136,45 +145,76 @@ function ChapterIndex({ source }: { source: BrowseSource }) {
 				>
 					{error}
 				</Notification>
-			) : !chapters ? (
+			) : !data ? (
 				<p className="mt-4 text-[var(--cds-text-2)] text-sm">
 					Loading chapters…
 				</p>
-			) : chapters.length === 0 ? (
+			) : agencies ? (
+				<div className="mt-4 divide-y divide-[var(--cds-border)] border border-[var(--cds-border)]">
+					{agencies.map((ag) => (
+						<details key={ag.id} className="group/agency">
+							<summary className="flex cursor-pointer list-none items-baseline gap-4 bg-[var(--cds-layer)] px-4 py-2.5 transition-colors hover:bg-[var(--cds-layer-hover)] [&::-webkit-details-marker]:hidden">
+								<span className="w-16 shrink-0 font-mono text-[13px] tabular-nums">
+									{ag.ordinal}
+								</span>
+								<span className="min-w-0 flex-1 text-sm leading-snug">
+									{ag.heading}
+								</span>
+								<span className="shrink-0 font-mono text-[var(--cds-helper)] text-xs tabular-nums">
+									{ag.chapters.length} ch.
+								</span>
+							</summary>
+							<div className="divide-y divide-[var(--cds-border)] border-[var(--cds-border)] border-t bg-[var(--cds-field)]">
+								{ag.chapters.map((ch) => (
+									<ChapterRow key={ch.id} ch={ch} indent />
+								))}
+							</div>
+						</details>
+					))}
+				</div>
+			) : !chapters || chapters.length === 0 ? (
 				<p className="mt-4 text-[var(--cds-text-2)] text-sm">
 					No chapters published.
 				</p>
 			) : (
 				<div className="mt-4 divide-y divide-[var(--cds-border)] border border-[var(--cds-border)]">
 					{chapters.map((ch) => (
-						<Link
-							key={ch.id}
-							href={`/chapter/${ch.id}`}
-							className="group flex items-baseline gap-4 bg-[var(--cds-layer)] px-4 py-2.5 transition-colors hover:bg-[var(--cds-layer-hover)]"
-						>
-							<span className="w-16 shrink-0 font-mono text-[13px] tabular-nums group-hover:text-[var(--cds-link)]">
-								{ch.ordinal}
-							</span>
-							<span
-								className={cn(
-									"min-w-0 flex-1 text-sm leading-snug",
-									ch.reserved
-										? "text-[var(--cds-helper)] italic"
-										: "group-hover:underline",
-								)}
-							>
-								{ch.heading || (ch.reserved ? "Reserved" : ch.ordinal)}
-							</span>
-							{ch.child_count > 0 && (
-								<span className="shrink-0 font-mono text-[var(--cds-helper)] text-xs tabular-nums">
-									{ch.child_count}
-								</span>
-							)}
-						</Link>
+						<ChapterRow key={ch.id} ch={ch} />
 					))}
 				</div>
 			)}
 		</div>
+	);
+}
+
+function ChapterRow({ ch, indent }: { ch: BrowseChapter; indent?: boolean }) {
+	return (
+		<Link
+			href={`/chapter/${ch.id}`}
+			className={cn(
+				"group flex items-baseline gap-4 bg-[var(--cds-layer)] px-4 py-2.5 transition-colors hover:bg-[var(--cds-layer-hover)]",
+				indent && "pl-10",
+			)}
+		>
+			<span className="w-16 shrink-0 font-mono text-[13px] tabular-nums group-hover:text-[var(--cds-link)]">
+				{ch.ordinal}
+			</span>
+			<span
+				className={cn(
+					"min-w-0 flex-1 text-sm leading-snug",
+					ch.reserved
+						? "text-[var(--cds-helper)] italic"
+						: "group-hover:underline",
+				)}
+			>
+				{ch.heading || (ch.reserved ? "Reserved" : ch.ordinal)}
+			</span>
+			{ch.child_count > 0 && (
+				<span className="shrink-0 font-mono text-[var(--cds-helper)] text-xs tabular-nums">
+					{ch.child_count}
+				</span>
+			)}
+		</Link>
 	);
 }
 

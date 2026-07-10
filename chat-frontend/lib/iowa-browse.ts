@@ -23,6 +23,14 @@ export type BrowseChapter = {
   child_count: number;
 };
 
+// Agency tier for 3-level sources (Iowa Admin. Code: agency → chapter → rule).
+export type BrowseAgency = {
+  id: number;
+  ordinal: string;
+  heading: string;
+  chapters: BrowseChapter[];
+};
+
 export type BrowseChild = {
   id: number;
   type: string;
@@ -138,8 +146,9 @@ export type CaseDetail = {
 
 export type BrowseSearchResult = {
   node_id: number;
-  // How the UI opens the hit: "case" → /cases/<case_id>; "code"/"rule" → reader.
-  kind: "code" | "rule" | "case";
+  // How the UI opens the hit: "case" → /cases/<case_id>; everything else
+  // ("code"/"rule"/"admin") opens the section reader via node_id.
+  kind: "code" | "rule" | "admin" | "case";
   // Decision node id for a caselaw hit (opinion hits resolve to their parent
   // decision); null for statutes/rules.
   case_id: number | null;
@@ -289,6 +298,9 @@ export const browseChapters = (slug: string) =>
   json<{
     source: { slug: string; name: string };
     chapters: BrowseChapter[];
+    // Present only for 3-level sources (Iowa Admin. Code): the same chapter
+    // rows grouped under their agency, in agency-number order.
+    agencies?: BrowseAgency[];
   }>(`/api/browse/sources/${encodeURIComponent(slug)}/chapters`);
 
 export const browseChapter = (id: number) =>

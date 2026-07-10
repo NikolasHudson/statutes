@@ -209,3 +209,46 @@ def make_iowa_corpus_minimal() -> tuple[Source, Node, NodeVersion]:
         review_status=ReviewStatus.APPROVED,
     )
     return src, section, version
+
+
+def make_iac_minimal() -> tuple[Source, Node, Node, Node]:
+    """A minimal agency → chapter → rule slice of the Iowa Administrative
+    Code. Source and node types come from seed migration 0022 (already in the
+    test DB); this only creates the nodes + an approved rule version."""
+    src = Source.objects.get(slug="iowa-admin-code")
+    types = {nt.key: nt for nt in src.node_types.all()}
+    agency = Node.objects.create(
+        source=src,
+        node_type=types["agency"],
+        ordinal="441",
+        path="441",
+        heading="Human Services Department[441]",
+    )
+    chapter = Node.objects.create(
+        source=src,
+        node_type=types["chapter"],
+        parent=agency,
+        ordinal="65",
+        path="441—65",
+        heading="ADMINISTRATION",
+    )
+    rule = Node.objects.create(
+        source=src,
+        node_type=types["rule"],
+        parent=chapter,
+        ordinal="65.2",
+        path="441—65.2",
+        heading="Application process",
+    )
+    body = (
+        "An application for food assistance shall be submitted on the form "
+        "prescribed by the department."
+    )
+    NodeVersion.objects.create(
+        node=rule,
+        body_text=body,
+        effective_from=dt.date(2025, 1, 1),
+        content_hash=hashlib.sha256(body.encode()).hexdigest(),
+        review_status=ReviewStatus.APPROVED,
+    )
+    return src, agency, chapter, rule

@@ -10,6 +10,7 @@ import {
   BookOpenIcon,
   ChevronDownIcon,
   FileTextIcon,
+  LandmarkIcon,
   ScaleIcon,
   SearchIcon,
   type LucideIcon,
@@ -25,7 +26,7 @@ import type { BrowseSource, SearchFilters } from "@/lib/iowa-browse";
 // ---------------------------------------------------------------------------
 
 export type AdvancedFilters = {
-  docType: "all" | "code" | "rules" | "cases";
+  docType: "all" | "code" | "admin" | "rules" | "cases";
   court: string; // "" | "iowa" | "iowactapp"
   status: string; // "" | "Published" | "Unpublished"
   yearFrom: string;
@@ -47,6 +48,7 @@ export const COURT_LABEL: Record<string, string> = {
 
 export const DOC_TYPE_LABEL: Record<string, string> = {
   code: "Iowa Code",
+  admin: "Iowa Admin. Code",
   rules: "Court Rules",
   cases: "Cases",
 };
@@ -168,6 +170,9 @@ export function AdvancedSearch({
           <Seg value="code" current={filters.docType} onClick={setDocType}>
             Iowa Code
           </Seg>
+          <Seg value="admin" current={filters.docType} onClick={setDocType}>
+            Admin. Code
+          </Seg>
           <Seg value="rules" current={filters.docType} onClick={setDocType}>
             Court Rules
           </Seg>
@@ -251,6 +256,7 @@ export function AdvancedSearch({
 
 export const SOURCE_ICON: Record<string, LucideIcon> = {
   "iowa-code": BookOpenIcon,
+  "iowa-admin-code": LandmarkIcon,
   "iowa-court-rules": FileTextIcon,
   "iowa-caselaw": ScaleIcon,
 };

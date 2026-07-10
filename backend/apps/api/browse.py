@@ -139,7 +139,14 @@ def list_sources(request):
 
 @browse_router.get("/sources/{slug}/chapters", auth=None)
 def list_chapters(request, slug: str):
-    """Chapters (top level) for a source, each with its child count."""
+    """Chapters (top level) for a source, each with its child count.
+
+    Sources with an ``agency`` tier above chapters (the Iowa Admin. Code's
+    agency → chapter → rule hierarchy) additionally get ``agencies``: the same
+    chapter rows grouped under their agency, in agency-number order, so the UI
+    can render a two-level TOC. The flat ``chapters`` list is kept for those
+    sources too (ordered agency-first) so consumers that don't know about
+    agencies still get a usable index."""
     source = get_object_or_404(Source, slug=slug)
     chapters = (
         Node.objects.filter(source=source, node_type__key="chapter")
@@ -151,20 +158,46 @@ def list_chapters(request, slug: str):
         )
         .order_by("path")
     )
+
+    def _chapter_row(c: Node) -> dict:
+        return {
+            "id": c.id,
+            "ordinal": c.ordinal,
+            "heading": c.heading,
+            "reserved": c.is_repealed,
+            "child_count": c.child_count,
+        }
+
+    agencies = list(
+        Node.objects.filter(source=source, node_type__key="agency")
+    )
+    if agencies:
+        agencies.sort(key=lambda a: _intkey(a.ordinal))
+        by_agency: dict[int, list[Node]] = {a.id: [] for a in agencies}
+        for c in chapters:
+            by_agency.setdefault(c.parent_id, []).append(c)
+        for group in by_agency.values():
+            group.sort(key=lambda n: _intkey(n.ordinal))
+        agency_rows = [
+            {
+                "id": a.id,
+                "ordinal": a.ordinal,
+                "heading": a.heading,
+                "chapters": [_chapter_row(c) for c in by_agency[a.id]],
+            }
+            for a in agencies
+        ]
+        return _cached_json(request, {
+            "source": {"slug": source.slug, "name": source.name},
+            "agencies": agency_rows,
+            "chapters": [c for a in agency_rows for c in a["chapters"]],
+        })
+
     # path is a string ("1".."70"); sort numerically for a sane TOC.
     rows = sorted(chapters, key=lambda n: _intkey(n.ordinal))
     return _cached_json(request, {
         "source": {"slug": source.slug, "name": source.name},
-        "chapters": [
-            {
-                "id": c.id,
-                "ordinal": c.ordinal,
-                "heading": c.heading,
-                "reserved": c.is_repealed,
-                "child_count": c.child_count,
-            }
-            for c in rows
-        ],
+        "chapters": [_chapter_row(c) for c in rows],
     })
 
 
@@ -227,7 +260,10 @@ def node_detail(request, node_id: int):
     # for yet). Two extra queries, constant in the citation count — cheap
     # enough for an endpoint that's already edge-cached for a minute.
     cross_refs: list[dict] = []
-    if version is not None and node.source.slug == "iowa-code":
+    # iowa-admin-code is included so IAC rule bodies get links as soon as the
+    # citation parser learns the em-dash rule form (Phase 3) — until then the
+    # parser finds nothing in IAC text and this stays an empty list.
+    if version is not None and node.source.slug in ("iowa-code", "iowa-admin-code"):
         cross_refs = [
             {
                 "text": link.raw,

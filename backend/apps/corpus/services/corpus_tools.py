@@ -57,7 +57,14 @@ def _node_dict(node: Node) -> dict[str, Any]:
     # parent of a rule/section is its chapter.
     parent = node.parent
     chapter = (
-        {"ordinal": parent.ordinal or parent.path, "heading": parent.heading}
+        # IAC chapter ordinals ("1") are meaningless without their agency
+        # prefix — use the full path ("441—65") so the context is unambiguous.
+        {
+            "ordinal": parent.path
+            if node.source.slug == "iowa-admin-code"
+            else (parent.ordinal or parent.path),
+            "heading": parent.heading,
+        }
         if parent is not None
         else None
     )
@@ -103,6 +110,11 @@ def _render_citation(node: Node) -> str:
     abbr = node.source.citation_abbreviation
     if node.source.slug == "iowa-code":
         return f"{abbr} § {node.path}"
+    if node.source.slug == "iowa-admin-code":
+        # IAC cites carry a tier sigil: rules "Iowa Admin. Code r. 441—65.2",
+        # chapters "ch. 441—65"; the agency tier is just the bare number.
+        sigil = {"rule": "r. ", "chapter": "ch. "}.get(node.node_type.key, "")
+        return f"{abbr} {sigil}{node.path}"
     return f"{abbr} {node.path}"
 
 

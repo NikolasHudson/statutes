@@ -70,7 +70,9 @@ export default function V2ChapterPage() {
 				>
 					{chapter.source_slug === "iowa-court-rules"
 						? "Iowa Court Rules"
-						: "Iowa Code"}
+						: chapter.source_slug === "iowa-admin-code"
+							? "Iowa Admin. Code"
+							: "Iowa Code"}
 				</Link>
 				<span className="mx-2 text-[var(--cds-helper)]">/</span>
 				<span className="font-semibold">{chapter.ordinal}</span>
@@ -89,7 +91,8 @@ export default function V2ChapterPage() {
 			</header>
 
 			<p className="mt-10 border-[var(--cds-border)] border-t pt-5 font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.18em]">
-				Sections in this chapter — {chapter.children.length}
+				{chapter.source_slug === "iowa-admin-code" ? "Rules" : "Sections"} in
+				this chapter — {chapter.children.length}
 			</p>
 			{chapter.children.length === 0 ? (
 				<p className="mt-4 text-[var(--cds-text-2)] text-sm">
