@@ -16,26 +16,24 @@ import {
 	ABOUT_HREF,
 	ARTICLES_HREF,
 	CONSULTING_HREF,
+	MARKETING_HOME,
 	PRICING_HREF,
-	PRODUCT_HREF,
+	PRODUCTS_INDEX_HREF,
 } from "./chrome";
 
 const NAV_LINKS = [
-	{ label: "Products", href: PRODUCT_HREF },
+	{ label: "Products", href: PRODUCTS_INDEX_HREF },
 	{ label: "Consulting", href: CONSULTING_HREF },
 	{ label: "Articles", href: ARTICLES_HREF },
 	{ label: "Pricing", href: PRICING_HREF },
 	{ label: "About", href: ABOUT_HREF },
 ];
 
-// TODO: point at "/" once the Carbon home is promoted from /home-2.
-const CARBON_HOME = "/home-2";
-
 // Carbon header-name treatment: bold prefix, regular product name.
 export function CarbonWordmark() {
 	return (
 		<Link
-			href={CARBON_HOME}
+			href={MARKETING_HOME}
 			className="flex items-baseline gap-1.5 whitespace-nowrap text-sm"
 		>
 			<span className="font-semibold tracking-wide">Hudson</span>

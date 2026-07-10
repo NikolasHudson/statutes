@@ -25,7 +25,11 @@ import {
 	SolidLink,
 	TextLink,
 } from "@/components/marketing/carbon";
-import { CONSULTING_HREF, MARKETING_HOME } from "@/components/marketing/chrome";
+import {
+	CONSULTING_HREF,
+	PRODUCTS_INDEX_HREF,
+} from "@/components/marketing/chrome";
+import { ProductFamily } from "@/components/marketing/product-family";
 import { APP_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +47,7 @@ export default function CorpusProductPage() {
 			<FeatureSections />
 			<CapabilityGrid />
 			<CtaBand />
+			<ProductFamily current="corpus" n="05" />
 		</CarbonPage>
 	);
 }
@@ -278,7 +283,7 @@ function CapabilityGrid() {
 				</div>
 
 				<div className="mt-14">
-					<TextLink href={`${MARKETING_HOME}#more`}>All products</TextLink>
+					<TextLink href={PRODUCTS_INDEX_HREF}>All products</TextLink>
 				</div>
 			</div>
 		</section>

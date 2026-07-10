@@ -16,7 +16,13 @@ const INPUT_CLASS =
 const TEXTAREA_CLASS =
 	"min-h-28 w-full rounded-none border-0 border-b border-[#8d8d8d] bg-[#f4f4f4] px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-2 focus:outline-[#0f62fe] focus:-outline-offset-2";
 
-export function ConsultForm() {
+export function ConsultForm({
+	submitLabel = "Request a consultation",
+	caption = "No sales pressure — just a conversation about whether we can help.",
+}: {
+	submitLabel?: string;
+	caption?: string;
+} = {}) {
 	const [sent, setSent] = useState(false);
 	const [busy, setBusy] = useState(false);
 
@@ -106,13 +112,11 @@ export function ConsultForm() {
 			>
 				<span className="inline-flex items-center gap-2">
 					{busy && <Loader2Icon className="size-4 animate-spin" />}
-					{busy ? "Sending…" : "Request a consultation"}
+					{busy ? "Sending…" : submitLabel}
 				</span>
 				<ArrowRightIcon className="size-4" />
 			</button>
-			<p className="mt-3 text-[12px] text-muted-foreground">
-				No sales pressure — just a conversation about whether we can help.
-			</p>
+			<p className="mt-3 text-[12px] text-muted-foreground">{caption}</p>
 		</form>
 	);
 }

@@ -15,16 +15,20 @@
 import { ArrowRightIcon } from "lucide-react";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
-import { APP_URL, MCP_URL } from "@/lib/site";
+import { APP_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { CarbonNav, CarbonWordmark } from "./carbon-nav";
 import {
 	ABOUT_HREF,
 	ARTICLES_HREF,
 	CONSULTING_HREF,
+	CONTACT_HREF,
+	EMAIL_PRODUCT_HREF,
+	MCP_PRODUCT_HREF,
 	PRICING_HREF,
 	PRODUCT_HREF,
 } from "./chrome";
+import { Reveal } from "./reveal";
 
 const plexSans = IBM_Plex_Sans({
 	weight: ["300", "400", "600"],
@@ -41,8 +45,8 @@ const plexMono = IBM_Plex_Mono({
 // Carbon gray-100 for the dark bands.
 export const INK = "bg-[#161616]";
 
-// Page shell: Plex fonts (scoped — the legacy home keeps Geist), Carbon nav
-// and footer. Wrap a page's sections in this instead of SiteNav/SiteFooter.
+// Page shell: scoped Plex fonts plus the Carbon nav and footer. Every
+// marketing page wraps its sections in this.
 export function CarbonPage({ children }: { children: React.ReactNode }) {
 	return (
 		<div
@@ -91,7 +95,9 @@ export function Eyebrow({
 }
 
 // Section opener: hairline rule + numbered mono eyebrow, IBM-style. Headlines
-// are Plex light per Carbon's expressive type set.
+// are Plex light per Carbon's expressive type set. On first scroll into view
+// the rule draws in from the left and the text settles up (Reveal stamps
+// data-shown; reduced-motion users see it static).
 export function SectionHead({
 	n,
 	label,
@@ -104,22 +110,37 @@ export function SectionHead({
 	tone?: "light" | "dark";
 }) {
 	return (
-		<header
-			className={cn(
-				"border-t pt-6",
-				tone === "dark" ? "border-[#393939]" : "border-border",
-			)}
-		>
-			<Eyebrow tone={tone}>{n ? `${n} — ${label}` : label}</Eyebrow>
-			<h2 className="mt-8 max-w-5xl font-light text-3xl sm:text-4xl lg:text-[2.75rem] lg:leading-[1.15]">
-				{title}
-			</h2>
-		</header>
+		<Reveal>
+			<header>
+				<div
+					aria-hidden
+					className={cn(
+						"h-px w-full origin-left scale-x-0 transition-transform duration-700 ease-out group-data-[shown]/rv:scale-x-100 motion-reduce:scale-x-100 motion-reduce:transition-none",
+						tone === "dark" ? "bg-[#393939]" : "bg-border",
+					)}
+				/>
+				<div className="translate-y-3 pt-6 opacity-0 transition delay-150 duration-700 ease-out group-data-[shown]/rv:translate-y-0 group-data-[shown]/rv:opacity-100 motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:transition-none">
+					<Eyebrow tone={tone}>{n ? `${n} — ${label}` : label}</Eyebrow>
+					<h2 className="mt-8 max-w-5xl font-light text-3xl sm:text-4xl lg:text-[2.75rem] lg:leading-[1.15]">
+						{title}
+					</h2>
+				</div>
+			</header>
+		</Reveal>
 	);
 }
 
 // Dark leadspace for subpages: eyebrow → light-weight H1 → blue accent rule →
 // lede → actions. Keeps every page opening on the same beat as the home.
+// Heroes sit above the fold, so the entrance is pure CSS keyframes
+// (globals.css: hero-rise / hero-draw) that play as soon as styles load —
+// no hydration dependency, unlike SectionHead's scroll-triggered reveal.
+// `both` fill keeps elements hidden until their delay elapses.
+
+// Shared enter animation; callers append their own [animation-delay:*] step.
+const heroStep =
+	"animate-[hero-rise_700ms_ease-out_both] motion-reduce:animate-none";
+
 export function PageHero({
 	eyebrow,
 	title,
@@ -134,18 +155,38 @@ export function PageHero({
 	return (
 		<section className={cn("text-white", INK)}>
 			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-24">
-				<Eyebrow tone="dark">{eyebrow}</Eyebrow>
-				<h1 className="mt-8 max-w-5xl font-light text-4xl leading-[1.1] sm:text-5xl lg:text-[3.5rem]">
+				<div className={heroStep}>
+					<Eyebrow tone="dark">{eyebrow}</Eyebrow>
+				</div>
+				<h1
+					className={cn(
+						"mt-8 max-w-5xl font-light text-4xl leading-[1.1] [animation-delay:100ms] sm:text-5xl lg:text-[3.5rem]",
+						heroStep,
+					)}
+				>
 					{title}
 				</h1>
-				<div aria-hidden className="mt-10 h-0.5 w-24 bg-[#0f62fe]" />
+				<div
+					aria-hidden
+					className="mt-10 h-0.5 w-24 origin-left animate-[hero-draw_500ms_ease-out_both] bg-[#0f62fe] [animation-delay:300ms] motion-reduce:animate-none"
+				/>
 				{lede && (
-					<p className="mt-10 max-w-2xl text-[#c6c6c6] text-lg leading-relaxed">
+					<p
+						className={cn(
+							"mt-10 max-w-2xl text-[#c6c6c6] text-lg leading-relaxed [animation-delay:400ms]",
+							heroStep,
+						)}
+					>
 						{lede}
 					</p>
 				)}
 				{actions && (
-					<div className="mt-12 flex flex-col gap-3 sm:flex-row sm:items-center">
+					<div
+						className={cn(
+							"mt-12 flex flex-col gap-3 [animation-delay:500ms] sm:flex-row sm:items-center",
+							heroStep,
+						)}
+					>
 						{actions}
 					</div>
 				)}
@@ -277,8 +318,9 @@ const FOOTER_COLS: {
 		heading: "Product",
 		links: [
 			{ label: "Hudson Corpus", href: PRODUCT_HREF },
+			{ label: "Corpus MCP", href: MCP_PRODUCT_HREF },
+			{ label: "Email assistant", href: EMAIL_PRODUCT_HREF },
 			{ label: "Open the app", href: APP_URL },
-			{ label: "MCP & API", href: MCP_URL },
 		],
 	},
 	{
@@ -294,7 +336,7 @@ const FOOTER_COLS: {
 		links: [
 			{ label: "About", href: ABOUT_HREF },
 			{ label: "Consulting", href: CONSULTING_HREF },
-			{ label: "Contact", href: `${CONSULTING_HREF}#contact` },
+			{ label: "Contact", href: CONTACT_HREF },
 		],
 	},
 	{
