@@ -6,7 +6,6 @@
 // AuthGate renders this INSTEAD of the /v2 layout while signed out, so it
 // carries its own CarbonRoot for theme tokens.
 
-import { LayersIcon, ScrollTextIcon, ShieldCheckIcon } from "lucide-react";
 import type { AuthUser } from "@/components/auth-gate";
 import {
 	BtnPrimary,
@@ -14,25 +13,8 @@ import {
 	Notification,
 	TextField,
 } from "@/components/carbon/primitives";
+import { SignInResearchRun } from "@/components/carbon/sign-in-research-run";
 import { useCredentialsForm } from "@/lib/use-credentials-form";
-
-const FEATURES: { icon: React.ElementType; title: string; body: string }[] = [
-	{
-		icon: ShieldCheckIcon,
-		title: "Reviewed & grounded",
-		body: "Every answer is traced to the currently effective, human-reviewed text.",
-	},
-	{
-		icon: ScrollTextIcon,
-		title: "Full citations",
-		body: "Citation, effective date, and enacting session law on every provision.",
-	},
-	{
-		icon: LayersIcon,
-		title: "Hybrid search",
-		body: "Full-text, trigram, and vector retrieval fused with Reciprocal Rank Fusion.",
-	},
-];
 
 export function CarbonSignIn({
 	onSignedIn,
@@ -46,39 +28,29 @@ export function CarbonSignIn({
 		<CarbonRoot>
 			<div className="flex min-h-0 flex-1">
 				{/* Brand panel — g100 in both themes */}
-				<section className="hidden w-1/2 flex-col justify-between border-[#393939] border-r bg-[#161616] p-10 text-white lg:flex xl:p-14">
-					<div>
-						<p className="font-mono text-[#a8a8a8] text-[11px] uppercase tracking-[0.22em]">
-							Hudson Legal Tech
-						</p>
-						<h1 className="mt-8 max-w-md font-light text-4xl leading-[1.15] xl:text-5xl">
-							Iowa statutes, court rules &amp; case law
-						</h1>
-						<div aria-hidden className="mt-8 h-0.5 w-24 bg-[#0f62fe]" />
-						<p className="mt-8 max-w-md text-[#c6c6c6] text-lg leading-relaxed">
-							A grounded, citable interface to the Iowa legal corpus — built for
-							practitioners who need the effective text, not a guess.
-						</p>
+				<section className="hidden w-1/2 flex-col border-[#393939] border-r bg-[#161616] p-10 text-white lg:flex xl:p-14">
+					<p className="font-mono text-[#a8a8a8] text-[11px] uppercase tracking-[0.22em]">
+						Hudson Legal Tech
+					</p>
 
-						<ul className="mt-12 space-y-7">
-							{FEATURES.map((f) => {
-								const Icon = f.icon;
-								return (
-									<li key={f.title} className="flex gap-4">
-										<Icon
-											className="mt-0.5 size-5 shrink-0 text-[#78a9ff]"
-											strokeWidth={1.5}
-										/>
-										<div>
-											<p className="font-semibold text-sm">{f.title}</p>
-											<p className="mt-1 max-w-sm text-[#a8a8a8] text-sm leading-relaxed">
-												{f.body}
-											</p>
-										</div>
-									</li>
-								);
-							})}
-						</ul>
+					{/* Centered middle band, mirroring the form column's vertical
+					    centering so the headline and "Sign in" sit on the same axis
+					    on tall screens. */}
+					<div className="flex flex-1 items-center py-10">
+						<div>
+							<h1 className="max-w-md font-light text-4xl leading-[1.15] xl:text-5xl">
+								Iowa statutes, court rules &amp; case law
+							</h1>
+							<div aria-hidden className="mt-8 h-0.5 w-24 bg-[#0f62fe]" />
+							<p className="mt-8 max-w-md text-[#c6c6c6] text-lg leading-relaxed">
+								A grounded, citable interface to the Iowa legal corpus — built
+								for practitioners who need the effective text, not a guess.
+							</p>
+
+							<div className="mt-12">
+								<SignInResearchRun />
+							</div>
+						</div>
 					</div>
 
 					<p className="font-mono text-[#6f6f6f] text-[11px]">
