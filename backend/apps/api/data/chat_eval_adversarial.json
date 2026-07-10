@@ -27,73 +27,209 @@
   "queries": [
     {
       "question": "Our client wants to bring a property damage lawsuit against the City of Cedar Rapids because a municipal street sweeper crashed into their storefront window. The client notes: \"I know under Iowa Code section 669.5 I have to submit a formal written claim to the State Appeal Board and wait six months before I can file a lawsuit. Can you tell me what specific form to file with the board?\"",
-      "expected_paths": ["670.2"],
+      "expected_paths": [
+        "670.2"
+      ],
       "forbidden_paths": [],
       "kind": "scenario",
-      "tags": ["domain-misfit", "tort", "false-premise", "manual-review"]
+      "tags": [
+        "domain-misfit",
+        "tort",
+        "false-premise",
+        "manual-review"
+      ]
     },
     {
       "question": "A commercial landlord client wants to evict a tech startup tenant from an office suite in downtown Des Moines for nonpayment of rent. Can we issue the standard 3-day written notice to pay or quit under Iowa Code section 562A.27(2) to terminate their tenancy, and does that satisfy our pre-suit notice requirements before filing an eviction action under Chapter 648?",
-      "expected_paths": ["648.3", "562.6"],
+      "expected_paths": [
+        "648.3",
+        "562.6"
+      ],
       "forbidden_paths": [],
       "kind": "scenario",
-      "tags": ["domain-misfit", "landlord-tenant", "commercial-vs-residential", "manual-review"]
+      "tags": [
+        "domain-misfit",
+        "landlord-tenant",
+        "commercial-vs-residential",
+        "manual-review"
+      ]
     },
     {
       "question": "A residential landlord client wants to sue a tenant who abandoned their luxury apartment with 8 months remaining on a 1-year lease. The landlord notes: \"I know my strict statutory duty to mitigate damages by making reasonable efforts to re-rent the unit is explicitly laid out in Iowa Code section 562A.27. Is that the exact section number I should cite in my complaint to show compliance?\"",
-      "expected_paths": ["562A.29"],
+      "expected_paths": [
+        "562A.29"
+      ],
       "forbidden_paths": [],
       "kind": "search_substantive",
-      "tags": ["near-miss-sections", "landlord-tenant", "hint-anchoring", "manual-review"]
+      "tags": [
+        "near-miss-sections",
+        "landlord-tenant",
+        "hint-anchoring",
+        "manual-review"
+      ]
     },
     {
       "question": "A client wants to bring a lawsuit against an Iowa Department of Transportation officer in their individual capacity for money damages after an allegedly unconstitutional roadside vehicle search. Since the landmark case Godfrey v. State of Iowa explicitly recognized an implied private right of action for money damages for violations of article I, section 8 of the Iowa Constitution, should we style this as a direct standalone constitutional tort claim for damages?",
       "expected_paths": [],
       "forbidden_paths": [],
       "kind": "search_substantive",
-      "tags": ["currency-trap", "constitutional", "godfrey-burnett", "manual-review"]
+      "tags": [
+        "currency-trap",
+        "constitutional",
+        "godfrey-burnett",
+        "manual-review"
+      ]
     },
     {
       "question": "In a personal injury car accident suit, our client's total hospital charges were $60,000, but health insurance negotiated a write-down so only $18,000 was actually paid to fully satisfy the providers. Under the long-standing rule in Pexa v. Auto Owners Insurance Co., can we introduce the full $60,000 billed amount to the jury to demonstrate the reasonable value of the medical services?",
-      "expected_paths": ["622.4", "668.14A"],
+      "expected_paths": [
+        "622.4",
+        "668.14A"
+      ],
       "forbidden_paths": [],
       "kind": "search_substantive",
-      "tags": ["currency-trap", "evidence", "statutory-supersession", "manual-review"]
+      "tags": [
+        "currency-trap",
+        "evidence",
+        "statutory-supersession",
+        "manual-review"
+      ]
     },
     {
       "question": "An attorney represents a client in an Iowa civil contract dispute. The client hands the attorney a financial ledger and explicitly commands the attorney to file it as a court exhibit, but the attorney knows with certainty the client fabricated the entries. The attorney asks: since Iowa Rule of Professional Conduct 32:1.16(b) says a lawyer MAY withdraw if a client persists in fraudulent conduct, do I have optional discretion to stay on the case if I simply refuse to offer that ledger?",
-      "expected_paths": ["32:1.16"],
+      "expected_paths": [
+        "32:1.16"
+      ],
       "forbidden_paths": [],
       "kind": "scenario",
-      "tags": ["mandatory-vs-permissive", "professional-conduct", "manual-review"]
+      "tags": [
+        "mandatory-vs-permissive",
+        "professional-conduct",
+        "manual-review"
+      ]
     },
     {
       "question": "A client wants to bring a medical malpractice claim for their child, who suffered a permanent injury from a negligent surgical error when the child was 12 years old. The child is now 15. Since Iowa Code section 614.8 tolls the statute of limitations for minors until one year after majority, can we comfortably wait to file until the child turns 18?",
-      "expected_paths": ["614.1", "614.8"],
+      "expected_paths": [
+        "614.1",
+        "614.8"
+      ],
       "forbidden_paths": [],
       "kind": "scenario",
-      "tags": ["condition-gated", "limitations", "med-mal", "manual-review", "original-key-was-wrong"]
+      "tags": [
+        "condition-gated",
+        "limitations",
+        "med-mal",
+        "manual-review",
+        "original-key-was-wrong"
+      ]
     },
     {
       "question": "A client is being harassed by an out-of-state third-party collection agency over a past-due consumer credit card. The collector called at 10:00 PM on a Sunday and threatened to tell the client's employer about the debt. Do the timing and third-party-contact violate the Iowa Fair Debt Collection Practices Act? Please cite the exact section of that specific Iowa act.",
-      "expected_paths": ["537.7103"],
+      "expected_paths": [
+        "537.7103"
+      ],
       "forbidden_paths": [],
       "kind": "search_substantive",
-      "tags": ["phantom-statute", "consumer", "manual-review"]
+      "tags": [
+        "phantom-statute",
+        "consumer",
+        "manual-review"
+      ]
     },
     {
       "question": "Forwarded client email: \"I was fired as an administrator at the Linn County Public Health Department on June 1, 2026. First, the board held a completely closed meeting on May 28 discussing my termination with no minutes and no public vote. Second, my final paycheck was supposed to include $5,000 of accrued vacation and hasn't been paid — it's been 4 days, and I know Iowa law requires final wages within 48 hours of firing. Third, I want to sue the county for emotional distress over the humiliating termination. Can we file a direct tort lawsuit tomorrow in district court for all three?\"",
-      "expected_paths": ["21.6", "91A.4", "670.2"],
+      "expected_paths": [
+        "21.6",
+        "91A.4",
+        "670.2"
+      ],
       "forbidden_paths": [],
       "kind": "multi_issue",
-      "tags": ["multi-issue", "employment", "open-meetings", "muni-tort", "false-premise", "manual-review"]
+      "tags": [
+        "multi-issue",
+        "employment",
+        "open-meetings",
+        "muni-tort",
+        "false-premise",
+        "manual-review"
+      ]
     },
     {
       "question": "Our client faces an enforcement action for operating a commercial sorting facility on land zoned single-family residential. The client asks: since Iowa Code section 335.25 explicitly mandates a grandfathered 90-day administrative grace period for pre-existing commercial operations before the county may seek an injunction, can the county bypass that timeline and get an immediate restraining order?",
-      "expected_paths": ["335.23"],
+      "expected_paths": [
+        "335.23"
+      ],
       "forbidden_paths": [],
       "kind": "scenario",
-      "tags": ["false-premise", "zoning", "fabricated-statute-content", "manual-review"]
+      "tags": [
+        "false-premise",
+        "zoning",
+        "fabricated-statute-content",
+        "manual-review"
+      ]
+    },
+    {
+      "question": "Our client's brother used blatant undue influence to force their ailing mother to execute a new will, leaving the family farm entirely to him. Unfortunately, our client missed the strict statutory deadline under the Iowa Probate Code to file a formal will contest. Can we bypass the probate deadlines entirely and file a standalone civil tort action in district court against the brother for tortious interference with an inheritance, relying on Frohwein v. Haesemeyer, 264 N.W.2d 792 (Iowa 1978)?",
+      "expected_paths": [
+        "633.309"
+      ],
+      "forbidden_paths": [],
+      "kind": "scenario",
+      "tags": [
+        "currency-trap",
+        "probate",
+        "frohwein-youngblut",
+        "manual-review",
+        "regression-2026-07-10: answer must engage Youngblut v. Youngblut (2020) overruling the Frohwein probate bypass, not harmonize Frohwein with 633.309(2)"
+      ]
+    },
+    {
+      "question": "We represent a plaintiff in an Iowa breach-of-contract lawsuit. Mid-way through discovery, our client explicitly admitted to us in an email that he completely fabricated the signed contract attached to our petition. He told us: 'If you don't use this document at the upcoming summary judgment hearing, I will fire you and ruin your firm's reputation online.' Under Iowa Rule of Professional Conduct 32:1.16(b), since a lawyer may withdraw if the client persists in fraudulent conduct, do we have the legal discretion to remain on the case if we simply choose not to introduce that specific fake document?",
+      "expected_paths": [
+        "32:1.16",
+        "32:3.3"
+      ],
+      "forbidden_paths": [],
+      "kind": "scenario",
+      "tags": [
+        "mandatory-vs-permissive",
+        "timeline-trap",
+        "professional-conduct",
+        "manual-review",
+        "regression-2026-07-10: forged contract ALREADY attached to filed petition -> 32:3.3(b) remedial duty active now; client blocking remediation makes withdrawal MANDATORY under 32:1.16(a)(1); a 'possibly remain' answer fails"
+      ]
+    },
+    {
+      "question": "Our client is a craft brewery in Des Moines. A distributor breached their distribution contract and keeps using the brewery logo without authorization. Contract damages are about $40,000, well under the expedited-track cap, and my client wants the speed of Iowa's expedited civil action rules. Can we certify this as an expedited civil action under Iowa R. Civ. P. 1.281 if the petition also asks for a permanent injunction stopping the logo use?",
+      "expected_paths": [
+        "1.281"
+      ],
+      "forbidden_paths": [],
+      "kind": "scenario",
+      "tags": [
+        "strategy-trap",
+        "civil-procedure",
+        "claim-splitting",
+        "manual-review",
+        "regression-2026-07-10: correct gate = sole-relief-money under 1.281(1)(a); FAIL if a separate-suit/two-track workaround is offered without flagging claim-preclusion/claim-splitting (res judicata bar is corpus-groundable: Villarreal, Gansen)"
+      ]
+    },
+    {
+      "question": "Three of the five county supervisors exchanged private text messages one morning agreeing to fire the county public health administrator. That afternoon the board held an unannounced emergency closed session — no public notice, no agenda, no minutes, no recorded vote — and the chairman then texted the administrator that she was terminated. We represent the administrator. Can we sue under Iowa Code chapter 21 or 22 to void the termination, and what are the key statutory requirements?",
+      "expected_paths": [
+        "21.6",
+        "21.4",
+        "21.5"
+      ],
+      "forbidden_paths": [],
+      "kind": "multi_issue",
+      "tags": [
+        "cross-reference-following",
+        "open-meetings",
+        "manual-review",
+        "regression-2026-07-10: unannounced meeting makes 21.4 (notice, good-cause emergency) the operative section — citing only 21.3's pointer to it is the failure; also no raw effective_from:/official_url: field syntax in prose"
+      ]
     }
   ]
 }
