@@ -256,6 +256,13 @@ class Command(BaseCommand):
         parser.add_argument("--rc-mmr", action="store_true")
         parser.add_argument("--rc-no-u-order", action="store_true")
         parser.add_argument("--rc-no-chunk-excerpt", action="store_true")
+        # Phase 3 authority blend (retrieve_context authority_weight /
+        # authority_court_bonus). 0.0 = off = the phase3_baseline_* behavior.
+        parser.add_argument("--rc-authority", type=float, default=0.0)
+        parser.add_argument("--rc-authority-court", type=float, default=0.0)
+        # Phase 3 latency levers.
+        parser.add_argument("--rc-no-trigram", action="store_true")
+        parser.add_argument("--rc-doc-chars", type=int, default=None)
         parser.add_argument(
             "--allow-fake",
             action="store_true",
@@ -323,7 +330,12 @@ class Command(BaseCommand):
             mmr_lambda=DEFAULT_MMR_LAMBDA if opts["rc_mmr"] else None,
             u_order=not opts["rc_no_u_order"],
             chunk_excerpts=not opts["rc_no_chunk_excerpt"],
+            authority_weight=opts["rc_authority"],
+            authority_court_bonus=opts["rc_authority_court"],
+            use_trigram=not opts["rc_no_trigram"],
         )
+        if opts["rc_doc_chars"] is not None:
+            rc_kwargs["rerank_doc_chars"] = opts["rc_doc_chars"]
         if rc_on:
             configs.append("rc")
 

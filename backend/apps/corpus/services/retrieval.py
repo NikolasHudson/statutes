@@ -39,11 +39,13 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+import math
 import re
 
 from django.conf import settings
+from django.db.models import Count
 
-from apps.corpus.models import Node, NodeChunk, NodeVersion
+from apps.corpus.models import CrossReference, Node, NodeChunk, NodeVersion
 from apps.corpus.services.corpus_tools import (
     _caselaw_decision,
     _node_dict,
@@ -90,6 +92,29 @@ MMR_WINDOW_FACTOR = 4  # MMR considers top (display_limit * factor) deduped hits
 # Neighbor context to pull around a matched caselaw chunk so a holding isn't cut
 # mid-thought; the budget bounds the total, this just sets how the slack is spent.
 CHUNK_NEIGHBOR_CHARS = 600
+
+# Authority-weighted ranking (Phase 3). The cross-encoder scores passage↔query
+# fit only, so a progeny case QUOTING a canonical rule outscores the canonical
+# statement itself (phase3_baseline_authority: rerank is net-NEGATIVE on
+# doctrine-seeking queries — vector MRR 0.417 → rc 0.324; Gust 1→20, Bruegger
+# 1→22). The blend adds a citedness prior to the rerank relevance score:
+#
+#   blended = relevance + authority_weight * log1p(cited_by)/log1p(CITED_CAP)
+#           (+ authority_court_bonus when the decision is iowa supreme court)
+#
+# log1p compresses the heavy-tailed count. Normalization is ABSOLUTE (a fixed
+# cap ≈ the most-cited case in the corpus), NOT pool-relative: the offline
+# formula sweep (2026-07-09, scratchpad pools.json grid) showed pool-relative
+# norm hands a 44-cite case the same full boost as a 1,205-cite case whenever
+# the pool is low-cited, which flipped fact-pattern queries whose correct
+# answer is a recent, lightly-cited case (categories2 MRR 0.801→0.612 at flat
+# w=0.3). Absolute norm keeps moderate counts at moderate boosts.
+# Decisions with a NEGATIVE treatment flag get no boost — a heavily-cited
+# overruled case must not ride its citation count. Both weights default 0.0 =
+# off; production values are eval-gated against
+# benchmarks/caselaw/PHASE3_BASELINES.md.
+AUTHORITY_SUPREME_COURT_ID = "iowa"
+AUTHORITY_CITED_CAP = 1500  # ~the most-cited decision in the Iowa corpus
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +325,84 @@ def _treatment_for(node: Node) -> TreatmentFlag:
     return TreatmentFlag(**{k: v for k, v in td.items() if k in _TREATMENT_FIELDS})
 
 
+def _graph_cited_by(cluster_ids: set[int]) -> dict[int, int]:
+    """Distinct citing decisions per decision node id, from the caselaw
+    citation graph (same aggregation the /results "Cited by N" badge uses, so
+    a case ranked up by authority shows the number that explains it). Edges
+    are opinion→opinion; both sides aggregate through the parent decision."""
+    if not cluster_ids:
+        return {}
+    # Two-step on purpose: filtering the edge table by a LITERAL opinion-id
+    # list keeps the planner on the to_node FK index (~40ms); the single-query
+    # ``to_node__parent_id__in`` form seq-scans all 475K+ edge rows (~175ms).
+    opinion_ids = list(
+        Node.objects.filter(parent_id__in=cluster_ids).values_list("id", flat=True)
+    )
+    if not opinion_ids:
+        return {}
+    rows = (
+        CrossReference.objects.filter(
+            source="caselaw_graph", to_node_id__in=opinion_ids
+        )
+        .values("to_node__parent_id")
+        .annotate(n=Count("from_version__node__parent_id", distinct=True))
+    )
+    return {r["to_node__parent_id"]: r["n"] for r in rows}
+
+
+def _authority_reorder(
+    hits: list,
+    nodes: dict[int, Node],
+    relevance_by_id: dict[int, float],
+    cluster_id_of,
+    *,
+    cited_weight: float,
+    court_bonus: float,
+    pinned_ids: set[int],
+) -> tuple[list, dict]:
+    """Reorder caselaw hits by relevance + authority prior (see the constants
+    block). Only caselaw hits are re-scored, and they are permuted among the
+    positions caselaw already occupies — statute hits keep their exact slots,
+    so the blend can never push caselaw above a statute (or vice versa) that
+    the reranker preferred. Citation-pinned hits stay pinned. Python's stable
+    sort keeps the incoming (rerank) order on blended-score ties."""
+    slots = [
+        i
+        for i, h in enumerate(hits)
+        if nodes[h.node_id].source.slug == "iowa-caselaw"
+        and h.node_version_id not in pinned_ids
+    ]
+    if len(slots) < 2:
+        return hits, {"eligible": len(slots), "moved": 0}
+
+    clusters = {i: cluster_id_of(hits[i]) for i in slots}
+    counts = _graph_cited_by(set(clusters.values()))
+    cap_log = math.log1p(AUTHORITY_CITED_CAP)
+
+    def blended(i: int) -> float:
+        h = hits[i]
+        rel = relevance_by_id.get(h.node_version_id, 0.0)
+        decision = _caselaw_decision(nodes[h.node_id])
+        md = decision.source_metadata or {}
+        if ((md.get("treatment") or {}).get("status")) == "negative":
+            return rel  # never boost bad law
+        boost = cited_weight * min(
+            math.log1p(counts.get(clusters[i], 0)) / cap_log, 1.0
+        )
+        if md.get("court_id") == AUTHORITY_SUPREME_COURT_ID:
+            boost += court_bonus
+        return rel + boost
+
+    order = sorted(slots, key=blended, reverse=True)
+    out = list(hits)
+    moved = 0
+    for slot, src in zip(slots, order):
+        out[slot] = hits[src]
+        if slot != src:
+            moved += 1
+    return out, {"eligible": len(slots), "moved": moved}
+
+
 def _u_order(items: list) -> list:
     """Reorder a relevance-ranked list (best first) into a U-curve so the two
     strongest land at the ends and the weakest in the middle — the "lost in the
@@ -321,6 +424,7 @@ def retrieve_context(
     *,
     source_slug: str | None = None,
     use_vector: bool = True,
+    use_trigram: bool = True,
     candidate_pool: int = DEFAULT_CANDIDATE_POOL,
     display_limit: int = DEFAULT_DISPLAY_LIMIT,
     rerank: bool = True,
@@ -337,6 +441,8 @@ def retrieve_context(
     chunk_excerpts: bool = True,
     protect_citations: bool = True,
     require_phrases: list[str] | None = None,
+    authority_weight: float = 0.0,
+    authority_court_bonus: float = 0.0,
 ) -> RetrievedContext:
     """Retrieve, rerank, dedup, diversify, and assemble a surface-agnostic context.
 
@@ -363,6 +469,21 @@ def retrieve_context(
     every phrase (case-insensitive) BEFORE reranking — the search surface's
     'quoted phrase inside a natural query' contract: rank semantically, but
     only among documents that actually contain the phrase.
+
+    ``use_trigram`` passes through to ``hybrid_search``. The natural-language
+    search surface turns it OFF (Phase 3 latency): trigram is a single-token
+    typo/partial-heading tool that costs ~450ms per query and fuzzy-matches
+    noise on sentence-length queries (its weight is 0.2 and the case-name
+    retriever covers party-name lookups) — eval-gated, see PHASE3_BASELINES.md.
+
+    ``authority_weight`` / ``authority_court_bonus`` (Phase 3) blend a
+    citedness/court prior into the post-rerank ordering of CASELAW hits (see
+    the constants block and ``_authority_reorder``). Both default 0.0 = off
+    (byte-identical pipeline). Requires ``rerank`` — without relevance scores
+    there is nothing sane to blend against, so it is skipped. NOTE: with a
+    non-zero weight the "rank-1 hit stays at position 0" invariant is
+    deliberately relaxed — promoting the canonical case over an application
+    case at rank 1 is the point.
     """
     as_of = _today()
     if not query or not query.strip():
@@ -383,6 +504,7 @@ def retrieve_context(
         search_query,
         limit=candidate_pool,
         use_vector=use_vector,
+        use_trigram=use_trigram,
         source_slug=source_slug,
         metadata_contains=metadata_contains,
     )
@@ -437,11 +559,22 @@ def retrieve_context(
             )
             for h in rerankable
         ]
-        ranked_ids = active.rerank(search_query, candidates, top_k=len(candidates))
+        if callable(getattr(active, "rerank_scored", None)):
+            scored = active.rerank_scored(
+                search_query, candidates, top_k=len(candidates)
+            )
+        else:
+            # Minimal Reranker implementations (test fakes) expose only
+            # rerank(); synthesize the same linear pseudo-scores the Noop does.
+            ids = active.rerank(search_query, candidates, top_k=len(candidates))
+            scored = [(i, 1.0 - k / max(len(ids), 1)) for k, i in enumerate(ids)]
+        relevance_by_id = dict(scored)
         by_id = {h.node_version_id: h for h in rerankable}
-        ordered = cite_hits + [by_id[i] for i in ranked_ids if i in by_id]
+        ordered = cite_hits + [by_id[i] for i, _ in scored if i in by_id]
         diagnostics["cite_protected"] = len(cite_hits)
     else:
+        cite_ids = set()
+        relevance_by_id = {}
         ordered = list(hits)
 
     # --- Stage B: fetch the pool's nodes once; derive each hit's cluster ------
@@ -475,6 +608,26 @@ def retrieve_context(
             deduped.append(h)
         diagnostics["deduped_out"] = len(ordered) - len(deduped)
         ordered = deduped
+
+    # --- Stage C2: authority-weighted reorder (caselaw only, Phase 3) ---------
+    # After dedup (the prior is decision-level) and BEFORE the display slice, so
+    # a canonical case the reranker demoted to e.g. rank 27 can climb back into
+    # the visible page. Skipped without rerank: no relevance scores to blend.
+    if (authority_weight or authority_court_bonus) and rerank:
+        ordered, auth_diag = _authority_reorder(
+            ordered,
+            nodes,
+            relevance_by_id,
+            _cluster_id_of,
+            cited_weight=authority_weight,
+            court_bonus=authority_court_bonus,
+            pinned_ids=cite_ids,
+        )
+        diagnostics["authority"] = {
+            "weight": authority_weight,
+            "court_bonus": authority_court_bonus,
+            **auth_diag,
+        }
 
     # --- Stage D: MMR diversity select down to display_limit ------------------
     if mmr_lambda is not None and mmr_lambda < 1.0 and len(ordered) > 1:

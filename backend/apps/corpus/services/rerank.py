@@ -48,6 +48,23 @@ class Reranker(Protocol):
     ) -> list[int]:
         ...
 
+    def rerank_scored(
+        self, query: str, candidates: list[tuple[int, str]], *, top_k: int
+    ) -> list[tuple[int, float]]:
+        ...
+
+
+def _fallback_scored(
+    candidates: list[tuple[int, str]], top_k: int
+) -> list[tuple[int, float]]:
+    """Order-preserving scored fallback: keeps the incoming (RRF) order and
+    assigns a linearly decaying pseudo-score in (0, 1]. Linear — not 1/rank —
+    so a downstream blend against these scores degrades gracefully instead of
+    letting any additive signal swamp everything past the first few ranks."""
+    kept = candidates[:top_k]
+    n = len(kept)
+    return [(cid, 1.0 - i / max(n, 1)) for i, (cid, _) in enumerate(kept)]
+
 
 class NoopReranker:
     """Keeps the incoming order (already RRF-ranked) and just truncates to
@@ -57,6 +74,11 @@ class NoopReranker:
         self, query: str, candidates: list[tuple[int, str]], *, top_k: int
     ) -> list[int]:
         return [cid for cid, _ in candidates[:top_k]]
+
+    def rerank_scored(
+        self, query: str, candidates: list[tuple[int, str]], *, top_k: int
+    ) -> list[tuple[int, float]]:
+        return _fallback_scored(candidates, top_k)
 
 
 @dataclass
@@ -74,6 +96,14 @@ class VoyageReranker:
     def rerank(
         self, query: str, candidates: list[tuple[int, str]], *, top_k: int
     ) -> list[int]:
+        return [cid for cid, _ in self.rerank_scored(query, candidates, top_k=top_k)]
+
+    def rerank_scored(
+        self, query: str, candidates: list[tuple[int, str]], *, top_k: int
+    ) -> list[tuple[int, float]]:
+        """Like :meth:`rerank` but keeps Voyage's ``relevance_score`` per id
+        (roughly [0, 1], higher = more relevant) so callers can blend other
+        signals against real relevance instead of bare rank."""
         if not candidates:
             return []
         try:
@@ -92,10 +122,13 @@ class VoyageReranker:
             )
             # result.results: objects with .index into the docs list, already
             # sorted by descending relevance.
-            return [candidates[r.index][0] for r in result.results]
+            return [
+                (candidates[r.index][0], float(r.relevance_score))
+                for r in result.results
+            ]
         except Exception:  # noqa: BLE001 — rerank must never break search
             log.exception("rerank failed; falling back to RRF order")
-            return [cid for cid, _ in candidates[:top_k]]
+            return _fallback_scored(candidates, top_k)
 
 
 def default_reranker() -> Reranker:

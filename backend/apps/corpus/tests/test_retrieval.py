@@ -27,6 +27,7 @@ from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase, tag
 
 from apps.corpus.models import (
+    CrossReference,
     Jurisdiction,
     Node,
     NodeChunk,
@@ -39,6 +40,7 @@ from apps.corpus.services.embeddings import run_chunk_embedding_job, run_embeddi
 from apps.corpus.services.rerank import NoopReranker
 from apps.corpus.services.retrieval import (
     TreatmentFlag,
+    _authority_reorder,
     _chunk_excerpt,
     _jaccard,
     _mmr_select,
@@ -140,6 +142,111 @@ class ChunkExcerptTests(SimpleTestCase):
 
 
 @tag("postgres")
+def _auth_node(nid, *, slug="iowa-caselaw", md=None, parent=None):
+    """Minimal stand-in for a select_related Node as _authority_reorder reads
+    it: .source.slug, .source_metadata, .parent / .parent_id, .id."""
+    return SimpleNamespace(
+        id=nid,
+        source=SimpleNamespace(slug=slug),
+        source_metadata=md or {},
+        parent=parent,
+        parent_id=parent.id if parent else None,
+    )
+
+
+def _auth_hit(nv_id, node_id):
+    return SimpleNamespace(node_version_id=nv_id, node_id=node_id)
+
+
+class AuthorityReorderTests(SimpleTestCase):
+    """Pure-function tests for the Phase 3 authority blend. The citation-graph
+    lookup is patched so these pin ONLY the blend/permutation semantics."""
+
+    def _run(self, hits, nodes, relevance, counts, **kw):
+        kw.setdefault("cited_weight", 1.0)
+        kw.setdefault("court_bonus", 0.0)
+        kw.setdefault("pinned_ids", set())
+        with mock.patch(
+            "apps.corpus.services.retrieval._graph_cited_by", return_value=counts
+        ):
+            return _authority_reorder(
+                hits, nodes, relevance, lambda h: h.node_id, **kw
+            )
+
+    def test_citedness_promotes_the_canonical_case(self):
+        # Reranker prefers the application case (rel .60 vs .55); the canonical
+        # case's citedness (100 vs 2) must overcome the .05 relevance gap.
+        nodes = {1: _auth_node(1), 2: _auth_node(2)}
+        hits = [_auth_hit(11, 1), _auth_hit(22, 2)]  # application first
+        out, diag = self._run(
+            hits, nodes, {11: 0.60, 22: 0.55}, {1: 2, 2: 100}
+        )
+        self.assertEqual([h.node_id for h in out], [2, 1])
+        self.assertEqual(diag["moved"], 2)
+
+    def test_statute_slots_are_never_disturbed(self):
+        # caselaw - STATUTE - caselaw: the two caselaw hits swap; the statute
+        # keeps its exact middle slot regardless of any blend outcome.
+        nodes = {
+            1: _auth_node(1),
+            5: _auth_node(5, slug="iowa-code"),
+            2: _auth_node(2),
+        }
+        hits = [_auth_hit(11, 1), _auth_hit(55, 5), _auth_hit(22, 2)]
+        out, _ = self._run(
+            hits, nodes, {11: 0.60, 55: 0.99, 22: 0.55}, {1: 0, 2: 100}
+        )
+        self.assertEqual([h.node_id for h in out], [2, 5, 1])
+
+    def test_pinned_citation_hits_do_not_move(self):
+        nodes = {1: _auth_node(1), 2: _auth_node(2), 3: _auth_node(3)}
+        hits = [_auth_hit(11, 1), _auth_hit(22, 2), _auth_hit(33, 3)]
+        out, _ = self._run(
+            hits, nodes, {22: 0.5, 33: 0.4}, {2: 0, 3: 500},
+            pinned_ids={11},
+        )
+        self.assertEqual(out[0].node_id, 1)  # pinned cite hit stays first
+        self.assertEqual([h.node_id for h in out], [1, 3, 2])
+
+    def test_negative_treatment_gets_no_boost(self):
+        # The heavily-cited case is flagged overruled → keeps bare relevance
+        # and must NOT ride its citation count past the good-law case.
+        overruled = _auth_node(2, md={"treatment": {"status": "negative"}})
+        nodes = {1: _auth_node(1), 2: overruled}
+        hits = [_auth_hit(11, 1), _auth_hit(22, 2)]
+        out, _ = self._run(
+            hits, nodes, {11: 0.60, 22: 0.55}, {1: 2, 2: 1000}
+        )
+        self.assertEqual([h.node_id for h in out], [1, 2])
+
+    def test_court_bonus_breaks_a_citedness_tie(self):
+        supreme = _auth_node(2, md={"court_id": "iowa"})
+        coa = _auth_node(1, md={"court_id": "iowactapp"})
+        nodes = {1: coa, 2: supreme}
+        hits = [_auth_hit(11, 1), _auth_hit(22, 2)]
+        out, _ = self._run(
+            hits, nodes, {11: 0.50, 22: 0.50}, {1: 10, 2: 10},
+            cited_weight=0.2, court_bonus=0.05,
+        )
+        self.assertEqual([h.node_id for h in out], [2, 1])
+
+    def test_blend_ties_keep_rerank_order(self):
+        nodes = {1: _auth_node(1), 2: _auth_node(2)}
+        hits = [_auth_hit(11, 1), _auth_hit(22, 2)]
+        out, diag = self._run(
+            hits, nodes, {11: 0.5, 22: 0.5}, {1: 7, 2: 7}
+        )
+        self.assertEqual([h.node_id for h in out], [1, 2])
+        self.assertEqual(diag["moved"], 0)
+
+    def test_single_caselaw_hit_is_a_no_op(self):
+        nodes = {1: _auth_node(1), 5: _auth_node(5, slug="iowa-code")}
+        hits = [_auth_hit(55, 5), _auth_hit(11, 1)]
+        out, diag = self._run(hits, nodes, {11: 0.5, 55: 0.6}, {1: 50})
+        self.assertEqual(out, hits)
+        self.assertEqual(diag["eligible"], 1)
+
+
 class RetrievePipelineTests(TestCase):
     """End-to-end ``retrieve_context`` over a controlled caselaw + statute corpus.
 
@@ -367,6 +474,72 @@ class RetrievePipelineTests(TestCase):
             "merchant consumer fraud", source_slug="iowa-code", reranker=NoopReranker()
         )
         self.assertTrue(all(p.treatment.status == "unknown" for p in sctx.passages))
+
+    # -- Phase 3: authority blend end-to-end --------------------------------
+
+    def test_authority_weight_promotes_the_cited_decision(self):
+        # Give the foil ("In re Other") a citation-graph in-degree of 3; cl-9
+        # stays uncited. A scored reranker slightly prefers cl-9 (0.60 vs
+        # 0.55); the citedness prior must flip the order, and the same call
+        # WITHOUT the weight must keep the reranker's order (the control that
+        # proves the default path is untouched).
+        foil_versions = set(
+            NodeVersion.objects.filter(node=self.op_other).values_list(
+                "id", flat=True
+            )
+        )
+        for i in range(3):
+            d = Node.objects.create(
+                source=self.caselaw, node_type=self.decision.node_type,
+                ordinal=f"9{i}", path=f"cl-cite-{i}", heading=f"Citing {i}",
+            )
+            op = Node.objects.create(
+                source=self.caselaw, node_type=self.op_lead.node_type,
+                parent=d, ordinal="010", path=f"cl-cite-{i}/op-1",
+                heading="Opinion",
+            )
+            v = NodeVersion.objects.create(
+                node=op, body_text="cites In re Other",
+                effective_from=dt.date(2021, 1, 1), content_hash=f"cite{i}",
+                review_status=ReviewStatus.APPROVED,
+            )
+            CrossReference.objects.create(
+                from_version=v, to_node=self.op_other, source="caselaw_graph",
+            )
+
+        class _Scored:
+            def rerank(self, query, candidates, *, top_k):
+                return [cid for cid, _ in self.rerank_scored(query, candidates, top_k=top_k)]
+
+            def rerank_scored(self, query, candidates, *, top_k):
+                scored = [
+                    (cid, 0.55 if cid in foil_versions else 0.60)
+                    for cid, _ in candidates[:top_k]
+                ]
+                return sorted(scored, key=lambda t: t[1], reverse=True)
+
+        kw = dict(
+            source_slug="iowa-caselaw", use_vector=False, reranker=_Scored(),
+            u_order=False,
+        )
+        control = retrieve_context("warrantless blood draw", **kw)
+        self.assertEqual(control.passages[0].cluster_id, self.decision.id)
+        self.assertNotIn("authority", control.diagnostics)
+
+        # weight 0.5: 3 cites → boost 0.5*log1p(3)/log1p(1500) ≈ 0.095 > the
+        # 0.05 relevance gap (absolute norm — a tiny count gets a tiny boost).
+        ctx = retrieve_context("warrantless blood draw", authority_weight=0.5, **kw)
+        self.assertEqual(ctx.passages[0].cluster_id, self.decision2.id)
+        auth = ctx.diagnostics["authority"]
+        self.assertEqual(auth["weight"], 0.5)
+        self.assertGreaterEqual(auth["moved"], 2)
+
+    def test_authority_weight_needs_rerank(self):
+        ctx = retrieve_context(
+            "warrantless blood draw", source_slug="iowa-caselaw",
+            use_vector=False, rerank=False, authority_weight=0.5,
+        )
+        self.assertNotIn("authority", ctx.diagnostics)
 
     # -- citation lane bypasses the reranker -------------------------------
 

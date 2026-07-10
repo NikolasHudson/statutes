@@ -1,0 +1,228 @@
+Warming up embedder ...
+
+==============================================================================
+CASELAW RETRIEVAL EVAL
+  embedder : voyage-law-2  (1024-dim, cosine)
+  scope    : caselaw  ->  iowa-caselaw
+  reranker : rerank-2.5   deep=100   hnsw.ef_search=200   commit=7217c94
+  queries  : 20 landmark Iowa cases (natural-language holding -> case)
+
+------------------------------------------------------------------------------
+RANKING QUALITY  (case-level; ANY opinion of the case counts)
+  config       MRR  hit@1  hit@3  hit@5  hit@10  hit@50   ndcg@1  ndcg@3  ndcg@5  ndcg@10  ndcg@50   recov  medR  dist@50
+  vector    0.675   0.55   0.80   0.80   0.90   1.00     0.55    0.69    0.69    0.73    0.75   100%     1   46.85
+  fts       0.185   0.15   0.20   0.20   0.25   0.35     0.15    0.18    0.18    0.20    0.22   35%     2    7.60
+  hybrid    0.682   0.55   0.80   0.80   0.85   1.00     0.55    0.70    0.70    0.72    0.75   100%     1   50.00
+  vector_rr 0.800   0.75   0.85   0.85   0.85   1.00     0.75    0.81    0.81    0.81    0.84   100%     1   41.35
+  hybrid_rr 0.808   0.75   0.85   0.85   0.85   1.00     0.75    0.81    0.81    0.81    0.85   100%     1   43.40
+  rc        0.612   0.55   0.60   0.60   0.75   0.95     0.55    0.58    0.58    0.64    0.68   95%     1   50.00
+
+  95% CI (Wilson, n=20) — hit@1 / hit@5:
+    vector    hit@1 0.55 [0.34,0.74]   hit@5 0.80 [0.58,0.92]
+    fts       hit@1 0.15 [0.05,0.36]   hit@5 0.20 [0.08,0.42]
+    hybrid    hit@1 0.55 [0.34,0.74]   hit@5 0.80 [0.58,0.92]
+    vector_rr hit@1 0.75 [0.53,0.89]   hit@5 0.85 [0.64,0.95]
+    hybrid_rr hit@1 0.75 [0.53,0.89]   hit@5 0.85 [0.64,0.95]
+    rc        hit@1 0.55 [0.34,0.74]   hit@5 0.60 [0.39,0.78]
+
+  vector cosine — target best-chunk sim: p50=0.6123  min=0.4164  max=0.7458
+  vector cosine — rank-1 hit sim:        p50=0.6254  max=0.7458
+
+------------------------------------------------------------------------------
+PER-QUERY CASE-LEVEL RANK  (· = not found in top-100)
+  #  case                      area                     vector      fts   hybrid  vector_  hybrid_       rc
+  1  State v. Wright           A: Fact-Pattern               3        ·        3        2        2       19
+  2  Alcala v. Marriott Intern A: Fact-Pattern               1        ·        1        1        1        1
+  3  Schoff v. Combined Ins. C A: Fact-Pattern               1        ·        1        1        1        1
+  4  Standard Water Control Sy A: Fact-Pattern               1        ·        1        1        1       13
+  5  State v. Heemstra         A: Fact-Pattern              22        ·       22        1        1        1
+  6  Burnett v. Smith          B: Abstract Concept           7        ·        7       13       13       27
+  7  De Boom v. Raining Rose,  B: Abstract Concept           2        ·        2        1        1        1
+  8  State v. Roby             B: Abstract Concept           9        ·       14       21       21        6
+  9  State v. Pettijohn        B: Abstract Concept           1        1        1        1        1       16
+  10 Mease v. Fox              B: Abstract Concept           2        1        1        1        1        1
+  11 Garrison v. New Fashion P C: Fragmentary/Citati         2        2        2        1        1        1
+  12 Mitchell v. City of Cedar C: Fragmentary/Citati         1        ·        2        1        1        6
+  13 State v. Liggins          C: Fragmentary/Citati         1        ·        1        1        1        1
+  14 Iowa Supreme Court Attorn C: Fragmentary/Citati         1        9        1        1        1        1
+  15 Godfrey v. State          C: Fragmentary/Citati         1        ·        1        1        1        1
+  16 Garrison v. New Fashion P D: Adversarial                3        1        2        3        2        6
+  17 Burnett v. Smith          D: Adversarial               38       28       18       28       30        ·
+  18 State v. Storm            D: Adversarial                1        ·        1        1        1        1
+  19 State v. Mitchell         D: Adversarial                1        ·        1        1        1        1
+  20 In re Marriage of Gallagh D: Adversarial                1       17        1        1        1        2
+
+------------------------------------------------------------------------------
+BY LEGAL AREA  (hit@1 / hit@5 / MRR)
+  A: Fact-Pattern                    n=5
+      vector     hit@1=0.60  hit@5=0.80  mrr=0.68
+      fts        hit@1=0.00  hit@5=0.00  mrr=0.00
+      hybrid     hit@1=0.60  hit@5=0.80  mrr=0.68
+      vector_rr  hit@1=0.80  hit@5=1.00  mrr=0.90
+      hybrid_rr  hit@1=0.80  hit@5=1.00  mrr=0.90
+      rc         hit@1=0.60  hit@5=0.60  mrr=0.63
+  B: Abstract Concept                n=5
+      vector     hit@1=0.20  hit@5=0.60  mrr=0.45
+      fts        hit@1=0.40  hit@5=0.40  mrr=0.40
+      hybrid     hit@1=0.40  hit@5=0.60  mrr=0.54
+      vector_rr  hit@1=0.60  hit@5=0.60  mrr=0.62
+      hybrid_rr  hit@1=0.60  hit@5=0.60  mrr=0.62
+      rc         hit@1=0.40  hit@5=0.40  mrr=0.45
+  C: Fragmentary/Citation            n=5
+      vector     hit@1=0.80  hit@5=1.00  mrr=0.90
+      fts        hit@1=0.00  hit@5=0.20  mrr=0.12
+      hybrid     hit@1=0.60  hit@5=1.00  mrr=0.80
+      vector_rr  hit@1=1.00  hit@5=1.00  mrr=1.00
+      hybrid_rr  hit@1=1.00  hit@5=1.00  mrr=1.00
+      rc         hit@1=0.80  hit@5=0.80  mrr=0.83
+  D: Adversarial                     n=5
+      vector     hit@1=0.60  hit@5=0.80  mrr=0.67
+      fts        hit@1=0.20  hit@5=0.20  mrr=0.22
+      hybrid     hit@1=0.60  hit@5=0.80  mrr=0.71
+      vector_rr  hit@1=0.60  hit@5=0.80  mrr=0.67
+      hybrid_rr  hit@1=0.60  hit@5=0.80  mrr=0.71
+      rc         hit@1=0.40  hit@5=0.60  mrr=0.53
+
+------------------------------------------------------------------------------
+MISS / OUTRANK DIAGNOSTICS
+  [vector] 4 rank>5 or unrecovered:
+    #5 State v. Heemstra  (rank 22)
+        ↑ State v. Bruntlett
+        ↑ State v. Kneeskern
+        ↑ State v. Johnson
+    #6 Burnett v. Smith  (rank 7)
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Amended September 26, 2017 Christopher…
+        ↑ Christopher J. Godfrey v. State of Iow…
+    #8 State v. Roby  (rank 9)
+        ↑ State of Iowa v. Willard Noble Chaiden…
+        ↑ State of Iowa v. Damion John Seats
+        ↑ State of Iowa v. Aviana Eshante Smith
+    #17 Burnett v. Smith  (rank 38)
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Amended September 26, 2017 Christopher…
+  [fts] 16 rank>5 or unrecovered:
+    #1 State v. Wright  (rank >100)
+    #2 Alcala v. Marriott International, Inc.  (rank >100)
+    #3 Schoff v. Combined Ins. Co. of America  (rank >100)
+    #4 Standard Water Control Systems, Inc. v. Jones  (rank >100)
+    #5 State v. Heemstra  (rank >100)
+    #6 Burnett v. Smith  (rank >100)
+        ↑ State of Iowa v. Nicholas Dean Wright
+        ↑ State of Iowa v. Nicholas Dean Wright
+        ↑ State of Iowa v. Nicholas Dean Wright
+    #7 De Boom v. Raining Rose, Inc.  (rank >100)
+        ↑ Larry R. Hedlund v. State of Iowa
+    #8 State v. Roby  (rank >100)
+        ↑ State of Iowa v. Denem Anthony Null
+        ↑ Amended August 21, 2017 State of Iowa …
+        ↑ State of Iowa v. Sayvon Andre Propps
+    #12 Mitchell v. City of Cedar Rapids  (rank >100)
+        ↑ Adam Klein v. Iowa Public Information …
+    #13 State v. Liggins  (rank >100)
+    #14 Iowa Supreme Court Attorney Disciplinary Board v. Marzen  (rank 9)
+        ↑ Iowa Supreme Court Attorney Disciplina…
+        ↑ Amended March 6, 2015 Iowa Supreme Cou…
+        ↑ Amended March 6, 2015 Iowa Supreme Cou…
+    #15 Godfrey v. State  (rank >100)
+        ↑ Eugene Sikora v. State of Iowa and Dr.…
+        ↑ Cory Burnett v. Phillip Smith and Stat…
+        ↑ Cory Burnett v. Phillip Smith and Stat…
+    #17 Burnett v. Smith  (rank 28)
+        ↑ Dodson v. McCurnin
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Christopher J. Godfrey v. State of Iow…
+    #18 State v. Storm  (rank >100)
+    #19 State v. Mitchell  (rank >100)
+    #20 In re Marriage of Gallagher  (rank 17)
+        ↑ State of Iowa v. Jerry Lynn Burns
+        ↑ Planned Parenthood of the Heartland an…
+        ↑ Planned Parenthood of the Heartland, I…
+  [hybrid] 4 rank>5 or unrecovered:
+    #5 State v. Heemstra  (rank 22)
+        ↑ State v. Bruntlett
+        ↑ State v. Kneeskern
+        ↑ State v. Johnson
+    #6 Burnett v. Smith  (rank 7)
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Amended September 26, 2017 Christopher…
+        ↑ Christopher J. Godfrey v. State of Iow…
+    #8 State v. Roby  (rank 14)
+        ↑ Amended September 30, 2014 State of Io…
+        ↑ State of Iowa v. Andre Jerome Lyle Jr.
+        ↑ Amended August 21, 2017 State of Iowa …
+    #17 Burnett v. Smith  (rank 18)
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Amended September 26, 2017 Christopher…
+  [vector_rr] 3 rank>5 or unrecovered:
+    #6 Burnett v. Smith  (rank 13)
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Gregory Baldwin v. City of Estherville…
+        ↑ Kyle Conklin and A.C., a Minor, by Kyl…
+    #8 State v. Roby  (rank 21)
+        ↑ State of Iowa v. Yvette Marie Louisell
+        ↑ State of Iowa v. Jeffrey K. Ragland
+        ↑ State of Iowa v. Damion John Seats
+    #17 Burnett v. Smith  (rank 28)
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Amended September 26, 2017 Christopher…
+        ↑ Christopher J. Godfrey v. State of Iow…
+  [hybrid_rr] 3 rank>5 or unrecovered:
+    #6 Burnett v. Smith  (rank 13)
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Gregory Baldwin v. City of Estherville…
+        ↑ Kyle Conklin and A.C., a Minor, by Kyl…
+    #8 State v. Roby  (rank 21)
+        ↑ State of Iowa v. Yvette Marie Louisell
+        ↑ State of Iowa v. Jeffrey K. Ragland
+        ↑ State of Iowa v. Damion John Seats
+    #17 Burnett v. Smith  (rank 30)
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Amended September 26, 2017 Christopher…
+        ↑ Christopher J. Godfrey v. State of Iow…
+  [rc] 8 rank>5 or unrecovered:
+    #1 State v. Wright  (rank 19)
+        ↑ State v. Graves
+        ↑ State of Iowa v. Tremayne Latoine Thom…
+        ↑ State v. Henderson
+    #4 Standard Water Control Systems, Inc. v. Jones  (rank 13)
+        ↑ Schaffer v. Frank Moyer Construction, …
+        ↑ Larry D. Schaefer and Elaine M. Schaef…
+        ↑ Standard Water Control Systems, Inc., …
+    #6 Burnett v. Smith  (rank 27)
+        ↑ Marcus v. Young
+        ↑ Gregory Baldwin v. City of Estherville…
+        ↑ Christopher J. Godfrey v. State of Iow…
+    #8 State v. Roby  (rank 6)
+        ↑ State v. Lyle
+        ↑ State of Iowa v. Damion John Seats
+        ↑ State of Iowa v. Jeffrey K. Ragland
+    #9 State v. Pettijohn  (rank 16)
+        ↑ State of Iowa v. Carrie McIver
+        ↑ State v. Palmer
+        ↑ State of Iowa v. John Arthur Senn Jr.
+    #12 Mitchell v. City of Cedar Rapids  (rank 6)
+        ↑ City of Riverdale, Iowa v. Allen Dierc…
+        ↑ Marcus v. Young
+        ↑ Gabrilson v. Flynn
+    #16 Garrison v. New Fashion Pork LLP  (rank 6)
+        ↑ Bormann v. KOSSUTH COUNTY BD. OF SUP'RS
+        ↑ Weinhold v. Wolff
+        ↑ Goodell v. Humboldt County
+    #17 Burnett v. Smith  (rank >100)
+        ↑ Larry R. Hedlund v. State of Iowa
+        ↑ Larry R. Hedlund v. State of Iowa K. B…
+        ↑ Dennis L. Smith v. Iowa State Universi…
+
+------------------------------------------------------------------------------
+latency (ms):
+  embed     p50=168  p90=328  max=1365
+  vector    p50=1498  p90=2263  max=3450
+  fts       p50=38  p90=65  max=635
+  hybrid    p50=2587  p90=4592  max=5110
+  rerank    p50=566  p90=935  max=1874
+  rc        p50=3092  p90=5208  max=6567
+
+Snapshot written: /home/dev/statutes/backend/benchmarks/caselaw/phase3_categories2_w0.3.json

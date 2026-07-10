@@ -67,6 +67,22 @@ research_router = Router()
 NATURAL_DEPTH = 50
 NATURAL_POOL = 100
 
+# Phase 3 latency: trigram OFF for natural queries. It cost ~450ms/query and
+# the eval showed it was HURTING ranking on sentence-length queries (holdings
+# h@1 0.65→0.80 without it; authority MRR 0.487→0.525; categories2 neutral).
+# Typo/partial-heading lookups stay covered: boolean/citation modes and the
+# case-name retriever don't go through this flag.
+NATURAL_USE_TRIGRAM = False
+
+# Phase 3 authority-weighted ranking: blend a citedness prior into the
+# post-rerank ordering of caselaw hits (retrieve_context authority_weight;
+# absolute log1p norm, negative-treatment excluded). 0.25 chosen by the
+# 2026-07-09 eval gate: authority set rc MRR 0.324→0.487 / hit@5 0.43→0.61
+# with holdings + categories improving and categories2 −0.017 MRR (inside
+# noise; the recent-low-cited-target tension, documented in
+# benchmarks/caselaw/PHASE3_BASELINES.md). Set 0.0 to disable.
+NATURAL_AUTHORITY_WEIGHT = 0.25
+
 # URL `mode` values (short, shareable) → classifier overrides.
 _MODE_PARAM = {"tc": MODE_BOOLEAN, "boolean": MODE_BOOLEAN, "natural": MODE_NATURAL}
 # URL `sort` values → fts_search_paged order keys. Natural mode is
@@ -492,6 +508,7 @@ def research_search(
         q,
         source_slug=effective_source,
         use_vector=True,
+        use_trigram=NATURAL_USE_TRIGRAM,
         candidate_pool=NATURAL_POOL,
         display_limit=NATURAL_DEPTH,
         rerank=True,
@@ -500,6 +517,7 @@ def research_search(
         dedup_clusters=True,
         metadata_contains=metadata_contains,
         require_phrases=intent.phrases or None,
+        authority_weight=NATURAL_AUTHORITY_WEIGHT,
     )
     # Rows are built for the WHOLE pool (≤ NATURAL_DEPTH) before the date
     # filter and page slice: `date_filed` lives on the decision node, which

@@ -29,9 +29,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Iterable
 
+from django.core.cache import cache
 from django.db import connection, transaction
 
-from apps.corpus.models import NodeVersion, ReviewStatus
+from apps.corpus.models import NodeChunk, NodeVersion, ReviewStatus
 
 from .embedding_cache import embed_query_cached
 from .query_expansion import QueryExpander
@@ -808,24 +809,71 @@ def vector_search(
     vector = embed_query_cached(query, client=client)
     vector_literal = "[" + ",".join(f"{x:.7f}" for x in vector) + "]"
 
-    version_hits = _vector_search_versions(
-        vector_literal,
-        limit=limit,
-        include_pending=include_pending,
-        source_slug=source_slug,
-        metadata_contains=metadata_contains,
+    # Skip a granularity branch the scoped source cannot serve. This is not a
+    # micro-optimization: a filtered iterative HNSW scan whose filter rejects
+    # EVERY row (e.g. the version-level index under a caselaw scope — caselaw
+    # embeds chunks only) walks the graph to max_scan_tuples before returning
+    # empty, a measured ~470ms of pure waste on every natural caselaw query.
+    run_versions, run_chunks = _embedding_granularities(source_slug)
+    version_hits = (
+        _vector_search_versions(
+            vector_literal,
+            limit=limit,
+            include_pending=include_pending,
+            source_slug=source_slug,
+            metadata_contains=metadata_contains,
+        )
+        if run_versions
+        else []
     )
-    chunk_hits = _vector_search_chunks(
-        vector_literal,
-        limit=limit,
-        include_pending=include_pending,
-        source_slug=source_slug,
-        metadata_contains=metadata_contains,
+    chunk_hits = (
+        _vector_search_chunks(
+            vector_literal,
+            limit=limit,
+            include_pending=include_pending,
+            source_slug=source_slug,
+            metadata_contains=metadata_contains,
+        )
+        if run_chunks
+        else []
     )
     merged, chunk_map = _merge_version_chunk_hits(version_hits, chunk_hits, limit)
     if with_chunks:
         return merged, chunk_map
     return merged
+
+
+_EMBEDDING_GRANULARITY_TTL = 600  # seconds; re-probed after embed jobs land
+
+
+def _embedding_granularities(source_slug: str | None) -> tuple[bool, bool]:
+    """Which embedding granularities a scope can serve: ``(versions, chunks)``.
+
+    Unscoped search must query both indexes. A scoped search only needs the
+    granularity the source was actually embedded at (statutes/rules embed the
+    whole NodeVersion; caselaw embeds NodeChunk passages) — probed with two
+    EXISTS queries and cached (Django cache, shared in prod via Redis) since
+    it changes only when an embed job runs against a new source."""
+    if source_slug is None:
+        return True, True
+    key = f"embgran:{source_slug}"
+    cached = cache.get(key)
+    if cached is not None:
+        return tuple(cached)
+    versions = (
+        NodeVersion.objects.filter(
+            node__source__slug=source_slug, embedding__isnull=False
+        ).exists()
+    )
+    chunks = (
+        NodeChunk.objects.filter(
+            version__node__source__slug=source_slug, embedding__isnull=False
+        ).exists()
+    )
+    # A source with nothing embedded yet reports (False, False) and vector
+    # search correctly contributes no hits; re-probe after the TTL.
+    cache.set(key, (versions, chunks), _EMBEDDING_GRANULARITY_TTL)
+    return versions, chunks
 
 
 def _vector_search_versions(

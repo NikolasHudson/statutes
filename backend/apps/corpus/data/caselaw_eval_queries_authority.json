@@ -1,0 +1,270 @@
+{
+  "_": [
+    "CANONICAL-AUTHORITY eval set (Phase 3, 2026-07-09) — the eval gate for",
+    "authority-weighted ranking (plan: cached-riding-beaver.md Phase 3 item 1).",
+    "",
+    "Each query is a name-free DOCTRINE-SEEKING query: the kind an attorney types",
+    "when they want the SEMINAL case that states the rule, not a case that merely",
+    "applies it. target_cluster = the canonical decision; the failure mode being",
+    "measured is an application case (one of the target's ~cited_by citing",
+    "decisions) outranking the source of the doctrine. The live-test example that",
+    "motivated this set: 'pierce the corporate veil' ranked Briggs Transp. v.",
+    "Starr Sales (the six-factor case, cited_by=66) #3 behind two application",
+    "cases, because the reranker scores passage-query fit only.",
+    "",
+    "'area' carries the LEGAL AREA so eval_caselaw's by-area report groups by",
+    "doctrine family. 'cited_by' = distinct citing decisions in the caselaw_graph",
+    "CrossReference edges as of 2026-07-09 (dev DB); 'why_canonical' is",
+    "documentation the harness ignores.",
+    "",
+    "ALL 23 target_cluster values resolved against the dev DB on 2026-07-09 via",
+    "ReporterCitation, and each doctrine keyphrase was verified present in the",
+    "opinion body_text under the target cluster. Known artifact: State v. Formaro",
+    "exists as TWO embedded clusters (target cl-cluster-1809878, 19k-char opinion;",
+    "twin cl-cluster-8279331, 4.9k-char). If the twin outranks the target that is",
+    "a duplicate-cluster measurement artifact (eval finding #3), not an",
+    "authority-ranking failure.",
+    "",
+    "Scoring note: unlike the fact-pattern sets, a top-rank APPLICATION case here",
+    "is a genuine failure — the query asks for the rule's source. But do not tune",
+    "authority weighting on this set alone: the categories/categories2 sets are",
+    "the counter-gate (fact-pattern queries legitimately want the applying case).",
+    "",
+    "run: python manage.py eval_caselaw --rerank --use-retrieve-context \\",
+    "       --queries apps/corpus/data/caselaw_eval_queries_authority.json \\",
+    "       --out benchmarks/caselaw/authority_run.json"
+  ],
+  "scope_source": "iowa-caselaw",
+  "queries": [
+    {
+      "id": 1,
+      "case_name": "Meier v. Senecaut III",
+      "citation": "641 N.W.2d 532",
+      "area": "appellate-procedure",
+      "cited_by": 1205,
+      "why_canonical": "THE error-preservation case: issue must be both raised and decided below; party must request a ruling if the court doesn't rule.",
+      "query": "what must happen in the district court for an issue to be preserved for appellate review",
+      "target_cluster": "cl-cluster-1803920"
+    },
+    {
+      "id": 2,
+      "case_name": "In re P.L.",
+      "citation": "778 N.W.2d 33",
+      "area": "family-juvenile",
+      "cited_by": 1498,
+      "why_canonical": "Establishes the statutory framework for termination-of-parental-rights review under Iowa Code 232.116 (grounds, best interests, exceptions).",
+      "query": "framework courts must follow when reviewing termination of parental rights under chapter 232",
+      "target_cluster": "cl-cluster-1897742"
+    },
+    {
+      "id": 3,
+      "case_name": "In re Marriage of Hansen",
+      "citation": "733 N.W.2d 683",
+      "area": "family-juvenile",
+      "cited_by": 589,
+      "why_canonical": "States the nonexclusive factors for whether joint physical care is in the child's best interest.",
+      "query": "factors courts weigh when deciding whether joint physical care is appropriate",
+      "target_cluster": "cl-cluster-1832878"
+    },
+    {
+      "id": 4,
+      "case_name": "In re Marriage of Winter",
+      "citation": "223 N.W.2d 165",
+      "area": "family-juvenile",
+      "cited_by": 370,
+      "why_canonical": "The classic enumeration of custody best-interest factors.",
+      "query": "criteria for determining which custody arrangement is in the best interest of the child",
+      "target_cluster": "cl-cluster-1228513"
+    },
+    {
+      "id": 5,
+      "case_name": "In re Marriage of Frederici",
+      "citation": "338 N.W.2d 156",
+      "area": "family-juvenile",
+      "cited_by": 273,
+      "why_canonical": "Modification-of-physical-care standard: substantial change in circumstances plus superior ability to minister to the children's needs.",
+      "query": "what a parent must show to modify physical care including a substantial change in circumstances",
+      "target_cluster": "cl-cluster-2223699"
+    },
+    {
+      "id": 6,
+      "case_name": "In re Marriage of Gust",
+      "citation": "858 N.W.2d 402",
+      "area": "family-juvenile",
+      "cited_by": 220,
+      "why_canonical": "The leading modern statement on when traditional spousal support is warranted and its duration.",
+      "query": "when should traditional spousal support be awarded and for what duration",
+      "target_cluster": "cl-cluster-2770476"
+    },
+    {
+      "id": 7,
+      "case_name": "Ledezma v. State",
+      "citation": "626 N.W.2d 134",
+      "area": "criminal-procedure",
+      "cited_by": 633,
+      "why_canonical": "The standard framework for ineffective-assistance claims: breach of an essential duty plus prejudice.",
+      "query": "what a postconviction applicant must prove to prevail on a claim of ineffective assistance of counsel",
+      "target_cluster": "cl-cluster-1611878"
+    },
+    {
+      "id": 8,
+      "case_name": "State v. Heemstra",
+      "citation": "721 N.W.2d 549",
+      "area": "criminal-law",
+      "cited_by": 138,
+      "why_canonical": "Holds willful injury cannot serve as the predicate felony for felony murder when the same act causes the death (merger).",
+      "query": "can willful injury serve as the predicate felony for felony murder when the same act caused the death",
+      "target_cluster": "cl-cluster-1652030"
+    },
+    {
+      "id": 9,
+      "case_name": "State v. Lyle",
+      "citation": "854 N.W.2d 378",
+      "area": "criminal-sentencing",
+      "cited_by": 222,
+      "why_canonical": "Holds mandatory minimum sentences for juvenile offenders unconstitutional under the Iowa Constitution.",
+      "query": "constitutionality of mandatory minimum prison sentences imposed on juvenile offenders",
+      "target_cluster": "cl-cluster-8281429"
+    },
+    {
+      "id": 10,
+      "case_name": "State v. Bruegger",
+      "citation": "773 N.W.2d 862",
+      "area": "criminal-sentencing",
+      "cited_by": 289,
+      "why_canonical": "Establishes gross-proportionality review for as-applied cruel-and-unusual-punishment challenges.",
+      "query": "gross proportionality challenge to a criminal sentence as cruel and unusual punishment",
+      "target_cluster": "cl-cluster-1901039"
+    },
+    {
+      "id": 11,
+      "case_name": "State v. Sullivan",
+      "citation": "679 N.W.2d 19",
+      "area": "evidence",
+      "cited_by": 150,
+      "why_canonical": "The leading test for admissibility of prior-bad-acts evidence under rule 5.404(b).",
+      "query": "test for admitting evidence of a defendant's other crimes wrongs or acts at trial",
+      "target_cluster": "cl-cluster-1843093"
+    },
+    {
+      "id": 12,
+      "case_name": "State v. Graves",
+      "citation": "668 N.W.2d 860",
+      "area": "criminal-law",
+      "cited_by": 347,
+      "why_canonical": "The prosecutorial-misconduct framework, including whether the prosecutor may call the defendant a liar.",
+      "query": "prosecutorial misconduct asking defendant whether witnesses lied and calling the defendant a liar",
+      "target_cluster": "cl-cluster-1616730"
+    },
+    {
+      "id": 13,
+      "case_name": "Thompson v. Kaczinski",
+      "citation": "774 N.W.2d 829",
+      "area": "torts",
+      "cited_by": 121,
+      "why_canonical": "Adopts the Restatement (Third) duty framework, removing foreseeability from the duty analysis.",
+      "query": "adoption of the Restatement Third approach to duty of reasonable care and foreseeability in negligence",
+      "target_cluster": "cl-cluster-1666221"
+    },
+    {
+      "id": 14,
+      "case_name": "Briggs Transportation Co. v. Starr Sales Co.",
+      "citation": "262 N.W.2d 805",
+      "area": "business",
+      "cited_by": 66,
+      "why_canonical": "States the six factors for piercing the corporate veil — the live-test example that motivated this eval set.",
+      "query": "factors for piercing the corporate veil to hold shareholders personally liable",
+      "target_cluster": "cl-cluster-1284947"
+    },
+    {
+      "id": 15,
+      "case_name": "Schmidt v. State",
+      "citation": "909 N.W.2d 778",
+      "area": "criminal-procedure",
+      "cited_by": 193,
+      "why_canonical": "Recognizes freestanding actual-innocence claims, including for defendants who pleaded guilty.",
+      "query": "may a defendant who pleaded guilty later assert a freestanding claim of actual innocence",
+      "target_cluster": "cl-cluster-4480383"
+    },
+    {
+      "id": 16,
+      "case_name": "State v. Plain",
+      "citation": "898 N.W.2d 801",
+      "area": "criminal-procedure",
+      "cited_by": 237,
+      "why_canonical": "The leading jury-pool fair-cross-section case (Duren framework revisited).",
+      "query": "challenging the racial composition of the jury pool as a violation of the fair cross section requirement",
+      "target_cluster": "cl-cluster-4405279"
+    },
+    {
+      "id": 17,
+      "case_name": "State v. Formaro",
+      "citation": "638 N.W.2d 720",
+      "area": "criminal-sentencing",
+      "cited_by": 724,
+      "why_canonical": "The standard citation for review of sentencing discretion. NOTE: duplicate embedded cluster cl-cluster-8279331 exists (measurement artifact if it outranks).",
+      "query": "appellate review of a sentencing court's exercise of discretion in selecting a sentence",
+      "target_cluster": "cl-cluster-1809878"
+    },
+    {
+      "id": 18,
+      "case_name": "State v. Straw",
+      "citation": "709 N.W.2d 128",
+      "area": "criminal-procedure",
+      "cited_by": 579,
+      "why_canonical": "The leading case on challenging a guilty plea: motion in arrest of judgment and the ineffective-assistance gateway.",
+      "query": "consequences of failing to file a motion in arrest of judgment to challenge a guilty plea",
+      "target_cluster": "cl-cluster-1871161"
+    },
+    {
+      "id": 19,
+      "case_name": "State v. Ochoa",
+      "citation": "792 N.W.2d 260",
+      "area": "search-seizure",
+      "cited_by": 111,
+      "why_canonical": "Holds suspicionless warrantless searches of parolees violate article I section 8 of the Iowa Constitution.",
+      "query": "warrantless suspicionless search of a parolee under the Iowa constitution",
+      "target_cluster": "cl-cluster-4472474"
+    },
+    {
+      "id": 20,
+      "case_name": "State v. Cline",
+      "citation": "617 N.W.2d 277",
+      "area": "search-seizure",
+      "cited_by": 102,
+      "why_canonical": "Rejects a good-faith exception to the exclusionary rule under the Iowa Constitution.",
+      "query": "does Iowa recognize a good faith exception to the exclusionary rule",
+      "target_cluster": "cl-cluster-2227359"
+    },
+    {
+      "id": 21,
+      "case_name": "Springer v. Weeks & Leo Co.",
+      "citation": "429 N.W.2d 558",
+      "area": "employment",
+      "cited_by": 66,
+      "why_canonical": "Recognizes the public-policy exception to at-will employment (wrongful discharge tort).",
+      "query": "public policy exception to the at-will employment doctrine for a discharged employee",
+      "target_cluster": "cl-cluster-1845007"
+    },
+    {
+      "id": 22,
+      "case_name": "Koenig v. Koenig",
+      "citation": "766 N.W.2d 635",
+      "area": "torts",
+      "cited_by": 31,
+      "why_canonical": "Abolishes the invitee/licensee distinction in premises liability, adopting a multifactor reasonable-care standard.",
+      "query": "abolishing the distinction between invitees and licensees in premises liability",
+      "target_cluster": "cl-cluster-1943004"
+    },
+    {
+      "id": 23,
+      "case_name": "Goetzman v. Wichern",
+      "citation": "327 N.W.2d 742",
+      "area": "torts",
+      "cited_by": 57,
+      "why_canonical": "Adopts comparative negligence in place of contributory negligence.",
+      "query": "adoption of comparative negligence in place of contributory negligence as a complete bar to recovery",
+      "target_cluster": "cl-cluster-1709181"
+    }
+  ]
+}

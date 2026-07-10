@@ -1,0 +1,422 @@
+{"time": "2026-07-09 11:16:54,625", "level": "ERROR", "logger": "apps.corpus.services.rerank", "message": "rerank failed; falling back to RRF order", "exc_info": "Traceback (most recent call last):\n  File \"/home/dev/statutes/backend/apps/corpus/services/rerank.py\", line 117, in rerank_scored\n    result = client.rerank(\n             ^^^^^^^^^^^^^^\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/voyageai/client.py\", line 136, in rerank\n    for attempt in self._make_retry_controller():\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/tenacity/__init__.py\", line 438, in __iter__\n    do = self.iter(retry_state=retry_state)\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/tenacity/__init__.py\", line 371, in iter\n    result = action(retry_state)\n             ^^^^^^^^^^^^^^^^^^^\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/tenacity/__init__.py\", line 413, in exc_check\n    raise retry_exc.reraise()\n          ^^^^^^^^^^^^^^^^^^^\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/tenacity/__init__.py\", line 184, in reraise\n    raise self.last_attempt.result()\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/concurrent/futures/_base.py\", line 449, in result\n    return self.__get_result()\n           ^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/concurrent/futures/_base.py\", line 401, in __get_result\n    raise self._exception\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/voyageai/client.py\", line 138, in rerank\n    response = voyageai.Reranking.create(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/voyageai/api_resources/reranking.py\", line 12, in create\n    response = super().create(*args, **kwargs)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/voyageai/api_resources/api_resource.py\", line 45, in create\n    response = requestor.request(\n               ^^^^^^^^^^^^^^^^^^\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/voyageai/api_resources/api_requestor.py\", line 146, in request\n    resp = self._interpret_response(result)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/voyageai/api_resources/api_requestor.py\", line 394, in _interpret_response\n    return self._interpret_response_line(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/dev/statutes/backend/.venv/lib/python3.12/site-packages/voyageai/api_resources/api_requestor.py\", line 445, in _interpret_response_line\n    raise self.handle_error_response(rbody, rcode, resp.data, rheaders)\nvoyageai.error.RateLimitError: You have exceeded the project's Tokens Per Minute (TPM) rate limit of 2,000,000 tokens per minute for rerank-2.5. In the minute before this request, you used 1,951,958 tokens. See our documentation for ways to avoid or increase the project rate limits on the dashboard. https://docs.voyageai.com/docs/rate-limits#what-happens-if-i-exceed-the-rate-limit"}
+Warming up embedder ...
+
+==============================================================================
+CASELAW RETRIEVAL EVAL
+  embedder : voyage-law-2  (1024-dim, cosine)
+  scope    : caselaw  ->  iowa-caselaw
+  reranker : rerank-2.5   deep=100   hnsw.ef_search=200   commit=7217c94
+  queries  : 23 landmark Iowa cases (natural-language holding -> case)
+
+------------------------------------------------------------------------------
+RANKING QUALITY  (case-level; ANY opinion of the case counts)
+  config       MRR  hit@1  hit@3  hit@5  hit@10  hit@50   ndcg@1  ndcg@3  ndcg@5  ndcg@10  ndcg@50   recov  medR  dist@50
+  vector    0.417   0.26   0.57   0.57   0.65   0.83     0.26    0.44    0.44    0.47    0.51   91%     3   49.39
+  fts       0.171   0.04   0.26   0.35   0.39   0.61     0.04    0.16    0.20    0.21    0.27   74%     7   42.65
+  hybrid    0.419   0.30   0.43   0.52   0.70   0.87     0.30    0.38    0.42    0.48    0.52   91%     4   50.00
+  vector_rr 0.334   0.22   0.43   0.43   0.52   0.83     0.22    0.34    0.34    0.37    0.44   83%     3   43.43
+  hybrid_rr 0.376   0.26   0.48   0.48   0.57   0.87     0.26    0.38    0.38    0.41    0.48   87%     3   43.39
+  rc        0.475   0.35   0.57   0.70   0.74   0.83     0.35    0.47    0.52    0.54    0.56   83%     2   47.83
+
+  95% CI (Wilson, n=23) — hit@1 / hit@5:
+    vector    hit@1 0.26 [0.13,0.46]   hit@5 0.57 [0.37,0.74]
+    fts       hit@1 0.04 [0.01,0.21]   hit@5 0.35 [0.19,0.55]
+    hybrid    hit@1 0.30 [0.16,0.51]   hit@5 0.52 [0.33,0.71]
+    vector_rr hit@1 0.22 [0.10,0.42]   hit@5 0.43 [0.26,0.63]
+    hybrid_rr hit@1 0.26 [0.13,0.46]   hit@5 0.48 [0.29,0.67]
+    rc        hit@1 0.35 [0.19,0.55]   hit@5 0.70 [0.49,0.84]
+
+  vector cosine — target best-chunk sim: p50=0.5914  min=0.4329  max=0.7262
+  vector cosine — rank-1 hit sim:        p50=0.6059  max=0.7276
+
+------------------------------------------------------------------------------
+PER-QUERY CASE-LEVEL RANK  (· = not found in top-100)
+  #  case                      area                     vector      fts   hybrid  vector_  hybrid_       rc
+  1  Meier v. Senecaut III     appellate-procedure           7        ·        7        2        2        2
+  2  In re P.L.                family-juvenile               1       31        1        1        1        1
+  3  In re Marriage of Hansen  family-juvenile               6        ·        7       39       39        3
+  4  In re Marriage of Winter  family-juvenile              54       76       35        ·        1        ·
+  5  In re Marriage of Frederi family-juvenile               ·        ·        ·        ·        ·        ·
+  6  In re Marriage of Gust    family-juvenile               1        3        1       15       15        1
+  7  Ledezma v. State          criminal-procedure           11        ·       14       38       40        5
+  8  State v. Heemstra         criminal-law                  2        5        2       12       17       23
+  9  State v. Lyle             criminal-sentencing           3       13        4        1        1        1
+  10 State v. Bruegger         criminal-sentencing           1       12        1       17       19        4
+  11 State v. Sullivan         evidence                     57        ·       61        ·        ·        ·
+  12 State v. Graves           criminal-law                  1        3        1        3        3        1
+  13 Thompson v. Kaczinski     torts                         2       20        2       22       22        6
+  14 Briggs Transportation Co. business                     13        7       10        6        6        3
+  15 Schmidt v. State          criminal-procedure            1        1        1        1        1        1
+  16 State v. Plain            criminal-procedure           22        4       12       25       25       17
+  17 State v. Formaro          criminal-sentencing           ·        ·        ·        ·        ·        ·
+  18 State v. Straw            criminal-procedure           31       52       23        3        3        1
+  19 State v. Ochoa            search-seizure                2        2        1        1        1        1
+  20 State v. Cline            search-seizure                2       19        4        2        2        2
+  21 Springer v. Weeks & Leo C employment                    3       54        6        6        6        5
+  22 Koenig v. Koenig          torts                         3        2        3        3        3        3
+  23 Goetzman v. Wichern       torts                         1        3        1        1        1        1
+
+------------------------------------------------------------------------------
+BY LEGAL AREA  (hit@1 / hit@5 / MRR)
+  appellate-procedure                n=1
+      vector     hit@1=0.00  hit@5=0.00  mrr=0.14
+      fts        hit@1=0.00  hit@5=0.00  mrr=0.00
+      hybrid     hit@1=0.00  hit@5=0.00  mrr=0.14
+      vector_rr  hit@1=0.00  hit@5=1.00  mrr=0.50
+      hybrid_rr  hit@1=0.00  hit@5=1.00  mrr=0.50
+      rc         hit@1=0.00  hit@5=1.00  mrr=0.50
+  business                           n=1
+      vector     hit@1=0.00  hit@5=0.00  mrr=0.08
+      fts        hit@1=0.00  hit@5=0.00  mrr=0.14
+      hybrid     hit@1=0.00  hit@5=0.00  mrr=0.10
+      vector_rr  hit@1=0.00  hit@5=0.00  mrr=0.17
+      hybrid_rr  hit@1=0.00  hit@5=0.00  mrr=0.17
+      rc         hit@1=0.00  hit@5=1.00  mrr=0.33
+  criminal-law                       n=2
+      vector     hit@1=0.50  hit@5=1.00  mrr=0.75
+      fts        hit@1=0.00  hit@5=1.00  mrr=0.27
+      hybrid     hit@1=0.50  hit@5=1.00  mrr=0.75
+      vector_rr  hit@1=0.00  hit@5=0.50  mrr=0.21
+      hybrid_rr  hit@1=0.00  hit@5=0.50  mrr=0.20
+      rc         hit@1=0.50  hit@5=0.50  mrr=0.52
+  criminal-procedure                 n=4
+      vector     hit@1=0.25  hit@5=0.25  mrr=0.29
+      fts        hit@1=0.25  hit@5=0.50  mrr=0.32
+      hybrid     hit@1=0.25  hit@5=0.25  mrr=0.30
+      vector_rr  hit@1=0.25  hit@5=0.50  mrr=0.35
+      hybrid_rr  hit@1=0.25  hit@5=0.50  mrr=0.35
+      rc         hit@1=0.50  hit@5=0.75  mrr=0.56
+  criminal-sentencing                n=3
+      vector     hit@1=0.33  hit@5=0.67  mrr=0.44
+      fts        hit@1=0.00  hit@5=0.00  mrr=0.05
+      hybrid     hit@1=0.33  hit@5=0.67  mrr=0.42
+      vector_rr  hit@1=0.33  hit@5=0.33  mrr=0.35
+      hybrid_rr  hit@1=0.33  hit@5=0.33  mrr=0.35
+      rc         hit@1=0.33  hit@5=0.67  mrr=0.42
+  employment                         n=1
+      vector     hit@1=0.00  hit@5=1.00  mrr=0.33
+      fts        hit@1=0.00  hit@5=0.00  mrr=0.02
+      hybrid     hit@1=0.00  hit@5=0.00  mrr=0.17
+      vector_rr  hit@1=0.00  hit@5=0.00  mrr=0.17
+      hybrid_rr  hit@1=0.00  hit@5=0.00  mrr=0.17
+      rc         hit@1=0.00  hit@5=1.00  mrr=0.20
+  evidence                           n=1
+      vector     hit@1=0.00  hit@5=0.00  mrr=0.02
+      fts        hit@1=0.00  hit@5=0.00  mrr=0.00
+      hybrid     hit@1=0.00  hit@5=0.00  mrr=0.02
+      vector_rr  hit@1=0.00  hit@5=0.00  mrr=0.00
+      hybrid_rr  hit@1=0.00  hit@5=0.00  mrr=0.00
+      rc         hit@1=0.00  hit@5=0.00  mrr=0.00
+  family-juvenile                    n=5
+      vector     hit@1=0.40  hit@5=0.40  mrr=0.44
+      fts        hit@1=0.00  hit@5=0.20  mrr=0.08
+      hybrid     hit@1=0.40  hit@5=0.40  mrr=0.43
+      vector_rr  hit@1=0.20  hit@5=0.20  mrr=0.22
+      hybrid_rr  hit@1=0.40  hit@5=0.40  mrr=0.42
+      rc         hit@1=0.40  hit@5=0.60  mrr=0.47
+  search-seizure                     n=2
+      vector     hit@1=0.00  hit@5=1.00  mrr=0.50
+      fts        hit@1=0.00  hit@5=0.50  mrr=0.28
+      hybrid     hit@1=0.50  hit@5=1.00  mrr=0.62
+      vector_rr  hit@1=0.50  hit@5=1.00  mrr=0.75
+      hybrid_rr  hit@1=0.50  hit@5=1.00  mrr=0.75
+      rc         hit@1=0.50  hit@5=1.00  mrr=0.75
+  torts                              n=3
+      vector     hit@1=0.33  hit@5=1.00  mrr=0.61
+      fts        hit@1=0.00  hit@5=0.67  mrr=0.29
+      hybrid     hit@1=0.33  hit@5=1.00  mrr=0.61
+      vector_rr  hit@1=0.33  hit@5=0.67  mrr=0.46
+      hybrid_rr  hit@1=0.33  hit@5=0.67  mrr=0.46
+      rc         hit@1=0.33  hit@5=0.67  mrr=0.50
+
+------------------------------------------------------------------------------
+MISS / OUTRANK DIAGNOSTICS
+  [vector] 10 rank>5 or unrecovered:
+    #1 Meier v. Senecaut III  (rank 7)
+        ↑ Sullins v. District Court
+        ↑ State of Iowa v. Traci Marie Chamberla…
+        ↑ State of Iowa v. Erik Milton Childs
+    #3 In re Marriage of Hansen  (rank 6)
+        ↑ Molly Kaye Hurlbert v. Scott Eugene Ha…
+        ↑ In Re The Marriage Of Lyle Martin Hans…
+        ↑ In Re the Marriage of Kurt Rothfus and…
+    #4 In re Marriage of Winter  (rank 54)
+        ↑ In Re Marriage of Burham
+        ↑ In Re the Marriage of Miller
+        ↑ Zvorak v. Beireis
+    #5 In re Marriage of Frederici  (rank >100)
+        ↑ Edward Raul Rojas Pena v. Judith Jacke…
+        ↑ In Re the Marriage of Brian Joseph Har…
+        ↑ In Re the Marriage of Jason Eugene Tro…
+    #7 Ledezma v. State  (rank 11)
+        ↑ Robert MacLaird, Applicant-Appellant v…
+        ↑ Corey Darnell Moore, Applicant-Appella…
+        ↑ Demarrio Deshon Wright v. State of Iowa
+    #11 State v. Sullivan  (rank 57)
+        ↑ State v. Ripperger
+        ↑ State v. Rand
+        ↑ State v. Kelley
+    #14 Briggs Transportation Co. v. Starr Sales Co.  (rank 13)
+        ↑ Boyd v. Boyd & Boyd, Inc.
+        ↑ Minger Construction, Inc. v. Clark Far…
+        ↑ 
+    #16 State v. Plain  (rank 22)
+        ↑ State of Iowa v. Kelvin Plain, Sr.
+        ↑ State of Iowa v. Anthony Alexander Mong
+        ↑ State of Iowa v. Peter Leroy Veal
+    #17 State v. Formaro  (rank >100)
+        ↑ State v. Peckenschneider
+        ↑ State of Iowa v. Jason Curtis Voshell
+        ↑ State of Iowa v. Tyler Howell
+    #18 State v. Straw  (rank 31)
+        ↑ State v. Hook
+        ↑ State of Iowa v. Paul A. Garrity
+        ↑ Munz v. State
+  [fts] 15 rank>5 or unrecovered:
+    #1 Meier v. Senecaut III  (rank >100)
+        ↑ Tina Haskenhoff v. Homeland Energy Sol…
+        ↑ Amended August 25, 2017 Tina Haskenhof…
+        ↑ Brian K. Allison v. State of iowa
+    #2 In re P.L.  (rank 31)
+        ↑ Planned Parenthood of the Heartland, I…
+        ↑ Planned Parenthood of the Heartland, I…
+        ↑ Planned Parenthood of the Heartland, I…
+    #3 In re Marriage of Hansen  (rank >100)
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Christopher J. Godfrey v. State of Iow…
+        ↑ Planned Parenthood of the Heartland, I…
+    #4 In re Marriage of Winter  (rank 76)
+        ↑ Rozanne E. King Alisha Jane King Dacie…
+        ↑ Lindsay Moses v. Zachary Ray Rosol
+        ↑ Tadd Matthew Bergan, petitioner-appell…
+    #5 In re Marriage of Frederici  (rank >100)
+        ↑ State of Iowa v. Jonas Dorian Neiderba…
+        ↑ Amended September 21, 2016 State of Io…
+        ↑ State of Iowa v. John Arthur Senn Jr.
+    #7 Ledezma v. State  (rank >100)
+        ↑ State of Iowa v. Tony E. Doolin
+        ↑ Amended September 21, 2016 State of Io…
+        ↑ State of Iowa v. John Arthur Senn Jr.
+    #9 State v. Lyle  (rank 13)
+        ↑ Amended August 17, 2017 State of Iowa …
+        ↑ State of Iowa v. Christopher Ryan Lee …
+        ↑ Amended September 30, 2014 State of Io…
+    #10 State v. Bruegger  (rank 12)
+        ↑ State of Iowa v. Denem Anthony Null
+        ↑ State of Iowa v. Damion John Seats
+        ↑ State of Iowa v. Damion John Seats
+    #11 State v. Sullivan  (rank >100)
+        ↑ State of Iowa v. Christopher Clay McNe…
+        ↑ Warren County v. Judges of the Fifth J…
+        ↑ State of Iowa v. Leigh Laz Lepon
+    #13 Thompson v. Kaczinski  (rank 20)
+        ↑ Theresa Huck v. Wyeth, Inc. D/B/A Wyet…
+        ↑ Tina Haskenhoff v. Homeland Energy Sol…
+        ↑ Amended August 25, 2017 Tina Haskenhof…
+    #14 Briggs Transportation Co. v. Starr Sales Co.  (rank 7)
+        ↑ Minger Construction, Inc. v. Clark Far…
+        ↑ 
+        ↑ Zane Algreen v. Timothy Gardner and Ga…
+    #17 State v. Formaro  (rank >100)
+        ↑ Amended September 30, 2014 State of Io…
+        ↑ State of Iowa v. Andre Jerome Lyle Jr.
+        ↑ State of Iowa v. Jarrod Dale Majors
+    #18 State v. Straw  (rank 52)
+        ↑ State of Iowa v. Kenneth Wayne Baysdon
+        ↑ State of Iowa v. Michael Shawn Ball
+        ↑ State of Iowa v. Bradley William Arter…
+    #20 State v. Cline  (rank 19)
+        ↑ State v. Davis
+        ↑ State of Iowa v. Troy J. Ford
+        ↑ State of Iowa v. Jesus Angel Ramirez
+    #21 Springer v. Weeks & Leo Co.  (rank 54)
+        ↑ Karen Dorshkind v. Oak Park Place of D…
+        ↑ Susan Ackerman v. State of Iowa, Iowa …
+        ↑ Amended September 26, 2017 Christopher…
+  [hybrid] 11 rank>5 or unrecovered:
+    #1 Meier v. Senecaut III  (rank 7)
+        ↑ State of Iowa v. James Peter Rethwisch
+        ↑ Sullins v. District Court
+        ↑ State of Iowa v. Traci Marie Chamberla…
+    #3 In re Marriage of Hansen  (rank 7)
+        ↑ In Re the Marriage of Kelly Marie Vaug…
+        ↑ Molly Kaye Hurlbert v. Scott Eugene Ha…
+        ↑ In Re The Marriage Of Lyle Martin Hans…
+    #4 In re Marriage of Winter  (rank 35)
+        ↑ In Re Marriage of Burham
+        ↑ State of Iowa v. Alonzo Leroy Jeffrey
+        ↑ Fred K. Agyepong-Yeboah, plaintiff-app…
+    #5 In re Marriage of Frederici  (rank >100)
+        ↑ In Re the Marriage of Jason Eugene Tro…
+        ↑ In re the Marriage of Karas
+        ↑ In Re the Marriage of Jennifer M. Veld…
+    #7 Ledezma v. State  (rank 14)
+        ↑ Hubert Todd, Jr., Applicant-Appellant …
+        ↑ Donte Marcell Gilmore, Applicant-Appel…
+        ↑ Robert MacLaird, Applicant-Appellant v…
+    #11 State v. Sullivan  (rank 61)
+        ↑ State v. Henderson
+        ↑ Amended August 26, 2014 State of Iowa …
+        ↑ State v. Ripperger
+    #14 Briggs Transportation Co. v. Starr Sales Co.  (rank 10)
+        ↑ Minger Construction, Inc. v. Clark Far…
+        ↑ Boyd v. Boyd & Boyd, Inc.
+        ↑ 
+    #16 State v. Plain  (rank 12)
+        ↑ State of Iowa v. Kelvin Plain, Sr.
+        ↑ State of Iowa v. Peter Leroy Veal
+        ↑ State of Iowa v. Antoine Tyree Williams
+    #17 State v. Formaro  (rank >100)
+        ↑ State of Iowa v. Maurice Dontez Daye
+        ↑ State v. Peckenschneider
+        ↑ State v. Hildebrand
+    #18 State v. Straw  (rank 23)
+        ↑ State v. Hook
+        ↑ State of Iowa v. Clay Kalvig
+        ↑ State of Iowa v. Paul A. Garrity
+    #21 Springer v. Weeks & Leo Co.  (rank 6)
+        ↑ Susan Ackerman v. State of Iowa, Iowa …
+        ↑ Karen Dorshkind v. Oak Park Place of D…
+        ↑ Fitzgerald v. Salsbury Chemical, Inc.
+  [vector_rr] 13 rank>5 or unrecovered:
+    #3 In re Marriage of Hansen  (rank 39)
+        ↑ In Re the Marriage of Kurt Rothfus and…
+        ↑ In Re the Marriage of Kelly Marie Vaug…
+        ↑ Joshua Paul Thomsen v. Makinzie Rose N…
+    #4 In re Marriage of Winter  (rank >100)
+        ↑ In Re the Marriage of Bales
+        ↑ Hodson v. Moore
+        ↑ In Re the Marriage of Weidner
+    #5 In re Marriage of Frederici  (rank >100)
+        ↑ In re The Marriage of Wonser
+        ↑ 
+        ↑ Jonathan W. Hanig v. Brittany Mae Walk…
+    #6 In re Marriage of Gust  (rank 15)
+        ↑ In re the Marriage of Golwitzer
+        ↑ In re the Marriage of Yarlagadda
+        ↑ In re the Marriage of Faust
+    #7 Ledezma v. State  (rank 38)
+        ↑ Hubert Todd, Jr., Applicant-Appellant …
+        ↑ Terrance Jerrell Burnett, Applicant-Ap…
+        ↑ John West Sickels, Applicant-Appellant…
+    #8 State v. Heemstra  (rank 12)
+        ↑ Joel Goosman Vs. State Of Iowa
+        ↑ Goosman v. State
+        ↑ Chad Enderle, Applicant-Appellant v. S…
+    #10 State v. Bruegger  (rank 17)
+        ↑ Clifford Jackson, Applicant-Appellant …
+        ↑ State of Iowa v. James Leroy Huls
+        ↑ State of Iowa v. William R. Clayton
+    #11 State v. Sullivan  (rank >100)
+        ↑ State v. Ripperger
+        ↑ State v. Rand
+        ↑ State v. Kelley
+    #13 Thompson v. Kaczinski  (rank 22)
+        ↑ Leeann Mitchell, Individually, and on …
+        ↑ Curtis Gene Hoyt v. Gutterz Bowl & Lou…
+        ↑ Jennifer Morris, Individually and as t…
+    #14 Briggs Transportation Co. v. Starr Sales Co.  (rank 6)
+        ↑ Ross v. Playle
+        ↑ Beck v. Equine Estates Development Co.
+        ↑ Woodruff Construction, LLC v. K.W. "Ca…
+    #16 State v. Plain  (rank 25)
+        ↑ State of Iowa v. Devontez David Voigts
+        ↑ State of Iowa v. Lundell Buchanan
+        ↑ State of Iowa v. Peter Leroy Veal
+    #17 State v. Formaro  (rank >100)
+        ↑ State v. Peckenschneider
+        ↑ State of Iowa v. Floyd Frank Ezell Jr.
+        ↑ State v. Cooley
+    #21 Springer v. Weeks & Leo Co.  (rank 6)
+        ↑ Borschel v. City of Perry
+        ↑ Abrisz v. Pulley Freight Lines, Inc.
+        ↑ Dayle Eden v. Van Buren County Sheriff…
+  [hybrid_rr] 12 rank>5 or unrecovered:
+    #3 In re Marriage of Hansen  (rank 39)
+        ↑ In Re the Marriage of Kurt Rothfus and…
+        ↑ In Re the Marriage of Kelly Marie Vaug…
+        ↑ In re the Marriage of Darville
+    #5 In re Marriage of Frederici  (rank >100)
+        ↑ In re The Marriage of Wonser
+        ↑ 
+        ↑ Jonathan W. Hanig v. Brittany Mae Walk…
+    #6 In re Marriage of Gust  (rank 15)
+        ↑ In re the Marriage of Golwitzer
+        ↑ In re the Marriage of Yarlagadda
+        ↑ In re the Marriage of Faust
+    #7 Ledezma v. State  (rank 40)
+        ↑ Hubert Todd, Jr., Applicant-Appellant …
+        ↑ Terrance Jerrell Burnett, Applicant-Ap…
+        ↑ Kevin Sellers, Applicant-Appellant v. …
+    #8 State v. Heemstra  (rank 17)
+        ↑ James E. Wright, Jr., Applicant-Appell…
+        ↑ Joel Goosman Vs. State Of Iowa
+        ↑ Goosman v. State
+    #10 State v. Bruegger  (rank 19)
+        ↑ Clifford Jackson, Applicant-Appellant …
+        ↑ State of Iowa v. James Leroy Huls
+        ↑ State of Iowa v. William R. Clayton
+    #11 State v. Sullivan  (rank >100)
+        ↑ State v. Richardson
+        ↑ State v. Matlock
+        ↑ State v. Howell
+    #13 Thompson v. Kaczinski  (rank 22)
+        ↑ Curtis Gene Hoyt v. Gutterz Bowl & Lou…
+        ↑ Jennifer Morris, Individually and as t…
+        ↑ Debra Gries v. Ames Ecumenical Housing…
+    #14 Briggs Transportation Co. v. Starr Sales Co.  (rank 6)
+        ↑ Ross v. Playle
+        ↑ Beck v. Equine Estates Development Co.
+        ↑ Woodruff Construction, LLC v. K.W. "Ca…
+    #16 State v. Plain  (rank 25)
+        ↑ State of Iowa v. Devontez David Voigts
+        ↑ State of Iowa v. Lundell Buchanan
+        ↑ State of Iowa v. Peter Leroy Veal
+    #17 State v. Formaro  (rank >100)
+        ↑ State v. Peckenschneider
+        ↑ State of Iowa v. Floyd Frank Ezell Jr.
+        ↑ State v. Cooley
+    #21 Springer v. Weeks & Leo Co.  (rank 6)
+        ↑ Borschel v. City of Perry
+        ↑ Abrisz v. Pulley Freight Lines, Inc.
+        ↑ Dayle Eden v. Van Buren County Sheriff…
+  [rc] 7 rank>5 or unrecovered:
+    #4 In re Marriage of Winter  (rank >100)
+        ↑ Petition of Purscell
+        ↑ In Re the Marriage of Courtade
+        ↑ Yarolem v. Ledford
+    #5 In re Marriage of Frederici  (rank >100)
+        ↑ Jonathan W. Hanig v. Brittany Mae Walk…
+        ↑ In re the Marriage of Paulsen
+        ↑ In Re the Marriage of Jason Eugene Tro…
+    #8 State v. Heemstra  (rank 23)
+        ↑ Phuoc Nguyen v. State of Iowa
+        ↑ Goosman v. State
+        ↑ James E. Wright, Jr., Applicant-Appell…
+    #11 State v. Sullivan  (rank >100)
+        ↑ State v. Rodriquez
+        ↑ State v. Tillman
+        ↑ State v. Henderson
+    #13 Thompson v. Kaczinski  (rank 6)
+        ↑ Leeann Mitchell, Individually, and on …
+        ↑ Curtis Gene Hoyt v. Gutterz Bowl & Lou…
+        ↑ Troy McCormick and Lynn McCormick v. N…
+    #16 State v. Plain  (rank 17)
+        ↑ State of Iowa v. Lundell Buchanan
+        ↑ State of Iowa v. Antoine Tyree Williams
+        ↑ State v. Watkins
+    #17 State v. Formaro  (rank >100)
+        ↑ State v. Peckenschneider
+        ↑ State v. Stanley
+        ↑ State of Iowa v. Floyd Frank Ezell Jr.
+
+------------------------------------------------------------------------------
+latency (ms):
+  embed     p50=161  p90=214  max=615
+  vector    p50=1182  p90=2055  max=3035
+  fts       p50=63  p90=254  max=5917
+  hybrid    p50=1236  p90=2598  max=6799
+  rerank    p50=493  p90=2638  max=4433
+  rc        p50=1045  p90=2606  max=2992
+
+Snapshot written: /home/dev/statutes/backend/benchmarks/caselaw/phase3_authority_fast.json

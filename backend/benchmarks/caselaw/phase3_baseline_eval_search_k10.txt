@@ -1,0 +1,44 @@
+HIT  p@10=0.10 r@10=1.00  'state boundaries of Iowa'
+HIT  p@10=0.20 r@10=0.67  'rules of statutory construction'
+HIT  p@10=0.10 r@10=1.00  'ambiguous statute interpretation'
+HIT  p@10=0.10 r@10=1.00  'deposit of public funds definitions'
+HIT  p@10=0.20 r@10=1.00  'emergency management coordinator powers'
+HIT  p@10=0.10 r@10=1.00  'fraud against IPERS retirement benefits'
+HIT  p@10=0.10 r@10=1.00  'what age qualifies as a child for juvenile justice'
+HIT  p@10=0.10 r@10=1.00  'taking a child into custody'
+HIT  p@10=0.10 r@10=1.00  'founded child abuse central registry'
+HIT  p@10=0.10 r@10=1.00  'child in need of assistance petition'
+HIT  p@10=0.10 r@10=1.00  'sexual abuse first degree'
+MISS p@10=0.00 r@10=0.00  'what is sexual abuse under iowa law'
+    expected: ['709.1']
+    got     : ['cl-cluster-2134682/op-2134682', 'cl-cluster-5298893/op-5127455', '4.300', 'cl-cluster-2687571/op-2687571', 'cl-cluster-2101229/op-2101229', 'cl-cluster-2023378/op-2023378', 'cl-cluster-4472426/op-4249679', 'cl-cluster-1298947/op-1298947', 'cl-cluster-4472431/op-4249684', 'cl-cluster-2123840/op-2123840']
+HIT  p@10=0.10 r@10=1.00  'class A felony sentencing'
+HIT  p@10=0.10 r@10=1.00  'indeterminate sentence for felonies'
+HIT  p@10=0.10 r@10=1.00  'minimum sentence for using a dangerous weapon'
+HIT  p@10=0.10 r@10=1.00  'habitual offender mandatory minimum'
+HIT  p@10=0.10 r@10=1.00  'consents required for adoption'
+HIT  p@10=0.10 r@10=1.00  'who can file an adoption petition'
+HIT  p@10=0.10 r@10=1.00  'definitions in school finance chapter'
+HIT  p@10=0.10 r@10=1.00  'foundation property tax for schools'
+HIT  p@10=0.10 r@10=1.00  'presumption of enactment'
+HIT  p@10=0.10 r@10=1.00  'concurrent jurisdiction with federal government'
+HIT  p@10=0.10 r@10=1.00  'iowa indian child welfare'
+HIT  p@10=0.10 r@10=1.00  'investment standards for retirement fund'
+HIT  p@10=0.10 r@10=1.00  'early retirement date IPERS'
+HIT  p@10=0.10 r@10=1.00  'jury instructions for sexual abuse offenses'
+HIT  p@10=0.10 r@10=1.00  'place of confinement for felons'
+HIT  p@10=0.10 r@10=1.00  'rules referring to other statutes'
+HIT  p@10=0.10 r@10=1.00  'general versus special statutes conflict'
+HIT  p@10=0.10 r@10=1.00  'construction of adoption chapter'
+
+============================================================
+Eval @ K=10
+  scored queries:    30
+  hit@10:           29/30 (97%)
+  mean precision@10: 0.103
+  mean recall@10:    0.956
+
+  by tag:
+    keyword              n= 18  hit@10=18/18  mean p@10=0.106
+    natural-language     n=  3  hit@10=2/3  mean p@10=0.067
+    paraphrase           n=  9  hit@10=9/9  mean p@10=0.111
