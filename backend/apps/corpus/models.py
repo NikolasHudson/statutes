@@ -309,6 +309,10 @@ class CrossReferenceSource(models.TextChoices):
     STATUTE = "statute", "Statute prose"  # backfill_cross_references (Iowa Code)
     CASELAW_LINK = "caselaw_link", "Caselaw inline link"  # #1: html_with_citations
     CASELAW_GRAPH = "caselaw_graph", "Caselaw citation graph"  # #2: OpinionsCited
+    # IAC rule → the Iowa Code chapter/section that authorizes it, from the
+    # rule head's parenthetical ("441—65.2(234)" → ch. 234). The
+    # statute↔regulation axis of the graph. backfill_iac_enabling_statutes.
+    REG_ENABLING = "reg_enabling", "Regulation enabling statute"
 
 
 class CrossReference(models.Model):

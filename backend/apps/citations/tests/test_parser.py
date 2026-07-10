@@ -162,3 +162,108 @@ class RenderTests(SimpleTestCase):
     def test_long_form_chapter(self):
         c = Citation(chapter="232", section=None)
         self.assertEqual(c.render("long"), "Iowa Code ch. 232")
+
+
+class IACParseTests(SimpleTestCase):
+    """Iowa Admin. Code forms: em-dash agency—rule paths + the official
+    "441 IAC 65.2" inline form. All resolve to the em-dash Node.path."""
+
+    def _check(self, text: str, expected: Citation):
+        got = parse(text)
+        self.assertEqual(got.chapter, expected.chapter, text)
+        self.assertEqual(got.section, expected.section, text)
+        self.assertEqual(got.subdivisions, expected.subdivisions, text)
+        self.assertEqual(got.source_hint, "iowa-admin-code", text)
+
+    def test_bluebook_long_form(self):
+        self._check(
+            "Iowa Admin. Code r. 441—65.2",
+            Citation(chapter="441—65", section="441—65.2"),
+        )
+
+    def test_administrative_spelled_out(self):
+        self._check(
+            "Iowa Administrative Code 441—65.2",
+            Citation(chapter="441—65", section="441—65.2"),
+        )
+
+    def test_iac_sigil_prefix(self):
+        self._check(
+            "IAC 441—65.2", Citation(chapter="441—65", section="441—65.2")
+        )
+
+    def test_official_inline_form(self):
+        self._check(
+            "441 IAC 65.2", Citation(chapter="441—65", section="441—65.2")
+        )
+
+    def test_inline_form_with_subrule(self):
+        self._check(
+            "441 IAC 65.2(3)",
+            Citation(chapter="441—65", section="441—65.2", subdivisions=("3",)),
+        )
+
+    def test_bare_em_dash_path(self):
+        self._check(
+            "441—65.2", Citation(chapter="441—65", section="441—65.2")
+        )
+
+    def test_en_dash_and_hyphen_normalize(self):
+        for dash in ("–", "-"):
+            self._check(
+                f"441{dash}65.2",
+                Citation(chapter="441—65", section="441—65.2"),
+            )
+
+    def test_dotless_rest_is_chapter_only(self):
+        self._check(
+            "Iowa Admin. Code ch. 441—65",
+            Citation(chapter="441—65", section=None),
+        )
+
+    def test_enabling_statute_parenthetical_captured(self):
+        self._check(
+            "441—65.2(234)",
+            Citation(chapter="441—65", section="441—65.2", subdivisions=("234",)),
+        )
+
+    def test_render_round_trips(self):
+        c = parse("441 IAC 65.2")
+        self.assertEqual(c.render("long"), "Iowa Admin. Code r. 441—65.2")
+        got = parse(c.render("long"))
+        self.assertEqual(got.section, "441—65.2")
+
+    def test_iowa_code_forms_unaffected(self):
+        got = parse("Iowa Code § 714.16")
+        self.assertIsNone(got.source_hint)
+        self.assertEqual(got.section, "714.16")
+
+
+class IACFindAllTests(SimpleTestCase):
+    def test_finds_em_dash_cites_in_prose(self):
+        from apps.citations.parser import find_all
+
+        got = find_all(
+            "as provided in 441—65.2 and rule 441—65.4, subject to 481—50.3(1)"
+        )
+        self.assertEqual(
+            [c.section for c in got if c.source_hint == "iowa-admin-code"],
+            ["441—65.2", "441—65.4", "481—50.3"],
+        )
+
+    def test_finds_official_inline_form_in_prose(self):
+        from apps.citations.parser import find_all
+
+        got = find_all("see 761 IAC 615.38 for suspension periods")
+        self.assertIn(
+            "761—615.38",
+            [c.section for c in got if c.source_hint == "iowa-admin-code"],
+        )
+
+    def test_numeric_ranges_are_not_iac_cites(self):
+        from apps.citations.parser import find_all
+
+        got = find_all("chapters 135—137 govern; see also 2023-24 budget")
+        self.assertEqual(
+            [c for c in got if c.source_hint == "iowa-admin-code"], []
+        )

@@ -14,6 +14,9 @@ Recognizes the citation forms attorneys actually type:
     "Iowa R. Civ. P. 1.303"      (court rules, by reporter)
     "Iowa Ct. R. 32:1.7"
     "rule 1.421(4)"
+    "Iowa Admin. Code r. 441—65.2"   (admin code, em-dash agency—rule form)
+    "441 IAC 65.2(3)"                (admin code, official inline form)
+    "441—65.2"                       (em, en, or plain hyphen all accepted)
 
 Rule of thumb: be liberal in what we accept (case-insensitive, optional
 section sigil, optional spaces around dots) but strict about what we
@@ -33,6 +36,11 @@ class Citation:
     section: str | None  # e.g. "714.16" — None for chapter-only citations
     subdivisions: tuple[str, ...] = field(default_factory=tuple)
     raw: str = ""
+    # Set when the citation FORM itself names the corpus: the em-dash
+    # agency—rule shape is unambiguously the Iowa Admin. Code
+    # ("iowa-admin-code"). None for the dotted/colon forms, which are
+    # resolved against whatever source the caller passes.
+    source_hint: str | None = None
 
     @property
     def is_chapter_only(self) -> bool:
@@ -51,6 +59,14 @@ class Citation:
         body = self.section or self.chapter
         for sub in self.subdivisions:
             body += f"({sub})"
+        if self.source_hint == "iowa-admin-code":
+            if style == "long":
+                prefix = "Iowa Admin. Code r. " if self.section else "Iowa Admin. Code ch. "
+                return prefix + body
+            if style == "short":
+                prefix = "IAC r. " if self.section else "IAC ch. "
+                return prefix + body
+            return body
         if style == "long":
             prefix = "Iowa Code § " if self.section else "Iowa Code ch. "
             return prefix + body
@@ -65,6 +81,10 @@ _SIGIL_TOKEN_RE = re.compile(
     \s*
     (?:
         iowa\ code                # "Iowa Code"
+      # --- Iowa Admin. Code sigils (must precede I.C., whose optional dots
+      # would otherwise nibble the "IA" of a bare "IAC") ---
+      | iowa\s+admin(?:\.|istrative)?\s*code
+      | \biac\b
       | i\.?\s*c\.?               # I.C.
       # --- Iowa rule reporter prefixes (court rules are cited by reporter,
       # not "Iowa Code §"). Also lets our own rendered "Iowa Ct. R. 1.303"
@@ -107,6 +127,48 @@ _BODY_RE = re.compile(
 
 _SUB_RE = re.compile(r"\(\s*([^)\s]+)\s*\)")
 
+# --- Iowa Admin. Code body forms. Node.path stores the em-dash shape
+# ("441—65.2" = agency 441, chapter 65, rule 2); readers type em dash, en
+# dash, or plain hyphen interchangeably, so accept all three and normalize
+# to the em dash. A dotless rest ("441—65") is a chapter reference. The
+# parenthetical after a rule number is captured as subdivisions verbatim —
+# whether it is a subrule index or the enabling statute is a resolution
+# question (they share the syntax), not a parsing one.
+_IAC_BODY_RE = re.compile(
+    r"""
+    (?P<agency>\d+)\s*[—–-]\s*
+    (?P<rest>\d+(?:\.\d+)?)
+    (?P<subs>(?:\s*\([^)]+\))*)
+    \s*$
+    """,
+    re.VERBOSE,
+)
+
+# The official inline form ("441 IAC 65.2(3)") puts the sigil BETWEEN agency
+# and rule, so the leading-sigil stripper never sees it.
+_IAC_INLINE_RE = re.compile(
+    r"""
+    ^\s*(?P<agency>\d+)\s+iac\s+
+    (?P<rest>\d+(?:\.\d+)?)
+    (?P<subs>(?:\s*\([^)]+\))*)
+    \s*$
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _iac_citation(m: re.Match, raw: str) -> Citation:
+    agency, rest = m["agency"], m["rest"]
+    chapter = f"{agency}—{rest.split('.', 1)[0]}"
+    subdivisions = tuple(_SUB_RE.findall(m["subs"] or ""))
+    return Citation(
+        chapter=chapter,
+        section=f"{agency}—{rest}" if "." in rest else None,
+        subdivisions=subdivisions,
+        raw=raw,
+        source_hint="iowa-admin-code",
+    )
+
 _CHAPTER_TRIGGER_RE = re.compile(
     r"\b(ch(?:apter|\.)?)\b", re.IGNORECASE
 )
@@ -124,6 +186,10 @@ def parse(text: str) -> Citation:
     raw = text.strip()
     forced_chapter_only = bool(_CHAPTER_TRIGGER_RE.search(raw))
 
+    inline = _IAC_INLINE_RE.match(raw)
+    if inline:
+        return _iac_citation(inline, raw)
+
     consumed = 0
     while True:
         m = _SIGIL_TOKEN_RE.match(raw, consumed)
@@ -131,6 +197,12 @@ def parse(text: str) -> Citation:
             break
         consumed = m.end()
     body_text = raw[consumed:].strip()
+
+    # The dash form is unambiguously the Iowa Admin. Code — try it before the
+    # dotted-body fallback would misread "441—65.2" as bare chapter "441".
+    iac = _IAC_BODY_RE.match(body_text)
+    if iac:
+        return _iac_citation(iac, raw)
 
     body_match = _BODY_RE.match(body_text)
     if not body_match:
@@ -192,7 +264,13 @@ _ITER_RE = re.compile(
     )?
     \d+[A-Z]?
     (?:
-        :\s*\d+(?:\.\w+)+    # court-rule colon form: 32:1.10, 51:2.11
+        # Iowa Admin. Code forms. In free text only the em/en dash counts and
+        # the rule part must be dotted ("441—65.2") — a plain hyphen or a
+        # dotless rest would swallow every numeric range ("2023-24",
+        # "chapters 135—137"). Explicit lookups take those via parse().
+        \s*[—–]\s*\d+\.\w+   # em-dash form: 441—65.2
+      | \s+IAC\s+\d+\.\w+    # official inline form: 441 IAC 65.2
+      | :\s*\d+(?:\.\w+)+    # court-rule colon form: 32:1.10, 51:2.11
       | \.\w+               # dotted form: 714.16, 1.303
     )?
     (?:\s*\([^)]+\))*
