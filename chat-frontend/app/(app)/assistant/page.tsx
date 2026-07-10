@@ -165,9 +165,30 @@ export default function V2AssistantPage() {
 		[mutate],
 	);
 
+	// Follow the stream only while the reader is at (or near) the bottom.
+	// Any UPWARD scroll unpins instantly — position alone isn't enough,
+	// because the first wheel tick still lands inside the near-bottom zone
+	// and the next flush would yank the reader back down (a visible fight).
+	// Programmatic follow scrolls only ever move down, so they can't unpin.
+	// Scrolling back to the bottom repins; sending a message always repins.
+	const pinnedRef = useRef(true);
+	const lastScrollTopRef = useRef(0);
+
 	const scrollToEnd = () => {
 		const el = scrollRef.current;
-		if (el) el.scrollTop = el.scrollHeight;
+		if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
+	};
+
+	const onThreadScroll = () => {
+		const el = scrollRef.current;
+		if (!el) return;
+		const goingUp = el.scrollTop < lastScrollTopRef.current - 1;
+		lastScrollTopRef.current = el.scrollTop;
+		if (goingUp) {
+			pinnedRef.current = false;
+			return;
+		}
+		pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
 	};
 
 	const send = useCallback(
@@ -178,6 +199,7 @@ export default function V2AssistantPage() {
 			const controller = new AbortController();
 			abortRef.current = controller;
 			setBusy(true);
+			pinnedRef.current = true; // a new turn always snaps to the stream
 
 			// Seed the turn: user message + empty assistant message to stream into.
 			// Only user/assistant text reaches the chat endpoint — verify cards and
@@ -281,6 +303,10 @@ export default function V2AssistantPage() {
 						answer = answer || `The request failed: ${event.message}`;
 					}
 					flush();
+					// done/error are terminal: exit without waiting for the server
+					// to close the socket — a lingering keep-alive would otherwise
+					// leave the composer stuck on the Stop button.
+					if (event.type === "done" || event.type === "error") break;
 				}
 			} catch (e) {
 				if ((e as Error).name !== "AbortError") {
@@ -307,6 +333,7 @@ export default function V2AssistantPage() {
 			const controller = new AbortController();
 			abortRef.current = controller;
 			setBusy(true);
+			pinnedRef.current = true; // a new turn always snaps to the stream
 
 			const userText =
 				text.trim() || (file ? `Verify the citations in ${file.name}.` : "");
@@ -388,6 +415,9 @@ export default function V2AssistantPage() {
 							break;
 					}
 					flush();
+					// Terminal events end the turn — don't wait on the socket close
+					// (a lingering keep-alive would pin the composer on Stop).
+					if (ev.type === "done" || ev.type === "error") break;
 				}
 				if (state === "running") {
 					state = controller.signal.aborted ? "error" : "done";
@@ -474,7 +504,11 @@ export default function V2AssistantPage() {
 				</header>
 
 				{/* Thread */}
-				<div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+				<div
+					ref={scrollRef}
+					onScroll={onThreadScroll}
+					className="min-h-0 flex-1 overflow-y-auto"
+				>
 					<div className="mx-auto max-w-3xl px-5 py-8 sm:px-8">
 						{active.messages.length === 0 ? (
 							<EmptyState onAsk={send} />
@@ -935,6 +969,17 @@ function Composer({
 	const [verifyMode, setVerifyMode] = useState(false);
 	const [file, setFile] = useState<File | null>(null);
 	const fileRef = useRef<HTMLInputElement>(null);
+	const taRef = useRef<HTMLTextAreaElement>(null);
+
+	// Grow the textarea with its content (up to ~6 lines), and shrink back —
+	// including after submit clears the draft.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: draft drives the resize
+	useEffect(() => {
+		const el = taRef.current;
+		if (!el) return;
+		el.style.height = "auto";
+		el.style.height = `${Math.min(el.scrollHeight, 192)}px`;
+	}, [draft]);
 
 	const verifying = verifyMode || !!file;
 	const canSubmit = !busy && (!!draft.trim() || !!file);
@@ -979,16 +1024,25 @@ function Composer({
 						submit();
 					}}
 				>
-					<input
+					<textarea
+						ref={taRef}
+						rows={1}
 						value={draft}
 						onChange={(e) => setDraft(e.target.value)}
+						onKeyDown={(e) => {
+							// Enter sends; Shift+Enter inserts a newline.
+							if (e.key === "Enter" && !e.shiftKey) {
+								e.preventDefault();
+								submit();
+							}
+						}}
 						placeholder={
 							verifying
 								? "Paste a document to verify its citations — or just send the attachment…"
 								: "Message the assistant…"
 						}
 						aria-label="Message the assistant"
-						className="h-12 w-full bg-transparent px-4 text-sm outline-none placeholder:text-[var(--cds-placeholder)]"
+						className="max-h-48 w-full resize-none bg-transparent px-4 py-3.5 text-sm leading-5 outline-none placeholder:text-[var(--cds-placeholder)]"
 					/>
 					<input
 						ref={fileRef}
