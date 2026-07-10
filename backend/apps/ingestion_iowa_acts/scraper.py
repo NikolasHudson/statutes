@@ -184,6 +184,15 @@ def scrape_session(fetcher: Fetcher, ssid: int) -> dict:
     is future work, tracked in the plan."""
     chapters = session_chapters(fetcher, ssid)
     if not chapters:
+        # Zero rows usually means a rate-limit/error page got cached, not an
+        # empty session — evict that one entry and refetch before giving up.
+        from apps.ingestion_iowa_code.scraper import _url_hash
+
+        (fetcher.cache_dir / f"{_url_hash(LISTING_URL.format(ssid=ssid))}.bin").unlink(
+            missing_ok=True
+        )
+        chapters = session_chapters(fetcher, ssid)
+    if not chapters:
         raise ValueError(f"no chapters found for ssid={ssid}")
     ga, session = chapters[0]["ga"], chapters[0]["session"]
 
