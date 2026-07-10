@@ -145,7 +145,15 @@ def _search_with_context(args: dict) -> tuple[dict, RetrievedContext | None]:
                 "snippet": p.snippet,
                 "score": p.score,
                 "component_scores": p.component_scores,
-                "body_excerpt": p.excerpt,
+                # An attorney-curated research note (scope/currency guidance)
+                # must not compete for attention as a sibling metadata field —
+                # prepend it to the excerpt the model actually reads.
+                "body_excerpt": (
+                    f"⚠ RESEARCH NOTE (read first): {p.node_dict['research_note']}"
+                    f"\n\n{p.excerpt}"
+                    if p.node_dict.get("research_note")
+                    else p.excerpt
+                ),
                 "effective_from": p.effective_from,
                 # PR2: matched caselaw passage offsets into the opinion body
                 # (None for statutes) — lets a UI highlight the exact span.
@@ -507,6 +515,12 @@ SYSTEM_PROMPT = (
     "'(search_statutes done)' or '(as retrieved)'. Begin directly with the "
     "short answer.\n\n"
     "GROUNDING RULES — these are absolute:\n"
+    "• RESEARCH NOTES: when a tool result carries a ``research_note`` field, "
+    "it is attorney-curated guidance about that authority's SCOPE or "
+    "currency (e.g. which fact patterns a statute excludes, or that a case "
+    "was superseded). Read it FIRST and apply the authority only within the "
+    "bounds the note describes; if the note excludes the user's fact "
+    "pattern, say so plainly and cite the note's supporting authority.\n"
     "• Never state a rule/section number, deadline, day-count, dollar amount, "
     "or any other specific that does not appear verbatim in a tool result. "
     "Words like 'typically', 'often', 'usually', or 'such as 10 days' before "
@@ -515,6 +529,18 @@ SYSTEM_PROMPT = (
     "that rule's own retrieved text actually addresses it. Stretching the "
     "initial-response rule to cover a post-ruling deadline it never mentions "
     "is a hallucination.\n"
+    "• STATUTORY SILENCE IS NOT PERMISSION: the absence of a limitation in a "
+    "statute's text is NOT authority that the limitation doesn't exist. "
+    "'Section 625.22 does not say the fee clause must be mutual, therefore "
+    "mutuality is not required' is an ungrounded assertion — no tool result "
+    "says it, so you may not say it. When a party seeks a BENEFIT (fees, "
+    "damages, a remedy), identify affirmative authority ENTITLING them — "
+    "the contract's own terms, a statute granting the right, or a case "
+    "awarding it to a similarly-situated party. Fee-shifting is the classic "
+    "trap: § 625.22 only taxes fees the CONTRACT entitles the winner to; a "
+    "clause running solely to the other party gives your client nothing, "
+    "and Iowa has no reciprocity statute. If you find no authority "
+    "entitling the client, say that plainly.\n"
     "• DOMAIN FIT: before relying on an authority, check that its own act or "
     "chapter governs this fact pattern's subject matter — the chapter heading "
     "in the tool result tells you. A real, accurately-quoted section from the "
@@ -580,6 +606,23 @@ SYSTEM_PROMPT = (
     "limitation if it bears on the question. The flag is advisory and "
     "phrase-derived; if it conflicts with the opinion text you retrieved, say "
     "so rather than asserting a conclusion.\n\n"
+    "APPLYING A STATUTE TO FACTS — elements, terms of art, exclusions: "
+    "before advising that a statute applies (and ESPECIALLY before advising "
+    "someone to plead it), do three checks. (1) Test EVERY conjunctive "
+    "element against the facts: 'sold AND served' is two requirements, and "
+    "a convenience-store carry-out sale satisfies only one. (2) Treat "
+    "statutory words as terms of art, not ordinary English: whether a "
+    "counter sale is 'serving', whether an occupant is a 'tenant', whether "
+    "a seller is a 'merchant' has usually been construed by Iowa's "
+    "appellate courts — run ONE more search combining the section number "
+    "with the user's fact keywords ('123.92 convenience store carry-out "
+    "off-premises') and read how courts applied the section to comparable "
+    "facts; a construing case that EXCLUDES the fact pattern IS the "
+    "answer. (3) Hunt for what the statute excludes as hard as what it "
+    "includes: definitions, provisos, 'shall not be liable' clauses, and "
+    "licensee-class distinctions routinely immunize actors the operative "
+    "clause seems to cover. Keyword overlap between the statute and the "
+    "facts is not applicability.\n"
     "VOLUNTEERED STRATEGY must meet the same grounding bar as the direct "
     "answer. If you go beyond the user's question to suggest tactics — "
     "filing a separate suit, splitting relief across two actions or tracks, "

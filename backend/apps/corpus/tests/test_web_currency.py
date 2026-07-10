@@ -292,3 +292,45 @@ class VerifyAnswerWiringTests(TestCase):
         report = self.report(checker)
         self.assertEqual(report["web_currency_problems"], [])
         self.assertEqual(checker.calls, 1)  # adverse note current: no re-check
+
+
+class ConstructionNoteTests(TestCase):
+    """kind=construction notes surface inside tool results (_node_dict) so the
+    model reads scope guidance WITH the authority — the Eddy/§123.92 fix."""
+
+    def test_construction_note_injected_into_node_dict(self):
+        from django.utils import timezone as tz
+
+        from apps.api.tests._factories import make_iowa_corpus_minimal
+        from apps.corpus.services.corpus_tools import lookup_citation_tool
+
+        _, section, _ = make_iowa_corpus_minimal()
+        CaseResearchNote.objects.create(
+            node=section, kind=CaseResearchNote.Kind.CONSTRUCTION,
+            status=CaseResearchNote.Status.ADVERSE,
+            adverse_kind="scope_limitation",
+            claimed_by="Some v. Case, 1 N.W.2d 1 (Iowa 1990)",
+            evidence="SCOPE: does not reach private one-off sales.",
+            corpus_verified=True, review_status=CaseResearchNote.Review.PENDING,
+            model="manual", checked_at=tz.now(),
+        )
+        result = lookup_citation_tool("714.16")
+        node_dict = result["section"]["node"]
+        self.assertIn("does not reach private one-off sales", node_dict["research_note"])
+        self.assertIn("Some v. Case", node_dict["research_note"])
+
+    def test_rejected_construction_note_never_surfaces(self):
+        from django.utils import timezone as tz
+
+        from apps.api.tests._factories import make_iowa_corpus_minimal
+        from apps.corpus.services.corpus_tools import lookup_citation_tool
+
+        _, section, _ = make_iowa_corpus_minimal()
+        CaseResearchNote.objects.create(
+            node=section, kind=CaseResearchNote.Kind.CONSTRUCTION,
+            status=CaseResearchNote.Status.ADVERSE, evidence="bogus",
+            review_status=CaseResearchNote.Review.REJECTED,
+            model="manual", checked_at=tz.now(),
+        )
+        result = lookup_citation_tool("714.16")
+        self.assertNotIn("research_note", result["section"]["node"])

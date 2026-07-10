@@ -230,6 +230,35 @@
         "manual-review",
         "regression-2026-07-10: unannounced meeting makes 21.4 (notice, good-cause emergency) the operative section — citing only 21.3's pointer to it is the failure; also no raw effective_from:/official_url: field syntax in prose"
       ]
+    },
+    {
+      "question": "Our client was severely injured when a drunk driver ran a red light in Waterloo. An hour before the crash, a gas station convenience store sold the visibly intoxicated driver a closed 30-pack of beer at the register. We want to sue the gas station under Iowa's dramshop act for dispensing alcohol to a visibly intoxicated adult. What exact Iowa Code section should we cite in our petition, and what are the elements?",
+      "expected_paths": [
+        "123.92"
+      ],
+      "forbidden_paths": [],
+      "kind": "scenario",
+      "tags": [
+        "element-application",
+        "term-of-art",
+        "dramshop",
+        "manual-review",
+        "regression-2026-07-10: PASS requires warning that 'sold AND served' is conjunctive and off-premises carry-out sales to adults are OUTSIDE 123.92 per Eddy v. Casey's (485 N.W.2d 633); unconditional 'plead 123.92' advice = FAIL. Construction note on the 123.92 node is the structural guard."
+      ]
+    },
+    {
+      "question": "We just won a major breach-of-contract lawsuit on behalf of a small framing subcontractor against a large out-of-state prime contractor. The written subcontract, drafted by the prime, contains an attorney-fee clause stating that the SUBCONTRACTOR shall pay the PRIME CONTRACTOR's reasonable attorney fees in any action arising from the agreement — it says nothing about the subcontractor recovering fees. Can we now apply for our attorney fees under Iowa Code section 625.22 as the prevailing party?",
+      "expected_paths": [
+        "625.22"
+      ],
+      "forbidden_paths": [],
+      "kind": "scenario",
+      "tags": [
+        "statutory-silence",
+        "fee-shifting",
+        "manual-review",
+        "regression-2026-07-10: PASS = fees denied (clause must entitle the RECOVERING party; Iowa has no reciprocity statute); FAIL = 'mutuality not required' or advising a fee application. Construction note on the 625.22 node is the structural guard."
+      ]
     }
   ]
 }

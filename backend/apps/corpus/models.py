@@ -425,6 +425,11 @@ class CaseResearchNote(models.Model):
 
     class Kind(models.TextChoices):
         WEB_CURRENCY = "web_currency", "Web currency check"
+        # Attorney-curated scope/construction guidance on an authority (e.g.
+        # "'sold and served' excludes off-premises carry-out sales — Eddy").
+        # Surfaced INSIDE tool results via corpus_tools._node_dict so the
+        # model reads it WITH the authority, on every surface.
+        CONSTRUCTION = "construction", "Construction / scope note"
 
     class Status(models.TextChoices):
         CLEAR = "clear", "Clear (good law per source)"
