@@ -1,0 +1,51 @@
+{# OAuth consent page. Deliberately server-rendered (no SPA dependency): the #}
+{# authorize redirect must work from a bare browser tab opened by any MCP    #}
+{# client. CSRF token is REQUIRED here — this POST rides the session cookie. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Authorize {{ client.client_name|default:"connector" }} — Iowa Legal Corpus</title>
+  <style>
+    body { font-family: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
+           background: #f4f4f4; color: #161616; margin: 0;
+           display: flex; min-height: 100vh; align-items: center; justify-content: center; }
+    .card { background: #fff; max-width: 26rem; width: 100%; padding: 2rem;
+            border-top: 3px solid #0f62fe; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+    h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 1rem; }
+    p { font-size: .875rem; line-height: 1.4; color: #525252; }
+    .scope { background: #f4f4f4; padding: .5rem .75rem; font-size: .8125rem;
+             font-family: 'IBM Plex Mono', monospace; margin: 1rem 0; }
+    .actions { display: flex; gap: .5rem; margin-top: 1.5rem; }
+    button { flex: 1; padding: .75rem 1rem; font-size: .875rem; border: none; cursor: pointer; }
+    .approve { background: #0f62fe; color: #fff; }
+    .deny { background: #fff; color: #161616; border: 1px solid #8d8d8d; }
+    .who { font-size: .75rem; color: #8d8d8d; margin-top: 1.25rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Authorize connector</h1>
+    <p>
+      <strong>{{ client.client_name|default:"An MCP client" }}</strong> is requesting
+      access to the Iowa Legal Corpus MCP server on your behalf. It will be able to
+      search and read Iowa statutes, court rules, and caselaw, and run citation and
+      quote verification — with your account's plan limits.
+    </p>
+    <div class="scope">scope: {{ scope_display }}</div>
+    <form method="post">
+      {% csrf_token %}
+      {% for name, value in params.items %}
+        <input type="hidden" name="{{ name }}" value="{{ value }}">
+      {% endfor %}
+      <div class="actions">
+        <button class="deny" type="submit" name="action" value="deny">Deny</button>
+        <button class="approve" type="submit" name="action" value="approve">Authorize</button>
+      </div>
+    </form>
+    <p class="who">Signed in as {{ user.email }}. You can revoke this connector's
+      access at any time from your account settings or by revoking its token.</p>
+  </div>
+</body>
+</html>

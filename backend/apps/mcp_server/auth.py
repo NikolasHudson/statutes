@@ -1,12 +1,27 @@
-"""ASGI middleware that gates the MCP HTTP transport on X-API-Key.
+"""ASGI middleware that gates the MCP HTTP transport on Bearer OR X-API-Key.
 
 The stdio transport is local-only and assumed trusted (the README is explicit
 about that). The HTTP transport is what attorneys' Claude Desktop installs
 will dial into, so it has to be authenticated.
 
-We mirror the REST API's auth model: ``X-API-Key`` header → ``verify_key`` →
-401 if invalid. Successful requests get an ``mcp_api_key`` attribute on the
-ASGI scope so downstream code can read the user/tier off it.
+Two credentials are accepted, checked in this order:
+
+1. ``Authorization: Bearer <token>`` — an OAuth 2.0 access token issued by
+   our co-hosted authorization server (apps/mcp_server/oauth.py). This is the
+   MCP-spec path and what claude.ai's connector UI uses. Tokens are opaque
+   bearers verified by hashed lookup (:func:`models.verify_access_token`);
+   the resolved token is wrapped in :class:`BearerPrincipal` so the existing
+   per-user gating applies unchanged.
+2. ``X-API-Key`` header → ``verify_key`` — the original REST-mirrored path,
+   kept for backward compatibility (Claude Desktop via ``mcp-remote``).
+
+401 responses carry ``WWW-Authenticate: Bearer resource_metadata="…"`` per
+RFC 9728 §5.1 / the MCP authorization spec, so a spec-following client can
+discover the authorization server and start the OAuth flow unprompted.
+
+Successful requests get an ``mcp_api_key`` attribute on the ASGI scope so
+downstream code can read the user/tier off it (for Bearer requests that is
+the :class:`BearerPrincipal`, which duck-types the same surface).
 
 Beyond authentication we also apply the REST API's *authorization* and
 *rate-limiting* on this transport (see :mod:`apps.mcp_server.gating`): the
@@ -29,6 +44,55 @@ ASGIApp = Callable[[dict, Callable, Callable], Awaitable[None]]
 
 
 HEADER_NAME = b"x-api-key"
+AUTHORIZATION_HEADER = b"authorization"
+
+
+class BearerPrincipal:
+    """Adapt an OAuthToken to the APIKey surface the gate reads.
+
+    ``gate_request`` (gating.py) needs exactly two attributes: ``.user`` (its
+    tier drives ``require_feature``) and ``.pk`` (the rate-limit cache key).
+    The pk is prefixed so an OAuth token's daily quota bucket can never
+    collide with an APIKey row that happens to share the integer id."""
+
+    def __init__(self, token):
+        self.token = token
+        self.user = token.user
+        self.pk = f"oauth-{token.pk}"
+
+    @property
+    def user_id(self):
+        return self.token.user_id
+
+
+def _resource_metadata_url(scope: dict) -> str:
+    """The RFC 9728 Protected Resource Metadata URL advertised on 401s.
+
+    ``MCP_OAUTH_ISSUER`` pins the public origin in prod (the MCP service can
+    sit behind path-based ingress where the request Host is an internal
+    hostname); otherwise it derives from the request's Host header."""
+    configured = os.environ.get("MCP_OAUTH_ISSUER", "").strip()
+    if configured:
+        base = configured.rstrip("/")
+    else:
+        host = ""
+        for raw_name, raw_value in scope.get("headers", []):
+            if raw_name == b"host":
+                host = raw_value.decode("latin-1").strip()
+                break
+        bare = host.split(":", 1)[0]
+        scheme = "http" if bare in ("localhost", "127.0.0.1") else "https"
+        base = f"{scheme}://{host}" if host else "https://localhost"
+    return f"{base}/.well-known/oauth-protected-resource/mcp"
+
+
+def _www_authenticate(scope: dict, error: str | None = None) -> bytes:
+    parts = ["Bearer"]
+    attrs = []
+    if error:
+        attrs.append(f'error="{error}"')
+    attrs.append(f'resource_metadata="{_resource_metadata_url(scope)}"')
+    return (parts[0] + " " + ", ".join(attrs)).encode("latin-1")
 
 
 # Cap the buffered request body. We must buffer to inspect the JSON-RPC method,
@@ -52,22 +116,31 @@ def _unauthorized(detail: str) -> tuple[bytes, int]:
     return _error(detail, 401, code="unauthorized")
 
 
-async def _send_json(send: Callable, body: bytes, status: int) -> None:
+async def _send_json(
+    send: Callable,
+    body: bytes,
+    status: int,
+    extra_headers: list[tuple[bytes, bytes]] | None = None,
+) -> None:
+    headers = [
+        (b"content-type", b"application/json"),
+        (b"content-length", str(len(body)).encode("ascii")),
+    ]
+    if extra_headers:
+        headers.extend(extra_headers)
     await send(
         {
             "type": "http.response.start",
             "status": status,
-            "headers": [
-                (b"content-type", b"application/json"),
-                (b"content-length", str(len(body)).encode("ascii")),
-            ],
+            "headers": headers,
         }
     )
     await send({"type": "http.response.body", "body": body, "more_body": False})
 
 
 def api_key_middleware(app: ASGIApp) -> ASGIApp:
-    """Wrap an ASGI app so every HTTP request must carry a valid X-API-Key.
+    """Wrap an ASGI app so every HTTP request must carry a valid credential —
+    an OAuth Bearer access token or an X-API-Key.
 
     Non-HTTP scopes (lifespan, websocket) are passed through untouched."""
 
@@ -76,30 +149,80 @@ def api_key_middleware(app: ASGIApp) -> ASGIApp:
             await app(scope, receive, send)
             return
 
-        # Find the X-API-Key header. ASGI lowercases header names.
+        # Find the credential headers. ASGI lowercases header names.
         key: str | None = None
+        bearer: str | None = None
         for raw_name, raw_value in scope.get("headers", []):
-            if raw_name == HEADER_NAME:
+            if raw_name == HEADER_NAME and key is None:
                 key = raw_value.decode("latin-1").strip()
-                break
+            elif raw_name == AUTHORIZATION_HEADER and bearer is None:
+                value = raw_value.decode("latin-1").strip()
+                if value[:7].lower() == "bearer ":
+                    bearer = value[7:].strip()
 
-        if not key:
-            body, status = _unauthorized("missing X-API-Key header")
-            await _send_json(send, body, status)
+        if not key and not bearer:
+            body, status = _unauthorized(
+                "missing credentials: send an OAuth Bearer token "
+                "(Authorization header) or an X-API-Key header"
+            )
+            await _send_json(
+                send,
+                body,
+                status,
+                extra_headers=[(b"www-authenticate", _www_authenticate(scope))],
+            )
             return
 
         # Django ORM is sync; the MCP server runs ASGI.
-        from apps.accounts.models import verify_key as _verify_key
-
-        # thread_sensitive=True keeps the sync DB call on the main thread so
-        # it shares the connection (and, in tests, the open transaction) with
-        # the rest of the process. The auth check is one indexed lookup; the
+        # thread_sensitive=True keeps the sync DB calls on the main thread so
+        # they share the connection (and, in tests, the open transaction) with
+        # the rest of the process. Each check is one indexed lookup; the
         # serialization cost is negligible.
-        api_key = await sync_to_async(_verify_key, thread_sensitive=True)(key)
-        if api_key is None:
-            body, status = _unauthorized("invalid or revoked API key")
-            await _send_json(send, body, status)
-            return
+        api_key = None
+        if bearer:
+            # OAuth path (the MCP-spec credential). A presented-but-invalid
+            # Bearer token 401s immediately — it must NOT fall through to the
+            # X-API-Key check, so a spec-following client sees the
+            # WWW-Authenticate challenge and re-runs the OAuth flow.
+            from .models import verify_access_token as _verify_token
+
+            token = await sync_to_async(_verify_token, thread_sensitive=True)(
+                bearer
+            )
+            if token is None:
+                body, status = _unauthorized(
+                    "invalid, expired, or revoked access token"
+                )
+                await _send_json(
+                    send,
+                    body,
+                    status,
+                    extra_headers=[
+                        (
+                            b"www-authenticate",
+                            _www_authenticate(scope, error="invalid_token"),
+                        )
+                    ],
+                )
+                return
+            api_key = BearerPrincipal(token)
+        else:
+            from apps.accounts.models import verify_key as _verify_key
+
+            api_key = await sync_to_async(_verify_key, thread_sensitive=True)(
+                key
+            )
+            if api_key is None:
+                body, status = _unauthorized("invalid or revoked API key")
+                await _send_json(
+                    send,
+                    body,
+                    status,
+                    extra_headers=[
+                        (b"www-authenticate", _www_authenticate(scope))
+                    ],
+                )
+                return
 
         # Buffer the request body so we can inspect the JSON-RPC method for the
         # feature/quota gate, then replay it downstream unchanged.

@@ -245,6 +245,13 @@ if not DEBUG:
 
 AUTH_USER_MODEL = "accounts.User"
 
+# Where redirect_to_login() sends an unauthenticated browser. The only Django
+# view that uses it today is the MCP OAuth consent page (apps/mcp_server/
+# oauth.authorize): the SPA's sign-in gate lives on the root route and gets
+# ?next=<full authorize URL> so it can land the user back on the consent page
+# after signing in.
+LOGIN_URL = "/"
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
