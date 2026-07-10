@@ -13,6 +13,7 @@ import html
 import re
 
 from apps.corpus.models import Node, ReporterCitation
+from apps.corpus.services.corpus_tools import acts_citation
 
 # Public browse search is keyword-only (FTS + trigram, RRF-fused) — no vector
 # embeddings and no reranker, so an unauthenticated box can't run up a Voyage
@@ -37,6 +38,8 @@ def _citation(node: Node) -> str:
         # chapters "ch. 441—65"; the agency tier is just the bare number.
         sigil = {"rule": "r. ", "chapter": "ch. "}.get(node.node_type.key, "")
         return f"{abbr} {sigil}{node.path}"
+    if node.source.slug == "iowa-acts":
+        return acts_citation(node.path)
     return f"{abbr} {node.path}".strip()
 
 
@@ -99,6 +102,7 @@ def _search_row(
         kind = {
             "iowa-court-rules": "rule",
             "iowa-admin-code": "admin",
+            "iowa-acts": "acts",
         }.get(slug, "code")
         case_id = None
         case_name = None
@@ -189,4 +193,6 @@ _DOC_TYPE_SLUG = {
     "admin": "iowa-admin-code",
     "admin_code": "iowa-admin-code",
     "regulations": "iowa-admin-code",
+    "acts": "iowa-acts",
+    "session_laws": "iowa-acts",
 }

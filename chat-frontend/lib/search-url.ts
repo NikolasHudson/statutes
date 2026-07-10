@@ -52,7 +52,11 @@ export function advancedFromParams(sp: URLSearchParams): AdvancedFilters {
 	const dt = sp.get("doc_type");
 	return {
 		docType:
-			dt === "code" || dt === "admin" || dt === "rules" || dt === "cases"
+			dt === "code" ||
+			dt === "admin" ||
+			dt === "acts" ||
+			dt === "rules" ||
+			dt === "cases"
 				? dt
 				: "all",
 		court: sp.get("court") ?? "",

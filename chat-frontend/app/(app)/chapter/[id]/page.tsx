@@ -72,7 +72,9 @@ export default function V2ChapterPage() {
 						? "Iowa Court Rules"
 						: chapter.source_slug === "iowa-admin-code"
 							? "Iowa Admin. Code"
-							: "Iowa Code"}
+							: chapter.source_slug === "iowa-acts"
+								? "Iowa Acts"
+								: "Iowa Code"}
 				</Link>
 				<span className="mx-2 text-[var(--cds-helper)]">/</span>
 				<span className="font-semibold">{chapter.ordinal}</span>

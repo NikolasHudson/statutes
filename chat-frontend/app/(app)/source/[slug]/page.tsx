@@ -112,6 +112,7 @@ function ChapterIndex({ source }: { source: BrowseSource }) {
 	const [data, setData] = useState<{
 		chapters: BrowseChapter[];
 		agencies?: BrowseAgency[];
+		group_label?: string;
 	} | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
@@ -135,7 +136,7 @@ function ChapterIndex({ source }: { source: BrowseSource }) {
 			<SourceHeader source={source} />
 
 			<p className="mt-10 border-[var(--cds-border)] border-t pt-5 font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.18em]">
-				{agencies ? "Agencies" : "Chapters"}
+				{agencies ? (data?.group_label ?? "Agencies") : "Chapters"}
 			</p>
 			{error ? (
 				<Notification

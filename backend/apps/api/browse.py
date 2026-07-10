@@ -141,12 +141,13 @@ def list_sources(request):
 def list_chapters(request, slug: str):
     """Chapters (top level) for a source, each with its child count.
 
-    Sources with an ``agency`` tier above chapters (the Iowa Admin. Code's
-    agency → chapter → rule hierarchy) additionally get ``agencies``: the same
-    chapter rows grouped under their agency, in agency-number order, so the UI
-    can render a two-level TOC. The flat ``chapters`` list is kept for those
-    sources too (ordered agency-first) so consumers that don't know about
-    agencies still get a usable index."""
+    Three-level sources — a level-0 tier above chapters (IAC agencies, Acts
+    sessions) — additionally get ``agencies``: the same chapter rows grouped
+    under their top-tier parent, in parent order, so the UI can render a
+    two-level TOC (``group_label`` names the tier: "Agencies", "Sessions").
+    The flat ``chapters`` list is kept for those sources too (ordered
+    group-first) so consumers that don't know about groups still get a
+    usable index."""
     source = get_object_or_404(Source, slug=slug)
     chapters = (
         Node.objects.filter(source=source, node_type__key="chapter")
@@ -168,11 +169,21 @@ def list_chapters(request, slug: str):
             "child_count": c.child_count,
         }
 
-    agencies = list(
-        Node.objects.filter(source=source, node_type__key="agency")
+    top_type = (
+        source.node_types.filter(level=0).exclude(key="chapter").first()
+    )
+    agencies = (
+        list(Node.objects.filter(source=source, node_type=top_type))
+        if top_type
+        else []
     )
     if agencies:
-        agencies.sort(key=lambda a: _intkey(a.ordinal))
+        # Agencies sort numerically; sessions ("2024", "2023X3") sort by
+        # ordinal string DESCENDING so the newest session leads the TOC.
+        if top_type.key == "session":
+            agencies.sort(key=lambda a: a.ordinal, reverse=True)
+        else:
+            agencies.sort(key=lambda a: _intkey(a.ordinal))
         by_agency: dict[int, list[Node]] = {a.id: [] for a in agencies}
         for c in chapters:
             by_agency.setdefault(c.parent_id, []).append(c)
@@ -189,6 +200,7 @@ def list_chapters(request, slug: str):
         ]
         return _cached_json(request, {
             "source": {"slug": source.slug, "name": source.name},
+            "group_label": top_type.label_plural,
             "agencies": agency_rows,
             "chapters": [c for a in agency_rows for c in a["chapters"]],
         })

@@ -510,6 +510,10 @@ const KIND: Record<
 		label: "Iowa Admin. Code",
 		tint: "bg-primary/10 text-primary",
 	},
+	acts: {
+		label: "Iowa Acts",
+		tint: "bg-primary/10 text-primary",
+	},
 	code: {
 		label: "Iowa Code",
 		tint: "bg-primary/10 text-primary",

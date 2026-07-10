@@ -115,7 +115,27 @@ def _render_citation(node: Node) -> str:
         # chapters "ch. 441—65"; the agency tier is just the bare number.
         sigil = {"rule": "r. ", "chapter": "ch. "}.get(node.node_type.key, "")
         return f"{abbr} {sigil}{node.path}"
+    if node.source.slug == "iowa-acts":
+        return acts_citation(node.path)
     return f"{abbr} {node.path}"
+
+
+def acts_citation(path: str) -> str:
+    """"2024.1170.12" → "2024 Iowa Acts, ch. 1170, §12" (Iowa Code § 3.3
+    form). Extra sessions carry an X suffix in the session token ("2023X3")
+    and cite with an Extra Session marker."""
+    parts = path.split(".")
+    year = parts[0]
+    prefix = (
+        f"{year.split('X')[0]} Iowa Acts (Extra Sess.)"
+        if "X" in year
+        else f"{year} Iowa Acts"
+    )
+    if len(parts) == 1:
+        return prefix
+    if len(parts) == 2:
+        return f"{prefix}, ch. {parts[1]}"
+    return f"{prefix}, ch. {parts[1]}, §{parts[2]}"
 
 
 def _caselaw_decision(node: Node) -> Node:

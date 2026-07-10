@@ -67,6 +67,14 @@ class Citation:
                 prefix = "IAC r. " if self.section else "IAC ch. "
                 return prefix + body
             return body
+        if self.source_hint == "iowa-acts":
+            if style in ("long", "short"):
+                parts = (self.section or self.chapter).split(".")
+                out = f"{parts[0].split('X')[0]} Iowa Acts, ch. {parts[1]}"
+                if len(parts) > 2:
+                    out += f", §{parts[2]}"
+                return out
+            return body
         if style == "long":
             prefix = "Iowa Code § " if self.section else "Iowa Code ch. "
             return prefix + body
@@ -144,6 +152,38 @@ _IAC_BODY_RE = re.compile(
     re.VERBOSE,
 )
 
+# Iowa Acts (session laws): "2024 Iowa Acts, ch. 1170, §12" (Iowa Code § 3.3
+# form; also seen without commas and as "Iowa Acts of 2024"). Node.path is
+# the dotted "{year}.{chapter}[.{section}]".
+_ACTS_RE = re.compile(
+    r"""
+    ^\s*
+    (?:
+        (?P<year>\d{4})\s+Iowa\s+Acts      # 2024 Iowa Acts
+      | Iowa\s+Acts\s+of\s+(?P<year2>\d{4})  # Iowa Acts of 2024
+    )
+    (?:\s*\(Extra\s+Sess[^)]*\))?
+    \s*,?\s*ch(?:apter|\.)?\s*(?P<chapter>\d+)
+    (?:\s*,?\s*§?\s*(?:sec(?:tion|\.)?\s*)?(?P<section>\d+))?
+    \s*$
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _acts_parse(m: re.Match, raw: str) -> Citation:
+    year = m["year"] or m["year2"]
+    chapter = f"{year}.{int(m['chapter'])}"
+    section = f"{chapter}.{int(m['section'])}" if m["section"] else None
+    return Citation(
+        chapter=chapter,
+        section=section,
+        subdivisions=(),
+        raw=raw,
+        source_hint="iowa-acts",
+    )
+
+
 # The official inline form ("441 IAC 65.2(3)") puts the sigil BETWEEN agency
 # and rule, so the leading-sigil stripper never sees it.
 _IAC_INLINE_RE = re.compile(
@@ -190,6 +230,10 @@ def parse(text: str) -> Citation:
     if inline:
         return _iac_citation(inline, raw)
 
+    acts = _ACTS_RE.match(raw)
+    if acts:
+        return _acts_parse(acts, raw)
+
     consumed = 0
     while True:
         m = _SIGIL_TOKEN_RE.match(raw, consumed)
@@ -235,12 +279,35 @@ def find_all(text: str) -> list[Citation]:
     already structured, but section bodies contain free-form refs ("section
     1.1", "as defined in chapter 232") we will want to capture later."""
     out: list[Citation] = []
+    spans: list[tuple[int, int]] = []
+    for match in _ACTS_ITER_RE.finditer(text):
+        try:
+            out.append(parse(match.group(0)))
+            spans.append(match.span())
+        except CitationParseError:
+            continue
     for match in _ITER_RE.finditer(text):
+        # Acts cites contain Code-shaped fragments ("ch. 1170") — skip
+        # anything inside a span the Acts pass already claimed.
+        if any(a <= match.start() < b for a, b in spans):
+            continue
         try:
             out.append(parse(match.group(0)))
         except CitationParseError:
             continue
     return out
+
+
+# Free-text Acts cites; anchored variants of _ACTS_RE without ^$.
+_ACTS_ITER_RE = re.compile(
+    r"""
+    (?:\d{4}\s+Iowa\s+Acts|Iowa\s+Acts\s+of\s+\d{4})
+    (?:\s*\(Extra\s+Sess[^)]*\))?
+    \s*,?\s*ch(?:apter|\.)?\s*\d+
+    (?:\s*,?\s*§?\s*(?:sec(?:tion|\.)?\s*)?\d+)?
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
 
 
 # Used by find_all and (re-exported into lookups.py) by citation_links,

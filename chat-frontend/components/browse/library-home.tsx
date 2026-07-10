@@ -12,6 +12,7 @@
 import {
 	BookOpenIcon,
 	ChevronRightIcon,
+	FileTextIcon,
 	GavelIcon,
 	LandmarkIcon,
 	type LucideIcon,
@@ -43,6 +44,10 @@ const SOURCE_VIEW: Record<string, { icon: LucideIcon; blurb: string }> = {
 	"iowa-admin-code": {
 		icon: BookOpenIcon,
 		blurb: "Administrative rules of Iowa agencies",
+	},
+	"iowa-acts": {
+		icon: FileTextIcon,
+		blurb: "Session laws — what each General Assembly enacted",
 	},
 	"iowa-court-rules": {
 		icon: GavelIcon,
