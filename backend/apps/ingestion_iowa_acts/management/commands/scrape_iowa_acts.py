@@ -60,7 +60,14 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"scraping ssid={s['ssid']} ({s['year']} {s['label']}, GA {s['ga']})…"
             )
-            payload = scrape_session(fetcher, s["ssid"])
+            try:
+                payload = scrape_session(fetcher, s["ssid"])
+            except ValueError as e:
+                # Extra sessions publish a whole-volume PDF with no
+                # per-chapter listing rows — skip them rather than kill the
+                # sweep (tracked as a plan gap; their corpora are tiny).
+                self.stdout.write(self.style.WARNING(f"  skipped: {e}"))
+                continue
             payload["year"], payload["label"] = s["year"], s["label"]
             spath = session_path(s["year"], payload["session"], s["label"])
             out = out_dir / f"acts_probe_{spath}.json"
