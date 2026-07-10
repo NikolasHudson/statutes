@@ -134,14 +134,28 @@ def parse_enrolled_rtf(data: bytes) -> ParsedAct:
             if line.strip() and not _TITLE_RE.match(line)
         ).strip()
 
-    heads = list(_SECTION_HEAD_RE.finditer(text))
+    # Act sections are strictly sequential (Section 1., Sec. 2., …). A head
+    # whose number doesn't continue the sequence is quoted text, not a
+    # boundary — joint resolutions embed a proposed constitutional
+    # amendment whose own text begins "Section 1.", and amendatory bodies
+    # can quote section heads too.
+    heads = [
+        h
+        for h in _SECTION_HEAD_RE.finditer(text)
+        if int(h.group("num")) < 10_000
+    ]
+    in_seq: list[re.Match] = []
+    for h in heads:
+        if int(h.group("num")) == len(in_seq) + 1:
+            in_seq.append(h)
+
     sections: list[ParsedActSection] = []
-    for i, h in enumerate(heads):
-        start, end = h.end(), heads[i + 1].start() if i + 1 < len(heads) else len(text)
+    for i, h in enumerate(in_seq):
+        start = h.end()
+        end = in_seq[i + 1].start() if i + 1 < len(in_seq) else len(text)
         body = text[h.start() : end].strip()
         after_head = text[start:end].strip()
-        number = int(h.group("num"))
-        sections.append(_classify(number, after_head, body))
+        sections.append(_classify(int(h.group("num")), after_head, body))
     return ParsedAct(bill=bill, title=title, sections=sections)
 
 

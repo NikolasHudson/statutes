@@ -47,3 +47,6 @@ prod.dump
 # Dev session logs / local tooling
 .devlogs/
 .screenshot-tool/
+
+# Claude Code agent worktrees
+.claude/worktrees/
