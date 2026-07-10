@@ -53,6 +53,23 @@ env = environ.Env(
     # applied to a residential lease). OFF by default like the other LLM
     # layers; no-op without an OpenAI key. See apps/corpus/services/applicability.py.
     RAG_APPLICABILITY_CHECK=(bool, False),
+    # PR9: web currency tripwire. At verification time, cases the answer
+    # relies on (and the citator doesn't flag) get one web-search call asking
+    # "still good law?"; the verdict persists as a CaseResearchNote on the
+    # decision node so future turns read it for free, and adverse findings
+    # queue for attorney review (corpus admin). Advisory-only; web content
+    # never enters generation. OFF by default like the other LLM layers.
+    RAG_WEB_CURRENCY_CHECK=(bool, False),
+    # Max NEW web checks per answer (cached notes are free). Bounds worst-case
+    # added latency on cache-miss turns to ~budget × timeout.
+    # Real web_search calls run 10-30s; the checker uses max_retries=0 so a
+    # timeout costs exactly this long, once. Worst case per answer =
+    # budget × timeout, and only on cache-miss turns; drop budget to 1 for
+    # latency-sensitive deploys.
+    RAG_WEB_CURRENCY_BUDGET=(int, 2),
+    RAG_WEB_CURRENCY_TIMEOUT=(int, 40),
+    # CLEAR notes re-check after this many days; ADVERSE notes persist.
+    RAG_WEB_CURRENCY_MAX_AGE_DAYS=(int, 30),
     # PR6: before answering, verify case-holding premises the USER asserts in the
     # question against the retrieved opinion, and inject a pre-answer caution so
     # the model doesn't anchor on a wrong premise. OFF by default; no-op without a
@@ -106,6 +123,22 @@ RAG_STALE_BLOCK_SEVERITY = env("RAG_STALE_BLOCK_SEVERITY")
 RAG_CLAIM_NLI = env("RAG_CLAIM_NLI")
 RAG_QUERY_REWRITE = env("RAG_QUERY_REWRITE")
 RAG_APPLICABILITY_CHECK = env("RAG_APPLICABILITY_CHECK")
+RAG_WEB_CURRENCY_CHECK = env("RAG_WEB_CURRENCY_CHECK")
+RAG_WEB_CURRENCY_BUDGET = env("RAG_WEB_CURRENCY_BUDGET")
+RAG_WEB_CURRENCY_TIMEOUT = env("RAG_WEB_CURRENCY_TIMEOUT")
+RAG_WEB_CURRENCY_MAX_AGE_DAYS = env("RAG_WEB_CURRENCY_MAX_AGE_DAYS")
+
+# Tests must NEVER make live LLM/web calls through the flag-gated verification
+# layers — the suites inject fake checkers explicitly. Turning a flag on in
+# .env (e.g. for the dev UI) must not leak real OpenAI/web traffic into
+# `manage.py test`, so the flags are forced off under the test runner.
+import sys  # noqa: E402
+
+if "test" in sys.argv:
+    RAG_CLAIM_NLI = False
+    RAG_PREMISE_CHECK = False
+    RAG_APPLICABILITY_CHECK = False
+    RAG_WEB_CURRENCY_CHECK = False
 RAG_PREMISE_CHECK = env("RAG_PREMISE_CHECK")
 RAG_CURRENCY_CHECK = env("RAG_CURRENCY_CHECK")
 DOCLING_SERVICE_URL = env("DOCLING_SERVICE_URL")

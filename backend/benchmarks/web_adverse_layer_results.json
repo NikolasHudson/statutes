@@ -1,0 +1,467 @@
+{
+  "web_model": "gpt-5-mini",
+  "summary": {
+    "cases_checked": 30,
+    "adverse": 4,
+    "corpus_verified": 4,
+    "citator_already_knew": 1,
+    "novel_catches": 3,
+    "unresolved": 0
+  },
+  "rows": [
+    {
+      "question": 1,
+      "case": "Supreme Court of Iowa, 1989",
+      "citation": "Swanger v. State, 445 N.W.2d 344",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Iowa Supreme Court decisions continue to cite Swanger for the proposition that the state appeal board has exclusive jurisdiction over ITCA claims and that exhaustion of that administrative process is jurisdictional.",
+        "source_url": "https://cases.justia.com/iowa/supreme-court/091010.pdf?ts=1396154076"
+      }
+    },
+    {
+      "question": 1,
+      "case": "Supreme Court of Iowa, 2017",
+      "citation": "Paula Segura and Ricardo Segura v. State of Iowa, 889 N.W.2d 215",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "I find no authority overruling or statutorily superseding Segura; it has been cited and applied by later Iowa decisions (e.g., Wagner v. State, 2020; Anderson v. State, 2024).",
+        "source_url": "https://cases.justia.com/iowa/supreme-court/2017/150203.pdf?ts=1490808560"
+      }
+    },
+    {
+      "question": 1,
+      "case": "Supreme Court of Iowa, 2016",
+      "citation": "Deborah E. McFadden, Individually and as Administrator of the Estate of Charles Walter McFadden, Jr. v. Department of Transportation, State of Iowa, 877 N.W.2d 119",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Anderson v. State, 2024 Iowa Supreme Court, cites McFadden, 877 N.W.2d 119 (Iowa 2016), treating McFadden as authoritative on exhaustion/presentment and stating McFadden found a claimant properly presented her claim.",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/2024/22-0759.html"
+      }
+    },
+    {
+      "question": 2,
+      "case": "Supreme Court of Iowa, 1992",
+      "citation": "Symonds v. Green, 493 N.W.2d 801",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Iowa Court of Appeals (Seldin Co. v. Calabro, 2005) cites Symonds v. Green and notes Symonds held the trial court lacked jurisdiction to hear a forcible-entry-and-detainer petition when the statutory three-day notice was defective.",
+        "source_url": "https://caselaw.findlaw.com/court/ia-court-of-appeals/1017269.html"
+      }
+    },
+    {
+      "question": 2,
+      "case": "Supreme Court of Iowa, 2009",
+      "citation": "War Eagle Village Apartments v. Plummer, 775 N.W.2d 714",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": true,
+        "kind": "superseded_by_statute",
+        "by": "Iowa Acts 2010, Senate File 2300 (amending Iowa Code \u00a7\u00a7562A.8, 562A.29A, 562B.27A, 648.3, 648.5; effective March 2, 2010)",
+        "evidence": "The legislative summary and bill materials state the Act was enacted \"in response to the Iowa Supreme Court\u2019s recent decision in War Eagle Village Apartments v. Plummer, 775 N.W.2d 714 (Iowa 2009)\" and that the Act takes effect March 2, 2010.",
+        "source_url": "https://www.legis.iowa.gov/docs/publications/SOL/401778.pdf"
+      },
+      "corpus_verification": {
+        "verified": true,
+        "matches": [
+          "statute 562A.8: Notice",
+          "statute 562A.29A: Method of service of notice on tenant",
+          "statute 562B.27A: Method of service of notice on tenant",
+          "statute 648.3: Notice to quit"
+        ]
+      },
+      "citator_knew": false
+    },
+    {
+      "question": 2,
+      "case": "Supreme Court of Iowa, 1946",
+      "citation": "Bates v. Bates, 24 N.W.2d 460",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Iowa Court of Appeals (Dec. 30, 2009) cited Bates v. Bates, 237 Iowa 1408, 24 N.W.2d 460 (1946) when discussing the sufficiency of a notice to terminate tenancy.",
+        "source_url": "https://law.justia.com/cases/iowa/court-of-appeals/2009/9-946.html"
+      }
+    },
+    {
+      "question": 3,
+      "case": "Supreme Court of Iowa, 1968",
+      "citation": "Vawter v. McKissick, 159 N.W.2d 538",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Iowa courts continue to cite and apply Vawter v. McKissick for the landlord's duty to mitigate and the requirement that efforts to relet be alleged and proved (see Harmsen v. Dr. MacDonald's, Inc., 403 N.W.2d 48 (Ct. App. 1987)).",
+        "source_url": "https://law.justia.com/cases/iowa/court-of-appeals/1987/86-118-0.html"
+      }
+    },
+    {
+      "question": 3,
+      "case": "Supreme Court of Iowa, 1992",
+      "citation": "Liberty Manor v. Rinnels, 487 N.W.2d 324",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Iowa courts continue to cite Liberty Manor v. Rinnels for the rule that failure to include the statutory right-to-cure language deprives the trial court of jurisdiction (e.g., Hunter v. City of Des Moines MHA, 2007).",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/2007/05-0375.html"
+      }
+    },
+    {
+      "question": 3,
+      "case": "Supreme Court of Iowa, 2016",
+      "citation": "Elyse De Stefano v. Apts. Downtown, Inc., 879 N.W.2d 155",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "No Iowa case or statute was found overruling or abrogating De Stefano; subsequent Iowa opinions cite and apply it (e.g., NCJC, Inc. v. WMG, 2021).",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/2016/140820.html"
+      }
+    },
+    {
+      "question": 4,
+      "case": "Supreme Court of Iowa, 2018",
+      "citation": "Gregory Baldwin v. City of Estherville, Iowa Matt Reineke, Individually and in His Official Capacity as an Officer of the Estherville Police Department and Matt Hellickson, Individually and in His Official Capacity as an Officer of the Estherville Police Department, 915 N.W.2d 259",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": true,
+        "kind": "caution",
+        "by": "Burnett v. Smith, No. 22\u20131010, filed May 5, 2023 (Iowa Supreme Court) (holding Godfrey v. State overruled and stating 'we no longer recognize a standalone cause of action for money damages under the Iowa Constitution'); and 2021 Iowa Acts, ch. 183 (codified at Iowa Code \u00a7\u00a7 669.14A, 670.4A, 669.26/670.14) (adding statutory qualified-immunity/pleading provisions)",
+        "evidence": "Burnett v. Smith (May 5, 2023): 'After careful consideration, we conclude that Godfrey should be overruled\u2026 we no longer recognize a standalone cause of action for money damages under the Iowa Constitution.'  The legislature also enacted 2021 Iowa Acts ch.183 (Iowa Code \u00a7\u00a7 669.14A, 670.4A) creating ",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/2023/22-1010.html"
+      },
+      "corpus_verification": {
+        "verified": true,
+        "matches": [
+          "statute 669.14A: Qualified immunity",
+          "statute 670.4A: Qualified immunity",
+          "statute 669.26: Money damages \u2014 nonwaiver of rights",
+          "statute 670.14: Money damages \u2014 nonwaiver of rights"
+        ]
+      },
+      "citator_knew": false
+    },
+    {
+      "question": 4,
+      "case": "Supreme Court of Iowa, 2023",
+      "citation": "Cory Burnett v. Phillip Smith and State of Iowa",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "'Godfrey v. State ... overruled by Burnett, 990 N.W.2d 289 (Iowa 2023).' (Burnett is being cited as controlling precedent and no subsequent Iowa decision or statute was found overruling Burnett.)",
+        "source_url": "https://cases.justia.com/iowa/supreme-court/2023-22-1010.pdf?ts=1683295429"
+      }
+    },
+    {
+      "question": 4,
+      "case": "Supreme Court of Iowa, 2017",
+      "citation": "Christopher J. Godfrey v. State of Iowa Terry Branstad, Governor of the State of Iowa, Individually and in His Official Capacity Kimberly Reynolds, Lieutenant Governor of the State of Iowa, Individually and in Her Official Capacity Jeffrey Boeyink, Chief of Staff to the Governor of the State of Iowa, Individually and in His Official Capacity Brenna Findley, Legal Counsel to the Governor of The, 898 N.W.2d 844",
+      "citator_status": "negative",
+      "citator_label": "overruled",
+      "web": {
+        "adverse": true,
+        "kind": "overruled",
+        "by": "Burnett v. Smith, 990 N.W.2d 289 (Iowa 2023, filed May 5, 2023)",
+        "evidence": "\"Accordingly, we have decided to overrule Godfrey and to restore the law as it existed in this state before 2017.\"",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/2023/22-1010.html"
+      },
+      "corpus_verification": {
+        "verified": true,
+        "matches": [
+          "case name: Cory Burnett v. Phillip Smith and State of Iowa"
+        ]
+      },
+      "citator_knew": true
+    },
+    {
+      "question": 5,
+      "case": "Supreme Court of Iowa, 2004",
+      "citation": "Pexa v. Auto Owners Insurance Co., 686 N.W.2d 150",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "As recently as 2018 the Iowa Supreme Court cited Pexa v. Auto Owners Ins., 686 N.W.2d 150, for the proposition that \"the amount charged, standing alone, is not evidence of the reasonable and fair value.\"",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/2018/17-0931.html"
+      }
+    },
+    {
+      "question": 5,
+      "case": "Supreme Court of Iowa, 1997",
+      "citation": "Waits v. United Fire & Casualty Co., 572 N.W.2d 565",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "The Iowa Supreme Court cited Waits v. United Fire & Cas. Co., 572 N.W.2d 565 (Iowa 1997), as authority in Hagenow v. Am. Family Mut. Ins. Co., No. 12\u20112088 (Iowa May 2, 2014), discussing Waits' rule on the meaning of 'legally entitled to recover'.",
+        "source_url": "https://cases.justia.com/iowa/supreme-court/2014-122088.pdf?ts=1399039504"
+      }
+    },
+    {
+      "question": 5,
+      "case": "Supreme Court of Iowa, 1963",
+      "citation": "Shewry v. Heuer, 121 N.W.2d 529",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Shewry v. Heuer (121 N.W.2d 529 (Iowa 1963)) continues to be cited by Iowa courts for the rule that a verdict awarding only medical expenses may be inadequate (see Cowan v. Flannery, 461 N.W.2d 155 (Iowa 1990); Allisa Dock v. Nicoletto, 2008), indicating no overruling or statutory supersession.",
+        "source_url": "https://law.justia.com/cases/iowa/court-of-appeals/2008/8-429-430.html"
+      }
+    },
+    {
+      "question": 6,
+      "case": "Supreme Court of Iowa, 1991",
+      "citation": "Committee on Professional Ethics & Conduct of the Iowa State Bar Ass'n v. Wenger, 469 N.W.2d 678",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Recent Iowa Supreme Court opinions (e.g., Iowa Sup. Ct. Att\u2019y Disciplinary Bd. v. Cramer, No. 25-1244 (2026)) cite Wenger, 469 N.W.2d 678 (Iowa 1991) as precedent and compare conduct to it rather than overruling or abrogating it.",
+        "source_url": "https://cases.justia.com/iowa/supreme-court/2026-25-1244.pdf?ts=1774015453"
+      }
+    },
+    {
+      "question": 6,
+      "case": "Supreme Court of Iowa, 2017",
+      "citation": "Iowa Supreme Court Attorney Disciplinary Board v. Springer, 904 N.W.2d 589",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "No credible negative treatment found \u2014 Springer, 904 N.W.2d 589 (Iowa 2017), is cited post-2017 by Iowa appellate courts (e.g., State v. Miller, Iowa Ct. App., Sept. 22, 2021, citing Springer).",
+        "source_url": "https://iowaappeals.com/wp-content/uploads/2022/02/Miller-Court-of-Appeals-Opinion.pdf"
+      }
+    },
+    {
+      "question": 6,
+      "case": "Supreme Court of Iowa, 2008",
+      "citation": "Iowa Supreme Court Attorney Disciplinary Board Vs. Todd Buchanan, 757 N.W.2d 251",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Iowa v. Van Ginkel (2012) cites Iowa Sup. Ct. Att\u2019y Disciplinary Bd. v. Buchanan, 757 N.W.2d 251 (Iowa 2008), treating Buchanan as precedent (e.g., noting a private reprimand is not discipline).",
+        "source_url": "https://cases.justia.com/iowa/supreme-court/110886.pdf?ts=1396154075"
+      }
+    },
+    {
+      "question": 7,
+      "case": "Supreme Court of Iowa, 1984",
+      "citation": "Kohrt Ex Rel. Kohrt v. Yetter, 344 N.W.2d 245",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "I found no authority overruling or abrogating Kohrt; Iowa courts continue to cite Kohrt for the proposition that \u00a7614.8\u2019s minor-tolling applies to \u00a7614.1(9) malpractice claims. ([law.justia.com](https://law.justia.com/cases/iowa/supreme-court/1984/83-772-0.html?utm_source=openai))",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/1984/83-772-0.html"
+      }
+    },
+    {
+      "question": 7,
+      "case": "Supreme Court of Iowa, 1989",
+      "citation": "Harden v. State, 434 N.W.2d 881",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Later Iowa decisions continue to cite Harden for the proposition that the tolling provision in Iowa Code \u00a7614.8 does not apply to statutes of limitation outside chapter 614.",
+        "source_url": "https://caselaw.findlaw.com/ia-supreme-court/1168510.html"
+      }
+    },
+    {
+      "question": 7,
+      "case": "Supreme Court of Iowa, 1980",
+      "citation": "Conner v. Fettkether, 294 N.W.2d 61",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "No Iowa decision or statute was found overruling or abrogating Conner; the Iowa Supreme Court continues to cite Conner approvingly (e.g., Harden v. State, 434 N.W.2d 881 (1989); Perkins v. Dallas Center\u2011Grimes, 2007).",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/2007/05-1075.html"
+      }
+    },
+    {
+      "question": 8,
+      "case": "Supreme Court of Iowa, 1990",
+      "citation": "Midwest Recovery Services v. Wolfe, 463 N.W.2d 73",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "The Iowa Supreme Court opinion (Midwest Recovery Servs. v. Wolfe, 463 N.W.2d 73 (Iowa 1990)) remains the controlling decision on the question and is cited by later Iowa decisions; I found no credible source showing it was overruled or superseded by statute.",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/1990/89-1656-0.html"
+      }
+    },
+    {
+      "question": 8,
+      "case": "Supreme Court of Iowa, 1979",
+      "citation": "State Ex Rel. Miller v. National Farmers Organization, 278 N.W.2d 905",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Subsequent Iowa decisions continue to cite State ex rel. Miller v. Nat\u2019l Farmers Org., 278 N.W.2d 905 (Iowa 1979), for application of the Iowa Consumer Credit Code to nonprofits and the holding that immediate membership dues are not an extension of credit, with no later Iowa opinion expressly overru",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/1979/62450-0.html"
+      }
+    },
+    {
+      "question": 8,
+      "case": "Supreme Court of Iowa, 2005",
+      "citation": "Chrysler Financial Co. v. Bergstrom, 703 N.W.2d 415",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "No Iowa appellate opinion or statutory amendment was found that expressly overrules or abrogates Chrysler Financial Co. v. Bergstrom (703 N.W.2d 415); Iowa Code \u00a7537.5201(7) continues to provide the bona fide-error defense.",
+        "source_url": "https://www.legis.iowa.gov/docs/code/2019/537.5201.pdf"
+      }
+    },
+    {
+      "question": 9,
+      "case": "Supreme Court of Iowa, 2019",
+      "citation": "Larry R. Hedlund v. State of Iowa, 930 N.W.2d 707",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Subsequent Iowa Supreme Court opinions continue to cite and apply Hedlund, 930 N.W.2d 707 (Iowa 2019), rather than overruling it (see Hedlund v. State, No. 22-0243, Iowa Supreme Court, June 9, 2023).",
+        "source_url": "https://cases.justia.com/iowa/supreme-court/2023/22-0243.pdf?ts=1686319491"
+      }
+    },
+    {
+      "question": 9,
+      "case": "Supreme Court of Iowa, 2023",
+      "citation": "Jim Nahas v. Polk County, Iowa",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": true,
+        "kind": "overruled",
+        "by": "Doe v. Western Dubuque Community School District, No. 24-0700, filed May 9, 2025 (Iowa) (2025 WL 1349436)",
+        "evidence": "\"To the extent Nahas said something different, we overrule it and follow the guidance of 1000 Friends of Iowa.\"",
+        "source_url": "https://cases.justia.com/iowa/supreme-court/2025/24-0700.pdf"
+      },
+      "corpus_verification": {
+        "verified": true,
+        "matches": [
+          "case name: Parent Father Doe and Parent Mother Doe, Individually on the"
+        ]
+      },
+      "citator_knew": false
+    },
+    {
+      "question": 9,
+      "case": "Supreme Court of Iowa, 2002",
+      "citation": "Bailiff v. Adams County Conference Board, 650 N.W.2d 621",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Iowa courts continue to cite Bailiff for the rule that \u201cequitable estoppel will not lie against a government agency except in exceptional circumstances.\u201d",
+        "source_url": "https://caselaw.findlaw.com/court/ia-supreme-court/1151607.html"
+      }
+    },
+    {
+      "question": 10,
+      "case": "Supreme Court of Iowa, 1996",
+      "citation": "Iowa Coal Mining Co. v. Monroe County, 555 N.W.2d 418",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "No subsequent Iowa Supreme Court opinion or statute appears to overrule or abrogate Iowa Coal Mining Co. v. Monroe County; the decision continues to be cited in later cases without being labeled overruled.",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/1996/555-n-w-2d-418.html"
+      }
+    },
+    {
+      "question": 10,
+      "case": "Supreme Court of Iowa, 1998",
+      "citation": "Quality Refrigerated Services, Inc. v. City of Spencer, 586 N.W.2d 202",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "Cited approvingly as recently as Worthwhile Wind, LLC v. Worth County Bd. of Supervisors (Iowa Apr. 24, 2026): \u201cno property owner has a vested right in the continuation of a particular zoning classification.\u201d",
+        "source_url": "https://law.justia.com/cases/iowa/supreme-court/2026/24-1813.html"
+      }
+    },
+    {
+      "question": 10,
+      "case": "Supreme Court of Iowa, 2016",
+      "citation": "Residential and Agricultural Advisory Committee, LLC, an Iowa Limited Liability Company Matt Mescher Allan R. Demmer Catherine Demmer Wayne Ameskamp Sharon Ameskamp Vernon Boge Donald Boge Mary Ann Rubly John R. Rubly Dolores Thier Larry Thier Gary Burkle Cindy Burkle Wayne Vorwald Linda Vorwald Jeff Pape Gerald Wolf And Joanne Wolf v. Dyersville City Council, Mayor Jame, 888 N.W.2d 24",
+      "citator_status": "unknown",
+      "citator_label": "",
+      "web": {
+        "adverse": false,
+        "kind": "none",
+        "by": "",
+        "evidence": "I found no authority overruling or statutorily superseding Residential & Agricultural Advisory Comm., 888 N.W.2d 24 (Iowa 2016); later Iowa appellate opinions continue to cite it approvingly for certiorari/rezoning principles.",
+        "source_url": "https://cases.justia.com/iowa/court-of-appeals/2024-23-1101.pdf?ts=1734538559"
+      }
+    }
+  ]
+}

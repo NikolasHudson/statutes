@@ -31,7 +31,7 @@ from typing import Any
 from django.conf import settings
 
 from apps.corpus.models import Source
-from apps.corpus.services import applicability, semantic_support
+from apps.corpus.services import applicability, semantic_support, web_currency
 from apps.corpus.services.lookups import validate_citations, verify_quotes
 from apps.corpus.services.retrieval import RetrievedContext, RetrievedPassage
 
@@ -329,6 +329,7 @@ def verify_answer(
     context: RetrievedContext | None = None,
     claim_checker: "semantic_support.SemanticChecker | None" = None,
     applicability_checker: "applicability.ApplicabilityChecker | None" = None,
+    web_currency_checker: "web_currency.WebCurrencyChecker | None" = None,
     premise_problems: list[dict[str, Any]] | None = None,
     question: str | None = None,
 ) -> dict[str, Any] | None:
@@ -482,12 +483,24 @@ def verify_answer(
         verdicts = app_checker.check(question, cited_authorities)
         domain_problems = [v for v in verdicts if v.get("fit") == "inapplicable"]
 
+    # PR9: web currency tripwire — for cases the answer relies on that the
+    # citator does NOT already flag, read (or create) the durable research
+    # note. Same opt-in posture as PR5/PR8; every failure degrades to no note.
+    web_currency_problems: list[dict[str, Any]] = []
+    wc_checker = web_currency_checker
+    if wc_checker is None and getattr(settings, "RAG_WEB_CURRENCY_CHECK", False):
+        wc_checker = web_currency.default_checker()
+    if wc_checker is not None and context is not None:
+        web_currency_problems = _web_currency_problems(
+            content, context, wc_checker, topic=question or ""
+        )
+
     premise_problems = premise_problems or []
     return {
         "ok": (
             not citation_problems and not quote_problems
             and not stale_silent and not misgrounded and not premise_problems
-            and not domain_problems
+            and not domain_problems and not web_currency_problems
         ),
         "source_label": primary.name if primary else "any loaded source",
         "citations_total": confident_total,
@@ -504,11 +517,89 @@ def verify_answer(
         # Additive (PR8): cited authorities whose body of law does not govern
         # the fact pattern (real cite, wrong domain).
         "domain_problems": domain_problems,
+        # Additive (PR9): relied-on cases with an adverse, corpus-verified web
+        # research note the citator doesn't know about yet.
+        "web_currency_problems": web_currency_problems,
         # Additive (PR6): the USER's case-holding premises the opinion doesn't
         # support (computed pre-answer by the chat layer; passed through here so
         # the trace + advisory carry one unified report).
         "premise_problems": premise_problems,
     }
+
+
+def _web_currency_problems(
+    content: str,
+    context: RetrievedContext,
+    checker: "web_currency.WebCurrencyChecker",
+    topic: str = "",
+) -> list[dict[str, Any]]:
+    """Relied-on caselaw with an adverse research note (PR9).
+
+    Reliance = the same anchor test as stale-use (case name / reporter cite
+    appears in the answer). Passages the citator already flags are skipped —
+    they get the stronger deterministic advisory. At most
+    ``RAG_WEB_CURRENCY_BUDGET`` NEW web checks run per answer (a stored note is
+    free); un-checked cases simply wait for a future turn's budget."""
+    budget = getattr(settings, "RAG_WEB_CURRENCY_BUDGET", 2)
+    norm = _normalize_for_match(content)
+    out: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for p in context.passages:
+        if p.source_slug != "iowa-caselaw" or p.cluster_id in seen:
+            continue
+        seen.add(p.cluster_id)
+        # Skip only NEGATIVE flags (those already draw the strong deterministic
+        # stale-use advisory). A CAUTION flag is deliberately still web-checked:
+        # phrase-derived labels can be wrong-sided — live failure 2026-07-10,
+        # Frohwein carried caution/"overruled-on-other-grounds" while Youngblut
+        # overruled it ON the relied-upon point, and deferring to the flag made
+        # PR9 silent exactly when it was needed.
+        if p.treatment.status == "negative":
+            continue
+        anchors = _passage_anchors(p)
+        if not anchors or not any(a in norm for a in anchors):
+            continue
+        note = web_currency.get_note(p.cluster_id)
+        if not web_currency.note_is_current(note):
+            if budget <= 0:
+                continue
+            budget -= 1
+            note = web_currency.check_and_store(
+                p.cluster_id, p.heading, p.citation, checker, topic=topic
+            )
+        if not web_currency.advisory_worthy(note):
+            continue
+        # Acknowledged-skip (mirrors stale-use): an answer that already tells
+        # the reader about the adverse authority handled it correctly — a
+        # "may have been overruled" advisory on top is redundant noise. The
+        # answer acknowledges when it names the claimed authority (case
+        # caption or a reporter cite from claimed_by appears in the text).
+        claimed_norm = _normalize_for_match(note.claimed_by)
+        name = claimed_norm.split(",")[0].strip()
+        acknowledged = (
+            bool(name and _CASE_V_RE.search(name) and name in norm)
+            or any(c in norm for c in _REPORTER_RE.findall(claimed_norm))
+            # Statute-superseded notes: naming the superseding SECTION is the
+            # acknowledgment (an answer already citing § 668.14A has engaged
+            # the supersession; the advisory would be redundant).
+            or any(
+                s.lower() in norm
+                for s in web_currency._SECTION_RE.findall(note.claimed_by or "")
+            )
+        )
+        if acknowledged:
+            continue
+        out.append(
+            {
+                "citation": p.citation or p.heading,
+                "kind": note.adverse_kind,
+                "by": note.claimed_by,
+                "evidence": note.evidence,
+                "source_url": note.source_url,
+                "review_status": note.review_status,
+            }
+        )
+    return out
 
 
 def render_advisory(report: dict[str, Any]) -> str:
@@ -567,6 +658,26 @@ def render_advisory(report: dict[str, Any]) -> str:
             f"- **{d['raw']}**{heading_txt} may not govern this fact "
             f"pattern{reason_txt}. Check whether an on-domain provision "
             f"controls before relying on it."
+        )
+    for w in report.get("web_currency_problems", []):
+        kind_txt = {
+            "overruled": "overruled",
+            "superseded_by_statute": "superseded by statute",
+            "caution": "qualified",
+        }.get(w.get("kind", ""), "negatively treated")
+        by = w.get("by") or "a later authority"
+        ev = (w.get("evidence") or "").strip()
+        ev_txt = (f" (“{ev[:140].rstrip()}…”)" if len(ev) > 140
+                  else (f" (“{ev}”)" if ev else ""))
+        reviewed = w.get("review_status") == "approved"
+        confidence_txt = (
+            "" if reviewed
+            else " This is an automated research note pending attorney review."
+        )
+        lines.append(
+            f"- Secondary sources indicate **{w['citation']}** may have been "
+            f"{kind_txt} by {by}{ev_txt}.{confidence_txt} Verify currency "
+            f"before relying on it."
         )
     for pp in report.get("premise_problems", []):
         # Currency axis (PR7): the premise rests on a case that is no longer good

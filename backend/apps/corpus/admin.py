@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 
 from .models import (
+    CaseResearchNote,
     CitationFormat,
     CrossReference,
     Jurisdiction,
@@ -103,3 +104,36 @@ class CrossReferenceAdmin(admin.ModelAdmin):
     list_filter = ("kind",)
     search_fields = ("external_text", "to_node__path", "from_version__node__path")
     autocomplete_fields = ("from_version", "to_node")
+
+
+@admin.register(CaseResearchNote)
+class CaseResearchNoteAdmin(admin.ModelAdmin):
+    """The attorney review queue for automated currency findings (PR9).
+
+    Approve = the finding is real (and a citator-gap candidate for the
+    supersession pipeline); Reject = false alarm, suppressed from advisories
+    everywhere (and the rejection sticks across re-checks of the same claim).
+    """
+
+    list_display = (
+        "node", "status", "adverse_kind", "claimed_by", "corpus_verified",
+        "review_status", "checked_at",
+    )
+    list_filter = ("status", "adverse_kind", "review_status", "corpus_verified")
+    search_fields = ("node__heading", "claimed_by", "evidence")
+    readonly_fields = (
+        "node", "kind", "status", "adverse_kind", "claimed_by", "evidence",
+        "source_url", "corpus_verified", "corpus_matches", "model",
+        "checked_at", "created_at",
+    )
+    actions = ["approve_notes", "reject_notes"]
+
+    @admin.action(description="Approve selected findings (real)")
+    def approve_notes(self, request, queryset):
+        updated = queryset.update(review_status=CaseResearchNote.Review.APPROVED)
+        self.message_user(request, f"{updated} note(s) approved.", messages.SUCCESS)
+
+    @admin.action(description="Reject selected findings (false alarm)")
+    def reject_notes(self, request, queryset):
+        updated = queryset.update(review_status=CaseResearchNote.Review.REJECTED)
+        self.message_user(request, f"{updated} note(s) rejected.", messages.SUCCESS)

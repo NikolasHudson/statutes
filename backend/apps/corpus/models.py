@@ -408,3 +408,69 @@ class ReporterCitation(models.Model):
 
     def __str__(self):
         return f"{self.volume} {self.reporter} {self.page}"
+
+
+class CaseResearchNote(models.Model):
+    """PR9: a durable, per-case research note written by automated currency
+    checks (today: the web tripwire) and read by every future assistant turn.
+
+    The design promise: the FIRST answer that relies on a case pays for the
+    web check; the verdict is stored HERE, on the case, so every later answer
+    — any surface, any user — reads the note instead of re-searching. Adverse
+    notes queue for attorney review in the admin; an approved note is a
+    citator-gap candidate for the supersession pipeline (Accuracy Program §2a),
+    a rejected one is suppressed everywhere. Notes NEVER enter answer
+    generation — they only add advisory caution at verification time.
+    """
+
+    class Kind(models.TextChoices):
+        WEB_CURRENCY = "web_currency", "Web currency check"
+
+    class Status(models.TextChoices):
+        CLEAR = "clear", "Clear (good law per source)"
+        ADVERSE = "adverse", "Adverse finding"
+
+    class Review(models.TextChoices):
+        PENDING = "pending", "Pending review"
+        APPROVED = "approved", "Approved (real)"
+        REJECTED = "rejected", "Rejected (false alarm)"
+
+    node = models.ForeignKey(
+        Node, on_delete=models.CASCADE, related_name="research_notes",
+        help_text="The decision (cluster) node the note is about.",
+    )
+    kind = models.CharField(
+        max_length=32, choices=Kind.choices, default=Kind.WEB_CURRENCY
+    )
+    status = models.CharField(max_length=16, choices=Status.choices)
+    # Adverse detail — empty for CLEAR notes.
+    adverse_kind = models.CharField(
+        max_length=32, blank=True,
+        help_text="overruled | superseded_by_statute | caution",
+    )
+    claimed_by = models.CharField(
+        max_length=300, blank=True,
+        help_text="The overruling case / superseding statute the source names.",
+    )
+    evidence = models.TextField(blank=True)
+    source_url = models.CharField(max_length=500, blank=True)
+    # Did the claimed authority resolve against OUR corpus? Unverified adverse
+    # claims are stored (for review) but never surfaced in advisories.
+    corpus_verified = models.BooleanField(default=False)
+    corpus_matches = models.JSONField(default=list, blank=True)
+    review_status = models.CharField(
+        max_length=16, choices=Review.choices, default=Review.PENDING
+    )
+    model = models.CharField(max_length=40, blank=True)  # web model used
+    checked_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["node", "kind"], name="research_note_one_per_node_kind"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.kind}:{self.status} on {self.node_id}"

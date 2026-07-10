@@ -83,7 +83,11 @@ _BIND_WINDOW = 130
 # (supported/no_claim → silent) is the precision backstop, so this can broaden
 # recall without producing false warnings. NB "in" is deliberately excluded — it
 # is too common in non-holding references ("In Smith, the plaintiff argued …").
-_HOLDING_PREP_RE = re.compile(r"\b(?:under|per|pursuant\s+to|according\s+to)\s+$", re.I)
+_HOLDING_PREP_RE = re.compile(
+    r"\b(?:under|per|pursuant\s+to|according\s+to|rely(?:ing)?\s+on|based\s+on|"
+    r"in\s+reliance\s+on|citing)\s+$",
+    re.I,
+)
 
 
 @dataclass
