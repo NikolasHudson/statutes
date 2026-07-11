@@ -102,8 +102,14 @@ def verify_key(raw_key):
         return None
     prefix = raw_key[:8]
     hashed = hashlib.sha256(raw_key.encode()).hexdigest()
+    # user__is_active: deactivating an account must be a full kill-switch —
+    # sessions already die via ModelBackend.get_user, and this keeps a still-
+    # valid API key from surviving the deactivation.
     return APIKey.objects.filter(
-        prefix=prefix, hashed_key=hashed, revoked_at__isnull=True
+        prefix=prefix,
+        hashed_key=hashed,
+        revoked_at__isnull=True,
+        user__is_active=True,
     ).select_related("user").first()
 
 

@@ -1,10 +1,14 @@
-// Typed API helpers for the staff-only /api/admin/usage/* endpoints that
-// power the admin usage dashboard. Modeled on lib/iowa-account.ts — same
-// session-cookie fetch + AccountError shape so callers can branch on
-// status (401 signed out / 403 not staff). All endpoints are GETs, so no
-// CSRF header is needed.
+// Typed API helpers for the staff-only /api/admin/* endpoints: the usage
+// dashboard (/api/admin/usage/*, GETs) and user management
+// (/api/admin/users/*, which also PATCHes). Modeled on lib/iowa-account.ts —
+// same session-cookie fetch + AccountError shape so callers can branch on
+// status (401 signed out or not staff), with the CSRF header attached on
+// unsafe methods.
 
+import { csrfHeaders } from "./csrf";
 import { AccountError } from "./iowa-account";
+
+const UNSAFE = /^(POST|PUT|PATCH|DELETE)$/i;
 
 export type UsageRange = 7 | 30 | 90;
 
@@ -64,10 +68,17 @@ export type UsageUser = {
 	last_active: string | null;
 };
 
-async function request<T>(path: string): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+	const method = init.method ?? "GET";
+	const csrf = UNSAFE.test(method) ? await csrfHeaders() : {};
 	const r = await fetch(path, {
 		credentials: "include",
-		headers: { "Content-Type": "application/json" },
+		...init,
+		headers: {
+			"Content-Type": "application/json",
+			...csrf,
+			...(init.headers ?? {}),
+		},
 	});
 	const text = await r.text();
 	let body: unknown = null;
@@ -123,4 +134,127 @@ export const getUsageDaily = (days: UsageRange, filter?: UsageFilter) =>
 export const getUsageUsers = (days: UsageRange, filter?: UsageFilter) =>
 	request<{ users: UsageUser[] }>(
 		`/api/admin/usage/users?${usageQuery(days, filter)}`,
+	);
+
+// ---------------------------------------------------------------------------
+// User management — /api/admin/users/*
+// Mirrors backend apps/api/admin_users.py. Writes require CSRF (handled by
+// request()) and are guarded server-side: staff only, superuser required for
+// staff-flag changes / edits to staff accounts, all mutations audited.
+// ---------------------------------------------------------------------------
+
+export type AdminUserStatusFilter = "" | "active" | "deactivated" | "staff";
+
+export type AdminUserRow = {
+	id: number;
+	email: string;
+	name: string;
+	tier: UsageTier;
+	is_staff: boolean;
+	is_superuser: boolean;
+	is_active: boolean;
+	date_joined: string;
+	last_login: string | null;
+	onboarding_completed: boolean;
+	active_api_keys: number;
+	// Month-to-date spend vs. the monthly budget (usage-dashboard semantics).
+	month_cost_usd: number;
+	budget_usd: number | null;
+	budget_used_pct: number | null;
+	budget_status: UsageUserStatus;
+};
+
+export type AdminUsersResponse = {
+	total: number;
+	users: AdminUserRow[];
+};
+
+export type AdminApiKey = {
+	id: number;
+	name: string;
+	prefix: string;
+	created_at: string;
+	last_used_at: string | null;
+};
+
+export type AdminUserProfile = {
+	organization: string;
+	role: string;
+	bar_number: string;
+	primary_jurisdiction: string;
+	phone: string;
+	city: string;
+	region: string;
+	timezone: string;
+	tos_version: string;
+	tos_accepted_at: string | null;
+};
+
+export type AdminAuditEvent = {
+	id: number;
+	event_type: string;
+	outcome: "success" | "failure" | "blocked";
+	created_at: string;
+	source_ip: string | null;
+	detail: Record<string, unknown>;
+};
+
+export type AdminUserDetail = {
+	user: AdminUserRow;
+	first_name: string;
+	last_name: string;
+	// Per-user override of the tier's monthly budget; null = tier default.
+	monthly_budget_override_usd: number | null;
+	profile: AdminUserProfile;
+	api_keys: AdminApiKey[];
+	usage: {
+		month_cost_usd: number;
+		days30_cost_usd: number;
+		days30_tokens: number;
+		last_llm_activity: string | null;
+	};
+	events: AdminAuditEvent[];
+	// UI hints only — the server re-checks both on every write.
+	can_edit: boolean;
+	can_edit_staff_flag: boolean;
+};
+
+// All optional; monthly_budget_usd: null clears the per-user override.
+export type AdminUserPatch = {
+	tier?: UsageTier;
+	monthly_budget_usd?: number | null;
+	is_active?: boolean;
+	is_staff?: boolean;
+};
+
+export const getAdminUsers = (opts: {
+	q?: string;
+	tier?: string;
+	status?: AdminUserStatusFilter;
+	limit?: number;
+	offset?: number;
+}) => {
+	const params = new URLSearchParams();
+	if (opts.q) params.set("q", opts.q);
+	if (opts.tier) params.set("tier", opts.tier);
+	if (opts.status) params.set("status", opts.status);
+	if (opts.limit) params.set("limit", String(opts.limit));
+	if (opts.offset) params.set("offset", String(opts.offset));
+	const qs = params.toString();
+	return request<AdminUsersResponse>(`/api/admin/users${qs ? `?${qs}` : ""}`);
+};
+
+export const getAdminUser = (id: number) =>
+	request<AdminUserDetail>(`/api/admin/users/${id}`);
+
+export const patchAdminUser = (id: number, data: AdminUserPatch) =>
+	request<AdminUserDetail>(`/api/admin/users/${id}`, {
+		method: "PATCH",
+		body: JSON.stringify(data),
+	});
+
+export const revokeAdminUserKey = (userId: number, keyId: number) =>
+	request<{ status: string; id: number }>(
+		`/api/admin/users/${userId}/api-keys/${keyId}/revoke`,
+		{ method: "POST" },
 	);

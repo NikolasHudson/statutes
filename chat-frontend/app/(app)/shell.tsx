@@ -19,6 +19,7 @@ import {
 	SlidersHorizontalIcon,
 	SunIcon,
 	TriangleAlertIcon,
+	UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -62,6 +63,7 @@ const ADMIN_NAV: NavGroup = {
 	group: "Admin",
 	items: [
 		{ href: "/admin/usage", label: "Usage & spend", icon: ChartColumnIcon },
+		{ href: "/admin/users", label: "Users", icon: UsersIcon },
 	],
 };
 
@@ -235,9 +237,7 @@ export function V2Shell({ children }: { children: React.ReactNode }) {
 						    column is collapsed. */}
 						<button
 							type="button"
-							aria-label={
-								desktopHidden ? "Show navigation" : "Hide navigation"
-							}
+							aria-label={desktopHidden ? "Show navigation" : "Hide navigation"}
 							title={desktopHidden ? "Show navigation" : "Hide navigation"}
 							onClick={() => setDesktopHidden((h) => !h)}
 							className={cn(

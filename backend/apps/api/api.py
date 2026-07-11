@@ -33,6 +33,7 @@ from apps.mail.api import mail_router
 
 from .accounts import account_router, auth_router
 from .admin_usage import admin_usage_router
+from .admin_users import admin_users_router
 from .auth import api_key_auth, enforce_rate_limit, require_feature
 from .browse import browse_router
 from .research import research_router
@@ -75,6 +76,9 @@ api.add_router("/research", research_router)
 # Staff-only usage/spend aggregates for the SPA admin dashboard. Auth lives
 # on the router (StaffSessionAuth): session cookie + is_staff, 401 otherwise.
 api.add_router("/admin/usage", admin_usage_router)
+# Staff-only user management (list/detail/edit accounts, revoke keys). Same
+# StaffSessionAuth; writes are CSRF-checked by the cookie auth and audited.
+api.add_router("/admin/users", admin_users_router)
 # Postmark inbound webhook (apps/mail). Shared-secret ?token= auth inside the
 # view; no session/API-key auth — the caller is Postmark, not a user.
 api.add_router("/email", mail_router)

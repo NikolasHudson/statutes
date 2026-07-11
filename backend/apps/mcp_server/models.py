@@ -235,7 +235,9 @@ def verify_access_token(raw: str) -> OAuthToken | None:
         return None
     token = (
         OAuthToken.objects.filter(
-            access_hashed=hash_token(raw), revoked_at__isnull=True
+            access_hashed=hash_token(raw),
+            revoked_at__isnull=True,
+            user__is_active=True,
         )
         .select_related("user")
         .first()
@@ -259,7 +261,9 @@ def verify_refresh_token(raw: str) -> OAuthToken | None:
         return None
     token = (
         OAuthToken.objects.filter(
-            refresh_hashed=hash_token(raw), revoked_at__isnull=True
+            refresh_hashed=hash_token(raw),
+            revoked_at__isnull=True,
+            user__is_active=True,
         )
         .select_related("user")
         .first()

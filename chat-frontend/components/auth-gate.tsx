@@ -33,6 +33,9 @@ export type AuthUser = {
 	onboarding_completed: boolean;
 	// Staff flag from /api/auth/me — gates the Admin nav + /admin routes.
 	is_staff?: boolean;
+	// Gates the staff-flag controls on /admin/users. Display-only — the
+	// server re-checks superuser on every admin write.
+	is_superuser?: boolean;
 };
 
 // Session-scoped flag so the first-login redirect into the wizard fires once

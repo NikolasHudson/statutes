@@ -56,6 +56,10 @@ class AuditEvent(models.Model):
         ONBOARDING_COMPLETED = "onboarding_completed", "Onboarding completed"
         API_KEY_CREATE = "api_key_create", "API key created"
         API_KEY_REVOKE = "api_key_revoke", "API key revoked"
+        # Staff acting on ANOTHER user's account via /api/admin/users. The
+        # actor is the staff member; the target lives in ``detail`` so the
+        # trail answers "who changed whose account, and what changed".
+        ADMIN_USER_CHANGE = "admin_user_change", "Admin changed a user account"
 
     class Outcome(models.TextChoices):
         SUCCESS = "success", "Success"
