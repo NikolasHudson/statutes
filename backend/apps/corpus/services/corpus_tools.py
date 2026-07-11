@@ -81,19 +81,21 @@ def _node_dict(node: Node) -> dict[str, Any]:
     }
     if node.source.slug == "iowa-caselaw":
         _annotate_caselaw(node, d)
-    # Attorney-curated construction/scope note (CaseResearchNote kind=
-    # construction): guidance like "'sold and served' is conjunctive;
-    # off-premises carry-out sales are outside §123.92 (Eddy)". Injected into
-    # the tool result so the model reads it WITH the authority, on every
-    # surface. Rejected notes never surface. One indexed query per node; the
-    # table is tiny and hits are rare.
-    note = (
-        node.research_notes.filter(kind="construction")
+    # Research notes injected into the tool result so the model reads them
+    # WITH the authority, on every surface: attorney construction/scope
+    # guidance and act-supersession warnings (a signed session law repealed
+    # this section after our Code edition's text). Supersession outranks
+    # construction when both exist — currency beats nuance. Rejected notes
+    # never surface. One indexed query per node; hits are rare.
+    notes = list(
+        node.research_notes.filter(kind__in=("act_supersession", "construction"))
         .exclude(review_status="rejected")
         .order_by("-checked_at")
-        .first()
     )
-    if note is not None:
+    if notes:
+        note = next(
+            (n for n in notes if n.kind == "act_supersession"), notes[0]
+        )
         d["research_note"] = note.evidence[:600] + (
             f" (See {note.claimed_by[:150]}.)" if note.claimed_by else ""
         )

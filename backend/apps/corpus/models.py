@@ -313,6 +313,10 @@ class CrossReferenceSource(models.TextChoices):
     # rule head's parenthetical ("441—65.2(234)" → ch. 234). The
     # statute↔regulation axis of the graph. backfill_iac_enabling_statutes.
     REG_ENABLING = "reg_enabling", "Regulation enabling statute"
+    # Act section → the Iowa Code section/chapter it amends/repeals/creates,
+    # from the legislature's sections-amended table joined with the parsed
+    # lead-ins. The current-awareness axis. backfill_acts_code_edges.
+    ACT_AFFECTS = "act_affects", "Act affects statute"
 
 
 class CrossReference(models.Model):
@@ -434,6 +438,12 @@ class CaseResearchNote(models.Model):
         # Surfaced INSIDE tool results via corpus_tools._node_dict so the
         # model reads it WITH the authority, on every surface.
         CONSTRUCTION = "construction", "Construction / scope note"
+        # A session law repealed/struck this Code section after our Code
+        # edition's text — the statute-side Madden trap. Written by
+        # backfill_acts_code_edges from the legislature's own amended table
+        # (deterministic, corpus_verified by construction); surfaced like
+        # construction notes so the model sees the warning WITH the section.
+        ACT_SUPERSESSION = "act_supersession", "Superseded by session law"
 
     class Status(models.TextChoices):
         CLEAR = "clear", "Clear (good law per source)"
