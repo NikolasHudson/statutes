@@ -167,6 +167,12 @@ class OpenAIRetrievalJudge:
         try:
             client = OpenAI(api_key=key)
             resp = client.chat.completions.create(**kwargs)
+            # Token accounting (lazy import — see semantic_support for why).
+            from apps.api.usage import FEATURE_RETRIEVAL_JUDGE, emit_completion_usage
+
+            emit_completion_usage(
+                FEATURE_RETRIEVAL_JUDGE, resp, fallback_model=self.model
+            )
             return _parse_verdict(resp.choices[0].message.content or "")
         except Exception as exc:  # noqa: BLE001 — judge failure must not kill the eval
             log.exception("retrieval judge call failed")

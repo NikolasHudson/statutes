@@ -100,6 +100,12 @@ class OpenAIApplicabilityChecker:
         try:
             client = OpenAI(api_key=self._key())
             completion = client.chat.completions.create(**kwargs)
+            # Token accounting (lazy import — see semantic_support for why).
+            from apps.api.usage import FEATURE_APPLICABILITY, emit_completion_usage
+
+            emit_completion_usage(
+                FEATURE_APPLICABILITY, completion, fallback_model=self.model
+            )
             data = json.loads(completion.choices[0].message.content or "{}")
         except Exception:  # noqa: BLE001 — a model failure must not break verify
             logger.exception("applicability check failed")

@@ -43,6 +43,7 @@ from apps.api.search_common import (
 )
 from apps.api.session_auth import session_auth
 from apps.api.trace_capture import record_search_log
+from apps.api.usage import collect_usage
 from apps.corpus.models import Court, CrossReference, Node, Source
 from apps.corpus.services.lookups import lookup_citation
 from apps.corpus.services.retrieval import (
@@ -296,7 +297,25 @@ def _facets_payload_exact(counts: dict, basis: str) -> dict:
     }
 
 
+def _collect_search_usage(view):
+    """Attribute LLM/embedding spend inside a search (query rewrite, vector
+    embed, rerank) to the signed-in searcher as one LlmUsage turn. Signature-
+    preserving (functools.wraps) so django-ninja still sees the real params."""
+    import functools
+
+    @functools.wraps(view)
+    def wrapper(request, *args, **kwargs):
+        user = getattr(request, "user", None)
+        if user is not None and not user.is_authenticated:
+            user = None
+        with collect_usage(user):
+            return view(request, *args, **kwargs)
+
+    return wrapper
+
+
 @research_router.get("/search", auth=session_auth)
+@_collect_search_usage
 def research_search(
     request,
     q: str,

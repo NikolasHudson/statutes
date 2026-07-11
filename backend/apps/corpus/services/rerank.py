@@ -120,6 +120,15 @@ class VoyageReranker:
                 model=self.model,
                 top_k=top_k,
             )
+            # Token accounting (lazy import — see semantic_support for why).
+            from apps.api.usage import FEATURE_RERANK, emit_usage
+
+            emit_usage(
+                FEATURE_RERANK,
+                self.model,
+                getattr(result, "total_tokens", 0) or 0,
+                0,
+            )
             # result.results: objects with .index into the docs list, already
             # sorted by descending relevance.
             return [

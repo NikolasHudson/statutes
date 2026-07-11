@@ -71,6 +71,13 @@ class VoyageClient:
             max_retries=self.max_retries,
         )
         result = client.embed(texts, model=self.model, input_type=input_type)
+        # Token accounting (lazy import — see semantic_support for why).
+        # Embeddings are input-only; Voyage reports one total_tokens figure.
+        from apps.api.usage import FEATURE_EMBEDDING, emit_usage
+
+        emit_usage(
+            FEATURE_EMBEDDING, self.model, getattr(result, "total_tokens", 0) or 0, 0
+        )
         return [list(vec) for vec in result.embeddings]
 
 

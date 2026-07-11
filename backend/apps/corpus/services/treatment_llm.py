@@ -202,6 +202,12 @@ class OpenAITreatmentClassifier:
         try:
             client = OpenAI(api_key=key)
             resp = client.chat.completions.create(**kwargs)
+            # Token accounting (lazy import — see semantic_support for why).
+            # Batch runs have no collector open, so these land unattributed —
+            # which is correct: citator spend is platform spend, not a user's.
+            from apps.api.usage import FEATURE_TREATMENT, emit_completion_usage
+
+            emit_completion_usage(FEATURE_TREATMENT, resp, fallback_model=self.model)
             text = resp.choices[0].message.content or ""
         except Exception:  # noqa: BLE001 — a model failure must not crash a batch
             log.exception("treatment v2 classify failed")

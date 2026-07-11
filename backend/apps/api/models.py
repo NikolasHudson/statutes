@@ -154,6 +154,68 @@ class VerificationRun(models.Model):
         )
 
 
+class LlmUsage(models.Model):
+    """One row per LLM round-trip: token counts and snapshotted cost.
+
+    The inverse confidentiality posture of its siblings above: ChatTrace
+    keeps the CONTENT without the user; this keeps the USER without the
+    content. Numbers only — model id, token counts, micro-dollar cost —
+    so per-user spend metering never becomes a per-user transcript.
+
+    ``request_id`` groups the rows of one turn (the chat completion plus
+    any verification / rewrite side-calls it triggered), written by
+    ``apps.api.usage.collect_usage``; distinct request_ids = billable
+    turns. ``user`` is null for background traffic (cron jobs, shell)
+    that still counts toward platform totals.
+
+    ``cost_microusd`` is computed at write time from the price table in
+    ``apps.api.usage`` — a snapshot, deliberately: repricing a model must
+    never rewrite what past traffic actually cost.
+    """
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    # SET_NULL: deleting a user anonymizes their usage history rather than
+    # deleting it — the platform-total books must not change retroactively.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="llm_usage",
+    )
+
+    # One UUID per collected turn; null for uncollected background emissions.
+    request_id = models.UUIDField(null=True, blank=True)
+
+    # "chat" | "email" | "verification" | "query_rewrite" | ... — slugs
+    # centralized in apps.api.usage so emitters and dashboard can't drift.
+    feature = models.CharField(max_length=32)
+    model = models.CharField(max_length=64, blank=True)
+
+    prompt_tokens = models.PositiveBigIntegerField(default=0)
+    completion_tokens = models.PositiveBigIntegerField(default=0)
+
+    # Integer micro-dollars (1_000_000 = $1). Integer so aggregation is exact.
+    cost_microusd = models.BigIntegerField(default=0)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            # Budget enforcement: per-user sums over today / this month.
+            models.Index(fields=("user", "created_at")),
+            models.Index(fields=("feature",)),
+            models.Index(fields=("request_id",)),
+        ]
+
+    def __str__(self) -> str:
+        who = self.user_id or "—"
+        return (
+            f"{self.created_at:%Y-%m-%d %H:%M} · u{who} · {self.feature} "
+            f"· {self.model} · {self.prompt_tokens}+{self.completion_tokens}tok"
+        )
+
+
 class SearchLog(models.Model):
     """One row per /api/research/search call.
 

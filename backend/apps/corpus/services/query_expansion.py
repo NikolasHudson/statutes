@@ -70,6 +70,18 @@ class AnthropicExpander:
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": query}],
             )
+            # Token accounting (lazy import — see semantic_support for why).
+            # Anthropic usage is input/output tokens.
+            from apps.api.usage import FEATURE_QUERY_EXPANSION, emit_usage
+
+            usage = getattr(resp, "usage", None)
+            if usage is not None:
+                emit_usage(
+                    FEATURE_QUERY_EXPANSION,
+                    getattr(resp, "model", "") or self.model,
+                    getattr(usage, "input_tokens", 0) or 0,
+                    getattr(usage, "output_tokens", 0) or 0,
+                )
             text = "".join(
                 block.text for block in resp.content if getattr(block, "type", "") == "text"
             ).strip()

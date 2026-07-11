@@ -63,6 +63,7 @@ export const THEMES: Record<ThemeName, Record<string, string>> = {
 		"--cds-link": "#0f62fe",
 		"--cds-danger-text": "#da1e28",
 		"--cds-success-text": "#24a148",
+		"--cds-purple-text": "#6929c4",
 	},
 	g100: {
 		"--cds-bg": "#161616",
@@ -79,6 +80,7 @@ export const THEMES: Record<ThemeName, Record<string, string>> = {
 		"--cds-link": "#78a9ff",
 		"--cds-danger-text": "#fa4d56",
 		"--cds-success-text": "#42be65",
+		"--cds-purple-text": "#be95ff",
 	},
 };
 
@@ -697,11 +699,19 @@ export function LineTabs<T extends string>({
 // Tags — square, status colors per docs/carbon-design-system.md
 // ---------------------------------------------------------------------------
 
-export type TagKind = "gray" | "blue" | "green" | "red" | "yellow" | "outline";
+export type TagKind =
+	| "gray"
+	| "blue"
+	| "green"
+	| "red"
+	| "yellow"
+	| "purple"
+	| "outline";
 
 const TAG_STYLES: Record<TagKind, string> = {
 	gray: "bg-[var(--cds-layer)] border border-[var(--cds-border)] text-[var(--cds-text-2)]",
 	blue: "bg-[#0f62fe]/15 text-[var(--cds-link)]",
+	purple: "bg-[#8a3ffc]/15 text-[var(--cds-purple-text)]",
 	green: "bg-[#24a148]/15 text-[var(--cds-success-text)]",
 	red: "bg-[#da1e28]/15 text-[var(--cds-danger-text)]",
 	yellow: "bg-[#f1c21b]/20 text-[var(--cds-text)]",

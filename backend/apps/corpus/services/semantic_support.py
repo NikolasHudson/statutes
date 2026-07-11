@@ -199,6 +199,14 @@ class OpenAIChecker:
         try:
             client = OpenAI(api_key=key)
             resp = client.chat.completions.create(**kwargs)
+            # Token accounting (lazy import: corpus must not hard-depend on
+            # the api app at module load). Attributed to the active turn's
+            # user when a collector is open, unattributed otherwise.
+            from apps.api.usage import FEATURE_VERIFICATION, emit_completion_usage
+
+            emit_completion_usage(
+                FEATURE_VERIFICATION, resp, fallback_model=self.model
+            )
             text = resp.choices[0].message.content or ""
             return _parse_verdicts(text, len(claims))
         except Exception:  # noqa: BLE001 — never let a model failure break verify

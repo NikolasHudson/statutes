@@ -33,6 +33,7 @@ from django.utils import timezone
 
 from apps.api.accounts import _require_login
 from apps.api.chat import ALLOWED_CHAT_MODELS, _bump, _enforce_chat_quota
+from apps.api.usage import collect_usage
 from apps.api.session_auth import session_auth
 from apps.api.services.extract import ExtractionError, extract_text
 from apps.api.trace_capture import record_verification_run
@@ -122,6 +123,15 @@ def verify_document_endpoint(
 def _stream_verify_events(*, user, source_name: str, text: str, semantic):
     """Drive ``iter_verify_document`` and serialize each event to NDJSON. Records
     the run to the audit log on the way out (success or failure)."""
+    # The semantic checker's OpenAI calls emit usage; attribute them to the
+    # user who submitted the document (numbers only, never its content).
+    with collect_usage(user):
+        yield from _verify_events_inner(
+            user=user, source_name=source_name, text=text, semantic=semantic
+        )
+
+
+def _verify_events_inner(*, user, source_name: str, text: str, semantic):
     started = time.monotonic()
     findings: list[dict] = []
     summary: dict = {"total": 0, "green": 0, "yellow": 0, "red": 0}

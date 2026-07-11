@@ -93,6 +93,9 @@ class UserOut(Schema):
     # Lets the SPA decide on first load whether to route into the onboarding
     # wizard — without a second round-trip to fetch the full profile.
     onboarding_completed: bool
+    # Gates the Admin section in the SPA nav. Display-only there — the
+    # /api/admin/* endpoints enforce staffness server-side regardless.
+    is_staff: bool = False
 
 
 class CreateKeyRequest(Schema):
@@ -214,6 +217,7 @@ def _user_out(user: User) -> UserOut:
         tier=user.tier,
         date_joined=user.date_joined,
         onboarding_completed=_get_profile(user).onboarding_completed,
+        is_staff=user.is_staff,
     )
 
 

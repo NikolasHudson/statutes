@@ -86,6 +86,12 @@ class OpenAIQueryRewriter:
         try:
             client = OpenAI(api_key=key)
             resp = client.chat.completions.create(**kwargs)
+            # Token accounting (lazy import — see semantic_support for why).
+            from apps.api.usage import FEATURE_QUERY_REWRITE, emit_completion_usage
+
+            emit_completion_usage(
+                FEATURE_QUERY_REWRITE, resp, fallback_model=self.model
+            )
             return _parse_query(resp.choices[0].message.content or "")
         except Exception:  # noqa: BLE001 — a rewrite failure must never break search
             log.exception("query rewrite failed")

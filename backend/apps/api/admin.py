@@ -20,7 +20,7 @@ from django.contrib import admin
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 
-from .models import ChatTrace, VerificationRun
+from .models import ChatTrace, LlmUsage, VerificationRun
 from .trace_capture import _answer_uses
 
 
@@ -269,3 +269,40 @@ class VerificationRunAdmin(admin.ModelAdmin):
             'background:#f6f8fa;padding:10px">{}</pre>',
             json.dumps(obj.findings, indent=2, default=str),
         )
+
+
+@admin.register(LlmUsage)
+class LlmUsageAdmin(admin.ModelAdmin):
+    """Read-only ledger view. The SPA dashboard (/admin/usage) is the primary
+    surface; this exists for row-level spot checks. Content-free by model
+    design, so ordinary staff may view it — unlike the trace admins above."""
+
+    list_display = (
+        "created_at",
+        "user",
+        "feature",
+        "model",
+        "prompt_tokens",
+        "completion_tokens",
+        "cost_usd",
+        "request_id",
+    )
+    list_filter = ("feature", "model")
+    date_hierarchy = "created_at"
+    search_fields = ("user__email",)
+    readonly_fields = tuple(f.name for f in LlmUsage._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Books, not a log: rows are the record chat spend is metered
+        # against, so not even superusers delete them casually.
+        return False
+
+    @admin.display(description="Cost (USD)", ordering="cost_microusd")
+    def cost_usd(self, obj: LlmUsage) -> str:
+        return f"${obj.cost_microusd / 1_000_000:.4f}"

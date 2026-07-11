@@ -33,6 +33,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     full_name = models.CharField(max_length=200, blank=True)
     tier = models.CharField(max_length=16, choices=Tier.choices, default=Tier.FREE)
 
+    # Per-user override of the tier's monthly LLM spend budget (USD). Null =
+    # use the tier default in apps.api.usage.TIER_BUDGETS_USD. Set via Django
+    # admin when a customer needs a higher (or tighter) cap; staff accounts
+    # are exempt from per-user budgets regardless of this value.
+    monthly_budget_usd = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)

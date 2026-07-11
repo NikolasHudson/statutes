@@ -6,6 +6,7 @@
 // suite keeps its own static shell in app/app-carbon-mockup/carbon.tsx.
 
 import {
+	ChartColumnIcon,
 	ChevronsUpDownIcon,
 	GitCompareArrowsIcon,
 	LogOutIcon,
@@ -54,6 +55,15 @@ const NAV: NavGroup[] = [
 		],
 	},
 ];
+
+// Staff-only nav group — appended after the workspace group for users whose
+// /api/auth/me carries is_staff.
+const ADMIN_NAV: NavGroup = {
+	group: "Admin",
+	items: [
+		{ href: "/admin/usage", label: "Usage & spend", icon: ChartColumnIcon },
+	],
+};
 
 function initials(name: string, email: string): string {
 	const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -172,6 +182,8 @@ function UserFooter() {
 
 export function V2Shell({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname() ?? "/";
+	const { user } = useAuth();
+	const navGroups = user.is_staff ? [...NAV, ADMIN_NAV] : NAV;
 	// The onboarding wizard brings its own stepper rail — give it the full
 	// canvas instead of the app nav.
 	const bare = pathname === "/onboarding";
@@ -204,7 +216,7 @@ export function V2Shell({ children }: { children: React.ReactNode }) {
 							/>
 						)}
 						<SideNav
-							groups={NAV}
+							groups={navGroups}
 							active={pathname}
 							footer={
 								<>

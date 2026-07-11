@@ -40,6 +40,7 @@ from apps.api.chat import (
     run_chat_turn,
 )
 from apps.api.trace_capture import record_chat_trace
+from apps.api.usage import FEATURE_CHAT, FEATURE_EMAIL, collect_usage
 from apps.tenancy.entitlement import is_entitled
 from django.conf import settings as django_settings
 
@@ -195,13 +196,16 @@ def _process(inbound: InboundEmail) -> None:
     trace: list = []
     started = time.monotonic()
     try:
-        content, actual_model = run_chat_turn(
-            messages=messages,
-            source_slug=source_slug,
-            model=model,
-            api_key=django_settings.OPENAI_API_KEY,
-            trace=trace,
-        )
+        # Same loop as the web chat, so the loop emits feature="chat";
+        # relabel on flush so the dashboard books this under email.
+        with collect_usage(user, relabel={FEATURE_CHAT: FEATURE_EMAIL}):
+            content, actual_model = run_chat_turn(
+                messages=messages,
+                source_slug=source_slug,
+                model=model,
+                api_key=django_settings.OPENAI_API_KEY,
+                trace=trace,
+            )
     except ChatTurnError as exc:
         _record_trace(user, messages, source_slug, "", trace, model,
                       started, error=exc.client_message)

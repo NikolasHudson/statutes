@@ -115,6 +115,20 @@ class OpenAIWebCurrencyChecker:
                     topic_line=topic_line,
                 ),
             )
+            # Token accounting (lazy import — see semantic_support for why).
+            # Responses API usage is input/output, not prompt/completion; the
+            # per-call web_search tool fee is NOT in token pricing, so this
+            # undercounts true web-currency cost slightly.
+            from apps.api.usage import FEATURE_WEB_CURRENCY, emit_usage
+
+            usage = getattr(resp, "usage", None)
+            if usage is not None:
+                emit_usage(
+                    FEATURE_WEB_CURRENCY,
+                    getattr(resp, "model", "") or self.model,
+                    getattr(usage, "input_tokens", 0) or 0,
+                    getattr(usage, "output_tokens", 0) or 0,
+                )
             text = (resp.output_text or "").strip()
             text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.M).strip()
             data = json.loads(text)

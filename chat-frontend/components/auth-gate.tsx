@@ -31,6 +31,8 @@ export type AuthUser = {
 	last_name: string;
 	tier: string;
 	onboarding_completed: boolean;
+	// Staff flag from /api/auth/me — gates the Admin nav + /admin routes.
+	is_staff?: boolean;
 };
 
 // Session-scoped flag so the first-login redirect into the wizard fires once

@@ -29,6 +29,12 @@ from ninja.errors import HttpError
 from apps.api.accounts import _require_login
 from apps.api.session_auth import session_auth
 from apps.api.trace_capture import record_chat_trace
+from apps.api.usage import (
+    FEATURE_CHAT,
+    collect_usage,
+    emit_completion_usage,
+    enforce_token_budget,
+)
 from apps.tenancy.entitlement import is_entitled
 from apps.corpus.models import Node, NodeVersion, ReviewStatus, Source
 from apps.corpus.services.lookups import current_version
@@ -829,6 +835,16 @@ def _create_completion(client, base_kwargs: dict, max_tokens: int, state: dict):
                 base_kwargs = {k: v for k, v in base_kwargs.items() if k != "reasoning_effort"}
                 last_exc = exc
                 continue
+            # Same defensive strip for stream_options (usage accounting on
+            # streams): an OpenAI-compatible proxy that predates it must
+            # degrade to "no usage recorded", never to a failed chat.
+            is_stream_options_param = (
+                "unsupported_parameter" in msg or "unsupported parameter" in msg
+            ) and "stream_options" in msg
+            if is_stream_options_param and "stream_options" in base_kwargs:
+                base_kwargs = {k: v for k, v in base_kwargs.items() if k != "stream_options"}
+                last_exc = exc
+                continue
             if is_token_param:
                 last_exc = exc
                 continue
@@ -973,6 +989,10 @@ def _enforce_chat_quota(user) -> None:
     either is exceeded. Counters are incremented up front so an in-flight
     OpenAI tool loop still counts against the budget — the whole point is
     that this endpoint spends our money, not the caller's."""
+    # Dollar budgets first (they don't consume anything): a budget-capped
+    # request must not burn one of the user's daily message-count slots.
+    enforce_token_budget(user)
+
     now = timezone.now()
 
     global_key = f"chat:global:{now:%Y-%m}"
@@ -1227,6 +1247,9 @@ def run_chat_turn(
                 f"OpenAI call failed: {type(exc).__name__}", trace=trace
             ) from exc
 
+        # Token accounting: every round of the loop is real spend.
+        emit_completion_usage(FEATURE_CHAT, completion, fallback_model=model)
+
         choice = completion.choices[0]
         msg = choice.message
         tool_calls = msg.tool_calls or []
@@ -1404,6 +1427,9 @@ def run_chat_turn_stream(
             "tools": OPENAI_TOOLS,
             "tool_choice": "none" if final_round else "auto",
             "stream": True,
+            # Token accounting: ask for a terminal usage chunk. Stripped and
+            # retried by _create_completion if a proxy rejects the param.
+            "stream_options": {"include_usage": True},
             **_model_extras(model),
         }
 
@@ -1427,6 +1453,14 @@ def run_chat_turn_stream(
 
         try:
             for chunk in stream:
+                if getattr(chunk, "model", None):
+                    actual_model = chunk.model
+                # The include_usage terminal chunk carries usage with EMPTY
+                # choices — read it before the empty-choices skip below.
+                if getattr(chunk, "usage", None):
+                    emit_completion_usage(
+                        FEATURE_CHAT, chunk, fallback_model=actual_model
+                    )
                 if not chunk.choices:
                     continue
                 choice = chunk.choices[0]
@@ -1451,8 +1485,6 @@ def run_chat_turn_stream(
                         if getattr(fn, "arguments", None):
                             slot["args_text"] += fn.arguments
 
-                if getattr(chunk, "model", None):
-                    actual_model = chunk.model
         except Exception as exc:
             # Client-visible (see run_chat_turn): type name only.
             logger.exception("OpenAI stream interrupted")
@@ -1579,10 +1611,28 @@ def _stream_ndjson_events(
     so the streamed turn shows up in the admin audit log just like the
     non-streaming endpoint."""
     trace: list[ToolCallTrace] = []
+    started = time.monotonic()
+
+    # Everything the turn spends — the tool-loop completions plus any
+    # verification / rewrite side-calls they trigger — flushes as one
+    # attributed LlmUsage turn when the generator finishes (numbers only;
+    # the content-free counterpart of the unattributed trace below).
+    with collect_usage(user):
+        yield from _stream_ndjson_events_inner(
+            user=user,
+            payload=payload,
+            api_key=api_key,
+            trace=trace,
+            started=started,
+        )
+
+
+def _stream_ndjson_events_inner(
+    *, user, payload: "ChatRequest", api_key: str, trace, started
+):
     content = ""
     actual_model = payload.model
     error: str | None = None
-    started = time.monotonic()
 
     try:
         gen = run_chat_turn_stream(
@@ -1770,14 +1820,17 @@ def chat(request, payload: ChatRequest):
         return int((time.monotonic() - started) * 1000)
 
     try:
-        content, actual_model = run_chat_turn(
-            messages=[{"role": m.role, "content": m.content} for m in payload.messages],
-            source_slug=payload.source_slug,
-            model=payload.model,
-            api_key=api_key,
-            trace=trace,
-            node_id=payload.node_id,
-        )
+        # Attribute the turn's spend (tool-loop rounds + verification /
+        # rewrite side-calls) to the user as one content-free LlmUsage turn.
+        with collect_usage(user):
+            content, actual_model = run_chat_turn(
+                messages=[{"role": m.role, "content": m.content} for m in payload.messages],
+                source_slug=payload.source_slug,
+                model=payload.model,
+                api_key=api_key,
+                trace=trace,
+                node_id=payload.node_id,
+            )
     except ChatTurnError as exc:
         # A failed turn (and what it had retrieved before dying) is often
         # the most informative one to inspect, so capture the partial trace

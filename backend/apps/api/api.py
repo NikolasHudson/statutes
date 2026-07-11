@@ -32,6 +32,7 @@ from apps.corpus.services.search import hybrid_search
 from apps.mail.api import mail_router
 
 from .accounts import account_router, auth_router
+from .admin_usage import admin_usage_router
 from .auth import api_key_auth, enforce_rate_limit, require_feature
 from .browse import browse_router
 from .research import research_router
@@ -71,6 +72,9 @@ api.add_router("/auth", auth_router)
 api.add_router("/account", account_router)
 api.add_router("/browse", browse_router)
 api.add_router("/research", research_router)
+# Staff-only usage/spend aggregates for the SPA admin dashboard. Auth lives
+# on the router (StaffSessionAuth): session cookie + is_staff, 401 otherwise.
+api.add_router("/admin/usage", admin_usage_router)
 # Postmark inbound webhook (apps/mail). Shared-secret ?token= auth inside the
 # view; no session/API-key auth — the caller is Postmark, not a user.
 api.add_router("/email", mail_router)

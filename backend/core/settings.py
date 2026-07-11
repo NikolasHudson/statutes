@@ -98,6 +98,11 @@ env = environ.Env(
     # with no retrieval; only a turn whose text ASSERTS a named case's holding pays up
     # to MAX_PREMISES retrieve_context calls pre-draft. Set False to disable.
     RAG_CURRENCY_CHECK=(bool, True),
+    # Whole-platform monthly LLM spend ceiling in USD (apps.api.usage). The
+    # dollar sibling of CHAT_MONTHLY_GLOBAL_LIMIT (message count): when
+    # month-to-date recorded cost crosses this, chat/verify return 503 for
+    # everyone (staff included) until the 1st. 0 disables the ceiling.
+    CHAT_GLOBAL_MONTHLY_BUDGET_USD=(float, 500.0),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
@@ -116,6 +121,7 @@ ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 OPENAI_API_KEY = env("OPENAI_API_KEY")
 CHAT_DAILY_USER_LIMIT = env("CHAT_DAILY_USER_LIMIT")
 CHAT_MONTHLY_GLOBAL_LIMIT = env("CHAT_MONTHLY_GLOBAL_LIMIT")
+CHAT_GLOBAL_MONTHLY_BUDGET_USD = env("CHAT_GLOBAL_MONTHLY_BUDGET_USD")
 CHAT_TRACE_CAPTURE = env("CHAT_TRACE_CAPTURE")
 CHAT_TRACE_RETENTION_DAYS = env("CHAT_TRACE_RETENTION_DAYS")
 RAG_ABSTAIN_BLOCKING = env("RAG_ABSTAIN_BLOCKING")
