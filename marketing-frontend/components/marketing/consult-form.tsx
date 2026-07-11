@@ -1,13 +1,15 @@
 "use client";
 
-// Contact / booking form for the consulting page. Mockup-only: it validates
-// required fields and shows a success state on submit, but doesn't POST
-// anywhere yet (wire to a real endpoint / inbox when the page goes live).
+// Contact / booking form for the consulting and contact pages. POSTs to the
+// same-origin /api/contact route handler, which relays to the backend's
+// ContactSubmission table (triaged in the Django admin) and fires an email
+// notification. A visually-hidden "website" honeypot field catches bots.
 // Carbon (IBM design system) treatment: a square white tile carrying
 // gray-10 fields with a bottom hairline and Blue-60 focus outline, mono
 // spec labels, and a square Blue-60 submit with a trailing arrow.
 
 import { ArrowRightIcon, CheckCircle2Icon, Loader2Icon } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
 const INPUT_CLASS =
@@ -23,15 +25,46 @@ export function ConsultForm({
 	submitLabel?: string;
 	caption?: string;
 } = {}) {
+	const pathname = usePathname();
 	const [sent, setSent] = useState(false);
 	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
-	function onSubmit(e: FormEvent) {
+	async function onSubmit(e: FormEvent<HTMLFormElement>) {
 		e.preventDefault();
 		setBusy(true);
-		// Mockup: no backend yet — fake a brief submit, then show confirmation.
-		setSent(true);
-		setBusy(false);
+		setError(null);
+		const data = new FormData(e.currentTarget);
+		try {
+			const res = await fetch("/api/contact", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					name: data.get("name"),
+					email: data.get("email"),
+					organization: data.get("org") ?? "",
+					role: data.get("role") ?? "",
+					message: data.get("message"),
+					website: data.get("website") ?? "",
+					page: pathname,
+				}),
+			});
+			if (!res.ok) {
+				setError(
+					res.status === 429
+						? "Too many submissions from this connection — please email us instead."
+						: "Something went wrong sending your message. Please try again, or email us directly.",
+				);
+				return;
+			}
+			setSent(true);
+		} catch {
+			setError(
+				"Something went wrong sending your message. Please try again, or email us directly.",
+			);
+		} finally {
+			setBusy(false);
+		}
 	}
 
 	if (sent) {
@@ -52,7 +85,7 @@ export function ConsultForm({
 	return (
 		<form
 			onSubmit={onSubmit}
-			className="border border-border bg-white p-6 text-foreground sm:p-8"
+			className="relative border border-border bg-white p-6 text-foreground sm:p-8"
 		>
 			<div className="grid gap-5 sm:grid-cols-2">
 				<Field label="Name" htmlFor="name">
@@ -105,6 +138,18 @@ export function ConsultForm({
 				</Field>
 			</div>
 
+			{/* Honeypot — visually hidden and tab-skipped; anything typed here
+			    tells the backend to quietly drop the submission. */}
+			<div
+				aria-hidden
+				className="absolute -left-[9999px] top-0 h-0 overflow-hidden"
+			>
+				<label htmlFor="website">
+					Website
+					<input id="website" name="website" tabIndex={-1} autoComplete="off" />
+				</label>
+			</div>
+
 			<button
 				type="submit"
 				disabled={busy}
@@ -116,6 +161,11 @@ export function ConsultForm({
 				</span>
 				<ArrowRightIcon className="size-4" />
 			</button>
+			{error && (
+				<p role="alert" className="mt-3 text-[13px] text-[#da1e28]">
+					{error}
+				</p>
+			)}
 			<p className="mt-3 text-[12px] text-muted-foreground">{caption}</p>
 		</form>
 	);

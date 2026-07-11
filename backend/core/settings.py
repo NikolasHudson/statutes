@@ -98,6 +98,11 @@ env = environ.Env(
     # with no retrieval; only a turn whose text ASSERTS a named case's holding pays up
     # to MAX_PREMISES retrieve_context calls pre-draft. Set False to disable.
     RAG_CURRENCY_CHECK=(bool, True),
+    # Marketing-site contact form (apps.marketing): where to send the "new
+    # submission" heads-up email, and the (Postmark-verified) From it uses.
+    # NOTIFY unset = no email; the admin row is always the durable record.
+    CONTACT_NOTIFY_EMAIL=(str, ""),
+    CONTACT_FROM_EMAIL=(str, "assistant@mail.nick.law"),
     # Whole-platform monthly LLM spend ceiling in USD (apps.api.usage). The
     # dollar sibling of CHAT_MONTHLY_GLOBAL_LIMIT (message count): when
     # month-to-date recorded cost crosses this, chat/verify return 503 for
@@ -159,6 +164,8 @@ POSTMARK_SERVER_TOKEN = env("POSTMARK_SERVER_TOKEN")
 EMAIL_INBOUND_WEBHOOK_TOKEN = env("EMAIL_INBOUND_WEBHOOK_TOKEN")
 EMAIL_REQUIRE_SENDER_AUTH = env("EMAIL_REQUIRE_SENDER_AUTH")
 EMAIL_LINK_BASE_URL = env("EMAIL_LINK_BASE_URL")
+CONTACT_NOTIFY_EMAIL = env("CONTACT_NOTIFY_EMAIL")
+CONTACT_FROM_EMAIL = env("CONTACT_FROM_EMAIL")
 if POSTMARK_SERVER_TOKEN:
     EMAIL_BACKEND = "anymail.backends.postmark.EmailBackend"
     ANYMAIL = {"POSTMARK_SERVER_TOKEN": POSTMARK_SERVER_TOKEN}
@@ -183,6 +190,7 @@ INSTALLED_APPS = [
     "apps.tenancy",
     "apps.api",
     "apps.mail",
+    "apps.marketing",
     "apps.citations",
     "apps.ingestion_iowa_code",
     "apps.ingestion_iowa_rules",

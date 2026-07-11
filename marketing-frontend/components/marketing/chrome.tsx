@@ -9,7 +9,6 @@
 
 export const MARKETING_HOME = "/";
 export const ARTICLES_HREF = "/articles";
-export const ARTICLE_HREF = "/articles/why-legal-ai-invents-citations";
 export const PRODUCTS_INDEX_HREF = "/products";
 export const PRODUCT_HREF = "/products/corpus";
 export const MCP_PRODUCT_HREF = "/products/mcp";

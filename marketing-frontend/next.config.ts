@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
 // Public marketing site (separate deployment from the app at corpus.nick.law).
-// No /api proxy — marketing is static/SSG and talks to no backend. CTAs link
-// out to the app via NEXT_PUBLIC_APP_URL (see lib/site.ts).
+// Mostly static/SSG; the browser never talks to the backend directly. The two
+// same-origin route handlers (app/api/contact, app/api/subscribe) and the
+// articles pages call the backend SERVER-side via API_ORIGIN (lib/api.ts), so
+// CSP stays self-only and backend CORS is untouched. CTAs link out to the app
+// via NEXT_PUBLIC_APP_URL (see lib/site.ts).
 const isProd = process.env.NODE_ENV === "production";
 
 // Content-Security-Policy. Marketing is self-contained today: Next injects

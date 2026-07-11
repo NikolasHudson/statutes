@@ -30,8 +30,10 @@ from apps.corpus.services.lookups import (
 from apps.corpus.services.search import hybrid_search
 
 from apps.mail.api import mail_router
+from apps.marketing.api import marketing_router
 
 from .accounts import account_router, auth_router
+from .admin_articles import admin_articles_router
 from .admin_usage import admin_usage_router
 from .admin_users import admin_users_router
 from .auth import api_key_auth, enforce_rate_limit, require_feature
@@ -79,9 +81,16 @@ api.add_router("/admin/usage", admin_usage_router)
 # Staff-only user management (list/detail/edit accounts, revoke keys). Same
 # StaffSessionAuth; writes are CSRF-checked by the cookie auth and audited.
 api.add_router("/admin/users", admin_users_router)
+# Staff-only marketing-article CRUD for the admin SPA. Same StaffSessionAuth;
+# rows are what the public marketing site serves (apps/marketing).
+api.add_router("/admin/articles", admin_articles_router)
 # Postmark inbound webhook (apps/mail). Shared-secret ?token= auth inside the
 # view; no session/API-key auth — the caller is Postmark, not a user.
 api.add_router("/email", mail_router)
+# Public marketing-site surface (apps/marketing): published articles out,
+# contact/newsletter capture in. auth=None on every route by design — the
+# caller is the static marketing site's server, which has no session.
+api.add_router("/marketing", marketing_router)
 
 
 # ---------------------------------------------------------------------------

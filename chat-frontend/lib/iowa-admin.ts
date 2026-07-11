@@ -258,3 +258,72 @@ export const revokeAdminUserKey = (userId: number, keyId: number) =>
 		`/api/admin/users/${userId}/api-keys/${keyId}/revoke`,
 		{ method: "POST" },
 	);
+
+// ---------------------------------------------------------------------------
+// Marketing articles — /api/admin/articles/*
+// Mirrors backend apps/api/admin_articles.py. Rows are marketing.Article —
+// what the public marketing site serves. source_path non-empty = the row is
+// synced from a markdown file in the repo and import_articles will overwrite
+// admin edits on its next run.
+// ---------------------------------------------------------------------------
+
+export type AdminArticleRow = {
+	id: number;
+	slug: string;
+	title: string;
+	category: string;
+	published: boolean;
+	published_at: string | null; // "2026-06-24"
+	read_minutes: number;
+	updated_at: string;
+	source_path: string;
+};
+
+export type AdminArticleDetail = AdminArticleRow & {
+	lede: string;
+	excerpt: string;
+	body_md: string;
+	tags: string[];
+	author_name: string;
+	author_title: string;
+};
+
+export type AdminArticleIn = {
+	title: string;
+	slug?: string; // omit/blank = derived from the title
+	category?: string;
+	lede?: string;
+	excerpt?: string;
+	body_md?: string;
+	tags?: string[];
+	author_name?: string;
+	author_title?: string;
+	published?: boolean;
+	published_at?: string | null;
+	read_minutes?: number; // 0 = auto from word count
+};
+
+export type AdminArticlePatch = Partial<AdminArticleIn>;
+
+export const getAdminArticles = () =>
+	request<AdminArticleRow[]>("/api/admin/articles");
+
+export const getAdminArticle = (id: number) =>
+	request<AdminArticleDetail>(`/api/admin/articles/${id}`);
+
+export const createAdminArticle = (data: AdminArticleIn) =>
+	request<AdminArticleDetail>("/api/admin/articles", {
+		method: "POST",
+		body: JSON.stringify(data),
+	});
+
+export const patchAdminArticle = (id: number, data: AdminArticlePatch) =>
+	request<AdminArticleDetail>(`/api/admin/articles/${id}`, {
+		method: "PATCH",
+		body: JSON.stringify(data),
+	});
+
+export const deleteAdminArticle = (id: number) =>
+	request<{ status: string; id: number }>(`/api/admin/articles/${id}`, {
+		method: "DELETE",
+	});

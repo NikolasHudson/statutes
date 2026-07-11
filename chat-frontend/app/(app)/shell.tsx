@@ -12,6 +12,7 @@ import {
 	LogOutIcon,
 	MessageSquareTextIcon,
 	MoonIcon,
+	NewspaperIcon,
 	PanelLeftCloseIcon,
 	PanelLeftOpenIcon,
 	SearchIcon,
@@ -64,6 +65,7 @@ const ADMIN_NAV: NavGroup = {
 	items: [
 		{ href: "/admin/usage", label: "Usage & spend", icon: ChartColumnIcon },
 		{ href: "/admin/users", label: "Users", icon: UsersIcon },
+		{ href: "/admin/articles", label: "Articles", icon: NewspaperIcon },
 	],
 };
 
