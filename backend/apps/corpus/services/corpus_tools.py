@@ -212,6 +212,7 @@ def _resolve_lookup(citation: str, source_slug: str | None):
     # Source — try each and return the first that actually resolves rather
     # than betting on .first().
     first_result = None
+    iowa_code_result = None
     for src in sources.order_by("slug", "id"):
         r = lookup_citation(citation, source=src)
         if r.parse_error:
@@ -220,6 +221,14 @@ def _resolve_lookup(citation: str, source_slug: str | None):
             return r
         if first_result is None:
             first_result = r
+        # The promised fallback for a total miss. Tracked explicitly: "first
+        # alphabetically" stopped being the Iowa Code when the Acts/IAC source
+        # seeds landed (iowa-acts sorts before iowa-code), which silently
+        # emptied the near-miss candidates.
+        if iowa_code_result is None and src.slug == "iowa-code":
+            iowa_code_result = r
+    if iowa_code_result is not None:
+        return iowa_code_result
     if first_result is not None:
         return first_result
     return lookup_citation(citation)
