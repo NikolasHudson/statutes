@@ -41,6 +41,7 @@ from apps.api.search_common import (
     _resolve_reporter_citation,
     _search_row,
 )
+from apps.api.paywall import require_paid_access
 from apps.api.session_auth import session_auth
 from apps.api.trace_capture import record_search_log
 from apps.api.usage import collect_usage
@@ -331,6 +332,7 @@ def research_search(
     limit: int = SEARCH_LIMIT_DEFAULT,
     offset: int = 0,
 ):
+    require_paid_access(request.auth)
     started = time.monotonic()
     q = (q or "").strip()
     limit = max(1, min(limit, SEARCH_LIMIT_MAX))

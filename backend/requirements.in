@@ -40,6 +40,12 @@ django-anymail[postmark]>=13.0,<14
 # ordered lists and 2-space-nested bullets, which python-markdown mishandles.
 # Rendered with html=False so model output cannot inject raw HTML.
 markdown-it-py>=3.0,<4
+# --- Billing (apps/billing) ---
+# Stripe Checkout, the Customer Portal, and webhook signature verification.
+# Imported lazily (apps/billing/stripe_api.py) so a checkout without it — or a
+# deploy with no STRIPE_SECRET_KEY — still boots and still serves every
+# non-billing route; the three Stripe-calling endpoints answer 503 instead.
+stripe>=15.3,<16
 # --- Auth hardening / observability (security findings #6,#15,#26) ---
 # Brute-force login throttle + lockout, keyed on IP+username against the shared
 # cache (Redis in prod). See AXES_* in core/settings.py.

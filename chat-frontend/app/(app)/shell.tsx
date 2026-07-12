@@ -6,8 +6,10 @@
 // suite keeps its own static shell in app/app-carbon-mockup/carbon.tsx.
 
 import {
+	Building2Icon,
 	ChartColumnIcon,
 	ChevronsUpDownIcon,
+	CreditCardIcon,
 	GitCompareArrowsIcon,
 	LogOutIcon,
 	MessageSquareTextIcon,
@@ -54,6 +56,17 @@ const NAV: NavGroup[] = [
 				label: "Compare editions",
 				icon: GitCompareArrowsIcon,
 			},
+		],
+	},
+	// Every user belongs to an org (a personal one, if nothing else) and every
+	// org has a plan, so both entries show for everyone; what each person can
+	// actually *do* there depends on their org role, which the server enforces
+	// on each call. Settings still lives in the user menu at the foot of the nav.
+	{
+		group: "Account",
+		items: [
+			{ href: "/org", label: "Organization", icon: Building2Icon },
+			{ href: "/account/billing", label: "Billing", icon: CreditCardIcon },
 		],
 	},
 ];

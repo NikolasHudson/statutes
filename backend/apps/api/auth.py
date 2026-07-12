@@ -94,7 +94,21 @@ api_key_auth = ApiKeyAuth()
 
 
 def require_feature(api_key: APIKey, feature: str) -> None:
-    """Raise 403 if ``api_key``'s tier doesn't include ``feature``."""
+    """Raise 403 if ``api_key``'s tier doesn't include ``feature``.
+
+    With ``BILLING_REQUIRE_PAID`` on there is no free tier at all: a free-tier
+    key gets 402 for every feature (the FEATURES_BY_TIER free set only exists
+    for the beta era). One chokepoint covers both headless surfaces — the REST
+    ``X-API-Key`` routes and MCP (apps/mcp_server/gating.py calls this).
+    """
+    from apps.tenancy.services import has_paid_access
+
+    if not has_paid_access(api_key.user):
+        raise HttpError(
+            402,
+            "An active plan is required to use the API. Start your free trial "
+            "at Account → Billing in the app.",
+        )
     allowed = FEATURES_BY_TIER.get(api_key.user.tier, set())
     if feature not in allowed:
         raise HttpError(

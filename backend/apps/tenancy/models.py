@@ -11,13 +11,19 @@ is this?* (by host) and *is this user allowed into it?* (by entitlement).
     jurisdiction it is locked to. A host that matches no product's ``hostname``
     (the flagship ``app.<domain>`` / the apex) is the *unlocked* experience.
   * :class:`Organization` — a distribution + billing vehicle: a bar association /
-    regulator / firm. Members inherit the org's subscriptions. Invisible in the
-    URL; carries only optional co-brand for a later "Provided by <bar>" ribbon.
-  * :class:`Subscription` — an active license of a product, attached to **a user
-    OR an org** (individual purchase OR bar-wide license). Status only for now;
-    seats + billing are deferred to a later phase.
+    regulator / firm — and, since billing moved onto orgs, ALSO the one-person
+    "personal" org auto-created for every solo signup (``is_personal=True``).
+    Members inherit the org's subscriptions. Invisible in the URL; carries only
+    optional co-brand for a later "Provided by <bar>" ribbon.
+  * :class:`Subscription` — a license held by **an org, always** (billing anchors
+    on the org; there is no user-held subscription). ``product IS NULL`` is the
+    flagship full-corpus plan; a non-null product is a scoped site license.
+    Carries the Stripe anchor (customer/subscription/price ids, seats, period).
   * :class:`OrgMembership` — which users belong to which org (many-to-many — a
     lawyer may belong to several bars; entitlement is a union, so that's fine).
+    ``role`` is load-bearing: owner/admin may manage billing + members.
+  * :class:`OrgInvitation` — a pending email invite into an org. Only the SHA-256
+    of the token is stored; the raw token is emailed and never persisted.
 
 Access is decided by **entitlement** (see :mod:`apps.tenancy.entitlement`), not by
 the URL: a user gets a product if they bought it directly, belong to an org that
@@ -34,10 +40,20 @@ already keys off ``source_slug`` (retrieval, system prompt, verification).
 
 from __future__ import annotations
 
+import datetime as dt
+import hashlib
+import secrets
+
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
+
+# Plans mirror ``accounts.models.Tier`` exactly — a Subscription's ``plan`` is
+# what ``User.tier`` is derived FROM (see apps.tenancy.services.sync_user_tier),
+# so the two vocabularies must not drift.
+from apps.accounts.models import Tier
 
 
 class Product(models.Model):
@@ -110,22 +126,43 @@ class Product(models.Model):
 
 
 class Organization(models.Model):
-    """A distribution + billing vehicle: a bar association, regulator, or firm.
+    """A distribution + billing vehicle: a bar association, regulator, firm — or
+    the personal one-person org auto-created for a solo signup.
 
     Members inherit the org's subscriptions. Per-tenant data is limited to this
     row, its memberships, its subscriptions, and members' own chat threads
     (already per-user) — never any walled-off copy of the corpus. Not in the URL.
+
+    ``status`` is the org-level kill-switch: ``suspended`` / ``canceled`` stop the
+    org granting ANY plan (see :func:`apps.tenancy.services.effective_plan`), which
+    is what makes staff suspension and a lapsed account actually bite — every
+    existing tier gate then sees ``free``.
     """
 
     class Status(models.TextChoices):
         TRIAL = "trial", "Trial"
         ACTIVE = "active", "Active"
+        PAST_DUE = "past_due", "Past due"
         SUSPENDED = "suspended", "Suspended"
+        CANCELED = "canceled", "Canceled"
+
+    # Org statuses that still allow the org to grant its subscription's plan.
+    # (Whether the SUBSCRIPTION grants is a separate check — see services.)
+    LIVE_STATUSES = frozenset({Status.TRIAL, Status.ACTIVE, Status.PAST_DUE})
 
     slug = models.SlugField(unique=True)  # "iowa-bar"
     name = models.CharField(max_length=200)  # "Iowa State Bar Association"
     status = models.CharField(
         max_length=16, choices=Status.choices, default=Status.TRIAL
+    )
+
+    # True for the org auto-created at registration for a single user. Exactly
+    # one per user; it is that user's *billing org* (services.billing_org).
+    is_personal = models.BooleanField(default=False)
+
+    # Stripe customer this org bills through. Null until the org first checks out.
+    stripe_customer_id = models.CharField(
+        max_length=64, null=True, blank=True, unique=True
     )
 
     # Optional co-brand for the post-login "Provided by <bar>" ribbon (deferred
@@ -134,6 +171,7 @@ class Organization(models.Model):
     logo_url = models.CharField(max_length=500, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ("name",)
@@ -143,10 +181,20 @@ class Organization(models.Model):
 
 
 class Subscription(models.Model):
-    """An active license of a product, held by **a user XOR an org**.
+    """A license held by an **org** — always. Billing anchors here.
 
-    user-held  → an individual who bought the product directly.
-    org-held   → a bar/firm site license; every member inherits it.
+    Two flavours, distinguished by ``product``:
+
+      * ``product IS NULL`` → **the flagship full-corpus plan**. This is the row
+        Stripe drives and the only row :func:`apps.tenancy.services.effective_plan`
+        reads, so a personal org's ``solo`` plan and a firm's ``firm`` plan are the
+        same shape.
+      * ``product`` set → a scoped site license (e.g. a bar association licensing
+        the Ethics app for its members). Grants that product via
+        :mod:`apps.tenancy.entitlement`; it does not grant a full-corpus plan.
+
+    There is no user-held subscription: a solo buyer holds theirs through the
+    personal org created at registration.
     """
 
     class Status(models.TextChoices):
@@ -154,64 +202,88 @@ class Subscription(models.Model):
         ACTIVE = "active", "Active"
         PAST_DUE = "past_due", "Past due"
         CANCELED = "canceled", "Canceled"
+        UNPAID = "unpaid", "Unpaid"
 
+    # Subscription statuses that grant outright. ``past_due`` grants only inside
+    # the grace window (services.effective_plan); everything else grants nothing.
+    LIVE_STATUSES = frozenset({Status.TRIAL, Status.ACTIVE})
+
+    # NULL = the flagship full-corpus plan (see class docstring).
     product = models.ForeignKey(
-        Product, on_delete=models.PROTECT, related_name="subscriptions"
+        Product,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="subscriptions",
     )
     org = models.ForeignKey(
         Organization,
-        null=True,
-        blank=True,
         on_delete=models.CASCADE,
         related_name="subscriptions",
     )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
-        related_name="subscriptions",
-    )
+
+    # Which plan this subscription grants its org's members. Mirrors User.Tier —
+    # User.tier is a derived cache of the max plan across a user's orgs.
+    plan = models.CharField(max_length=16, choices=Tier.choices, default=Tier.FREE)
     status = models.CharField(
         max_length=16, choices=Status.choices, default=Status.TRIAL
     )
+
+    # --- Stripe anchor. All null/blank for a comped or manually-granted row. ---
+    stripe_subscription_id = models.CharField(
+        max_length=64, null=True, blank=True, unique=True
+    )
+    stripe_price_id = models.CharField(max_length=64, blank=True)
+    # The Stripe quantity. Kept in step with seat_count(org) by billing.seats.
+    seats = models.PositiveIntegerField(default=1)
+    current_period_end = models.DateTimeField(null=True, blank=True)
+    cancel_at_period_end = models.BooleanField(default=False)
+    trial_end = models.DateTimeField(null=True, blank=True)
+    # When the subscription first went past_due — the grace-window anchor. Cleared
+    # on invoice.paid. Null while not past_due.
+    past_due_since = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [
-            # Exactly one holder: an org license XOR an individual license.
-            models.CheckConstraint(
-                check=(
-                    Q(org__isnull=False, user__isnull=True)
-                    | Q(org__isnull=True, user__isnull=False)
-                ),
-                name="subscription_org_xor_user",
-            ),
-            # One subscription per (holder, product), enforced per holder type
-            # since the other column is NULL.
+            # One subscription per (org, product).
             models.UniqueConstraint(
                 fields=("org", "product"),
-                condition=Q(org__isnull=False),
                 name="uniq_org_product_subscription",
             ),
+            # …and, because Postgres treats NULLs as distinct, the (org, product)
+            # unique above does NOT stop two flagship rows for one org. This does:
+            # exactly one flagship (product IS NULL) subscription per org, which is
+            # what effective_plan assumes when it reads "the" flagship row.
             models.UniqueConstraint(
-                fields=("user", "product"),
-                condition=Q(user__isnull=False),
-                name="uniq_user_product_subscription",
+                fields=("org",),
+                condition=Q(product__isnull=True),
+                name="uniq_org_flagship_subscription",
             ),
         ]
 
     def __str__(self) -> str:
-        holder = self.org.slug if self.org_id else f"user:{self.user_id}"
-        return f"{holder} → {self.product.slug} ({self.status})"
+        what = self.product.slug if self.product_id else f"plan:{self.plan}"
+        return f"{self.org.slug} → {what} ({self.status})"
+
+    @property
+    def is_flagship(self) -> bool:
+        return self.product_id is None
 
 
 class OrgMembership(models.Model):
     """Which users belong to which org, and their role.
 
-    For v1, membership in an org with an active subscription IS the entitlement
-    — no per-product seat assignment yet (that arrives with per-seat firm sales).
-    A user may belong to several orgs; entitlement is a union across them.
+    Membership in an org with a live subscription IS the entitlement — there is no
+    per-product seat assignment; a member = a Stripe seat (billing.seats keeps the
+    quantity in step). A user may belong to several orgs; entitlement is a union
+    across them and the plan is the max (services.effective_plan).
+
+    ``role`` is load-bearing: owner/admin may manage members + billing. Invariant:
+    **an org always has ≥1 owner** — enforced in :mod:`apps.tenancy.services`, not
+    in the DB (a check constraint cannot span rows).
     """
 
     class Role(models.TextChoices):
@@ -241,3 +313,86 @@ class OrgMembership(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user_id}@{self.org.slug} ({self.role})"
+
+
+# ---------------------------------------------------------------------------
+# Invitations
+# ---------------------------------------------------------------------------
+
+INVITATION_TTL_DAYS = 14
+
+
+def default_invitation_expiry():
+    """Module-level (not a lambda) so migrations can serialize the default."""
+    return timezone.now() + dt.timedelta(days=INVITATION_TTL_DAYS)
+
+
+def hash_invitation_token(raw_token: str) -> str:
+    """SHA-256 hex of a raw invitation token — what we store and look up by."""
+    return hashlib.sha256((raw_token or "").encode()).hexdigest()
+
+
+def generate_invitation_token() -> tuple[str, str]:
+    """(raw_token, token_hash). The raw token goes in the emailed link exactly
+    once and is never persisted — same posture as :func:`accounts.generate_key`."""
+    raw = secrets.token_urlsafe(32)
+    return raw, hash_invitation_token(raw)
+
+
+class OrgInvitation(models.Model):
+    """A pending email invite into an org.
+
+    The raw token is emailed as ``${APP_URL}/invite/<raw-token>`` and never
+    stored; the row keeps only its SHA-256, so a DB leak cannot be replayed into
+    org access. An invitation is *pending* while it has neither been accepted nor
+    revoked and has not expired — one pending invite per (org, email), enforced by
+    a partial unique index.
+    """
+
+    org = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="invitations"
+    )
+    # Lowercased on save; matched against the accepting user's login email.
+    email = models.EmailField()
+    role = models.CharField(
+        max_length=16,
+        choices=OrgMembership.Role.choices,
+        default=OrgMembership.Role.MEMBER,
+    )
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sent_org_invitations",
+    )
+    expires_at = models.DateTimeField(default=default_invitation_expiry)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("org", "email"),
+                condition=Q(accepted_at__isnull=True, revoked_at__isnull=True),
+                name="uniq_pending_invitation_per_org_email",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.email} → {self.org.slug} ({self.role})"
+
+    def save(self, *args, **kwargs):
+        self.email = (self.email or "").strip().lower()
+        super().save(*args, **kwargs)
+
+    @property
+    def is_pending(self) -> bool:
+        return (
+            self.accepted_at is None
+            and self.revoked_at is None
+            and self.expires_at > timezone.now()
+        )

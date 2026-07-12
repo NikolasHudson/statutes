@@ -75,7 +75,7 @@ class Command(BaseCommand):
         Subscription.objects.update_or_create(
             org=org,
             product=product,
-            defaults={"user": None, "status": Subscription.Status.ACTIVE},
+            defaults={"status": Subscription.Status.ACTIVE},
         )
 
         self.stdout.write(

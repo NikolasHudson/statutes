@@ -386,12 +386,23 @@ class ProcessingTests(TestCase):
         self.assertIn("access", mail.outbox[0].body.lower())
         turn.assert_not_called()
 
-        # Full-corpus tier: answered, and the search scope is clamped to the
+        # Full-corpus PLAN: answered, and the search scope is clamped to the
         # product's sources — the email surface honors the same lock as chat.
+        # Entitlement reads billing state (apps.tenancy.services.effective_plan),
+        # not the derived ``user.tier`` column, so give the user a real solo
+        # subscription on their personal org rather than just flipping the cache.
         from apps.accounts.models import Tier
+        from apps.tenancy.models import Subscription
+        from apps.tenancy.services import ensure_personal_org, sync_user_tier
 
-        self.user.tier = Tier.SOLO
-        self.user.save()
+        Subscription.objects.create(
+            org=ensure_personal_org(self.user),
+            product=None,  # NULL = the flagship full-corpus plan
+            plan=Tier.SOLO,
+            status=Subscription.Status.ACTIVE,
+        )
+        sync_user_tier(self.user)
+        self.user.refresh_from_db()
         answered = self.process(
             self.make_inbound(address=ethics, to_email="ethics@mail.nick.law")
         )

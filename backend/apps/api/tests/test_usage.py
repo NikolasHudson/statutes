@@ -25,6 +25,7 @@ from apps.api.usage import (
     emit_usage,
     price_for,
 )
+from apps.tenancy.services import ensure_personal_org
 
 from ._factories import make_user
 
@@ -87,7 +88,24 @@ class CaptureTests(TestCase):
         row = LlmUsage.objects.get()
         self.assertIsNone(row.user)
         self.assertIsNone(row.request_id)
+        self.assertIsNone(row.org_id)  # no user → no billing org
         self.assertEqual(row.cost_microusd, 210)
+
+    def test_collector_stamps_the_billing_org(self):
+        """The org dimension is for future org-level reporting; budgets stay
+        per-user. It is snapshotted at capture time from the user's personal org."""
+        org = ensure_personal_org(self.user)
+        with collect_usage(self.user):
+            emit_usage(FEATURE_CHAT, "gpt-4o-mini", 1000, 100)
+        self.assertEqual(LlmUsage.objects.get().org_id, org.id)
+
+    def test_capture_survives_a_user_with_no_org(self):
+        """A shell-created account has no personal org — the row still lands."""
+        with collect_usage(self.user):
+            emit_usage(FEATURE_CHAT, "gpt-4o-mini", 1000, 100)
+        row = LlmUsage.objects.get()
+        self.assertEqual(row.user_id, self.user.id)
+        self.assertIsNone(row.org_id)
 
     def test_collector_attributes_and_groups_one_turn(self):
         with collect_usage(self.user):

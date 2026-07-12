@@ -12,6 +12,8 @@ import json
 from django.test import Client, TestCase
 
 from apps.accounts.models import APIKey, User
+from apps.tenancy.models import Organization, OrgMembership
+from apps.tenancy.services import billing_org
 
 
 def _post(client: Client, path: str, payload: dict):
@@ -40,6 +42,58 @@ class RegisterLoginTests(TestCase):
         me = client.get("/api/auth/me")
         self.assertEqual(me.status_code, 200)
         self.assertEqual(me.json()["email"], "a@example.com")
+
+    def test_register_creates_the_personal_billing_org(self):
+        """Billing attaches to an org, always — so registration must mint one."""
+        client = Client()
+        resp = _post(
+            client,
+            "/api/auth/register",
+            {"email": "org@example.com", "password": "supersecret123", "full_name": "O"},
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+
+        user = User.objects.get(email="org@example.com")
+        org = billing_org(user)
+        self.assertIsNotNone(org)
+        self.assertTrue(org.is_personal)
+        self.assertEqual(org.status, Organization.Status.ACTIVE)
+        self.assertEqual(OrgMembership.objects.get(user=user, org=org).role, "owner")
+
+        # …and /auth/me hands the SPA that org so it can route.
+        body = client.get("/api/auth/me").json()
+        self.assertEqual(
+            body["org"],
+            {"id": org.id, "name": org.name, "role": "owner", "is_personal": True},
+        )
+
+    def test_register_with_an_invite_token_still_succeeds(self):
+        """The invitation-acceptance call is a Phase-2 stub (NotImplementedError).
+        A supplied token must never sink an otherwise valid registration."""
+        client = Client()
+        resp = _post(
+            client,
+            "/api/auth/register",
+            {
+                "email": "invited@example.com",
+                "password": "supersecret123",
+                "invite": "some-raw-token",
+            },
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        user = User.objects.get(email="invited@example.com")
+        self.assertIsNotNone(billing_org(user))
+
+    def test_me_backfills_an_org_for_a_legacy_account(self):
+        """Accounts created before the hook (shell, createsuperuser) get theirs on
+        first /me — same defensive posture as the UserProfile get_or_create."""
+        user = User.objects.create_user(email="legacy@example.com", password="x" * 12)
+        self.assertIsNone(billing_org(user))
+        client = Client()
+        client.force_login(user)
+        body = client.get("/api/auth/me").json()
+        self.assertIsNotNone(body["org"])
+        self.assertTrue(body["org"]["is_personal"])
 
     def test_register_rejects_short_password(self):
         client = Client()

@@ -33,6 +33,7 @@ from django.utils import timezone
 
 from apps.api.accounts import _require_login
 from apps.api.chat import ALLOWED_CHAT_MODELS, _bump, _enforce_chat_quota
+from apps.api.paywall import require_paid_access
 from apps.api.usage import collect_usage
 from apps.api.session_auth import session_auth
 from apps.api.services.extract import ExtractionError, extract_text
@@ -79,6 +80,7 @@ def verify_document_endpoint(
 ):
     """Grade every citation in a submitted document. Streams NDJSON."""
     user = _require_login(request)
+    require_paid_access(user)
 
     if model and model not in ALLOWED_CHAT_MODELS:
         raise HttpError(400, f"unsupported model: {model}")

@@ -27,6 +27,7 @@ from ninja import Router, Schema
 from ninja.errors import HttpError
 
 from apps.api.accounts import _require_login
+from apps.api.paywall import require_paid_access
 from apps.api.session_auth import session_auth
 from apps.api.trace_capture import record_chat_trace
 from apps.api.usage import (
@@ -1759,6 +1760,7 @@ def chat_stream(request, payload: ChatRequest):
     each line is one event (``tool_start`` / ``delta`` / ``done`` / ``error``).
     Same auth and quota gates as the non-streaming endpoint."""
     user = _require_login(request)
+    require_paid_access(user)
 
     if not payload.messages:
         raise HttpError(400, "messages must not be empty")
@@ -1793,6 +1795,7 @@ def chat_stream(request, payload: ChatRequest):
 def chat(request, payload: ChatRequest):
     # Login required: this endpoint spends our OpenAI key.
     user = _require_login(request)
+    require_paid_access(user)
 
     if not payload.messages:
         raise HttpError(400, "messages must not be empty")

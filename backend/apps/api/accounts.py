@@ -24,6 +24,7 @@ between the frontend dev server and Django.
 from __future__ import annotations
 
 import datetime as dt
+import logging
 
 from django.contrib.auth import (
     authenticate,
@@ -32,6 +33,7 @@ from django.contrib.auth import (
     update_session_auth_hash,
 )
 from django.core.cache import cache
+from django.db import transaction
 from django.middleware.csrf import get_token
 from django.utils import timezone
 from ninja import Router, Schema
@@ -41,6 +43,10 @@ from apps.accounts.audit import AuditEvent, client_ip, record_event
 from apps.accounts.models import APIKey, User, UserProfile, generate_key
 from apps.accounts.profile import CitationStyle, Role, SearchScope, Theme
 from apps.api.session_auth import csrf_protect, session_auth
+from apps.tenancy import services as tenancy
+
+
+logger = logging.getLogger(__name__)
 
 
 auth_router = Router()
@@ -64,6 +70,10 @@ class RegisterRequest(Schema):
     email: str
     password: str
     full_name: str = ""
+    # Raw org-invitation token from an emailed /invite/<token> link, carried
+    # through the login/register redirect as ``?invite=``. Optional: a plain
+    # signup has none. Accepting it joins the inviting org on first login.
+    invite: str | None = None
 
 
 class LoginRequest(Schema):
@@ -82,6 +92,16 @@ class ChangePasswordRequest(Schema):
     new_password: str
 
 
+class OrgOut(Schema):
+    """The caller's BILLING org (their personal one) — what /account/billing and
+    the org console route on. Not the full org detail; that is GET /api/org."""
+
+    id: int
+    name: str
+    role: str  # the caller's role in it: owner | admin | member
+    is_personal: bool
+
+
 class UserOut(Schema):
     id: int
     email: str
@@ -98,6 +118,14 @@ class UserOut(Schema):
     # /api/admin/* endpoints enforce both server-side regardless.
     is_staff: bool = False
     is_superuser: bool = False
+    # The billing org. Null only in the pathological case where the personal org
+    # could not be created/read — the SPA must treat null as "billing unavailable"
+    # rather than crashing.
+    org: OrgOut | None = None
+    # False when BILLING_REQUIRE_PAID is on and the account holds no live plan.
+    # The SPA renders its paywall off this; the server re-enforces with 402 on
+    # every interactive endpoint regardless.
+    paid_access: bool = True
 
 
 class CreateKeyRequest(Schema):
@@ -209,6 +237,23 @@ def _get_profile(user: User) -> UserProfile:
     return profile
 
 
+def _org_out(user: User) -> OrgOut | None:
+    """The user's billing org, created on the fly for accounts that predate the
+    registration hook (same defensive get_or_create posture as ``_get_profile``).
+    Never raises: a broken org lookup must not take down /auth/me."""
+    try:
+        org = tenancy.ensure_personal_org(user)
+    except Exception:  # noqa: BLE001 — /me must keep working
+        logger.exception("billing org lookup failed for user %s", user.pk)
+        return None
+    return OrgOut(
+        id=org.id,
+        name=org.name,
+        role=tenancy.role_of(user, org) or tenancy.Role.OWNER,
+        is_personal=org.is_personal,
+    )
+
+
 def _user_out(user: User) -> UserOut:
     return UserOut(
         id=user.id,
@@ -221,6 +266,8 @@ def _user_out(user: User) -> UserOut:
         onboarding_completed=_get_profile(user).onboarding_completed,
         is_staff=user.is_staff,
         is_superuser=user.is_superuser,
+        org=_org_out(user),
+        paid_access=tenancy.has_paid_access(user),
     )
 
 
@@ -366,11 +413,41 @@ def register(request, payload: RegisterRequest):
         )
         raise HttpError(400, "could not create account with those details")
 
-    user = User.objects.create_user(
-        email=email,
-        password=payload.password,
-        full_name=payload.full_name.strip(),
-    )
+    # One transaction: an account without its personal org has no billing vehicle,
+    # so the two must land together or not at all.
+    with transaction.atomic():
+        user = User.objects.create_user(
+            email=email,
+            password=payload.password,
+            full_name=payload.full_name.strip(),
+        )
+        # Billing attaches to an org, always — a solo signup gets a one-person org
+        # it owns (apps/tenancy/services.py). Everything downstream (plan, seats,
+        # Stripe customer) hangs off this row.
+        tenancy.ensure_personal_org(user)
+
+        if payload.invite:
+            # The invited user joins the inviting org in the same transaction.
+            # TODO(Phase 2): apps/api/orgs.py owns the real
+            # tenancy.services.accept_invitation implementation (it currently
+            # raises NotImplementedError). Until then a bad/expired token must not
+            # sink an otherwise valid registration, so failures are swallowed and
+            # the user simply lands in their personal org; they can re-open the
+            # /invite/<token> link and accept it while logged in.
+            try:
+                # Nested atomic = savepoint: a failure in here rolls back only the
+                # invitation work, leaving the outer user+org transaction usable.
+                with transaction.atomic():
+                    tenancy.accept_invitation(user, payload.invite)
+            except NotImplementedError:
+                logger.warning(
+                    "invite token supplied at registration but accept_invitation "
+                    "is not implemented yet (user=%s)",
+                    user.pk,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("invitation acceptance failed for user %s", user.pk)
+
     # Log them in immediately so the next request can see them. login() fires
     # user_logged_in, which the audit signal records as a LOGIN_SUCCESS; emit
     # the registration event explicitly so account creation is its own line.

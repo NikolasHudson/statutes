@@ -60,6 +60,16 @@ class AuditEvent(models.Model):
         # actor is the staff member; the target lives in ``detail`` so the
         # trail answers "who changed whose account, and what changed".
         ADMIN_USER_CHANGE = "admin_user_change", "Admin changed a user account"
+        # Organization membership + invitations (apps.tenancy.services, and the
+        # org REST API on top of it). The org and the affected member live in
+        # ``detail``; the actor is whoever made the change.
+        ORG_MEMBER_ADD = "org_member_add", "Org member added"
+        ORG_MEMBER_REMOVE = "org_member_remove", "Org member removed"
+        ORG_ROLE_CHANGE = "org_role_change", "Org member role changed"
+        ORG_INVITE_CREATE = "org_invite_create", "Org invitation sent"
+        ORG_INVITE_REVOKE = "org_invite_revoke", "Org invitation revoked"
+        ORG_INVITE_ACCEPT = "org_invite_accept", "Org invitation accepted"
+        ORG_UPDATE = "org_update", "Organization updated"
 
     class Outcome(models.TextChoices):
         SUCCESS = "success", "Success"

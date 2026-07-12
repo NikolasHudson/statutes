@@ -29,6 +29,7 @@ from apps.corpus.services.lookups import (
 )
 from apps.corpus.services.search import hybrid_search
 
+from apps.billing.api import billing_router
 from apps.mail.api import mail_router
 from apps.marketing.api import marketing_router
 
@@ -38,6 +39,7 @@ from .admin_usage import admin_usage_router
 from .admin_users import admin_users_router
 from .auth import api_key_auth, enforce_rate_limit, require_feature
 from .browse import browse_router
+from .orgs import orgs_router
 from .research import research_router
 from .chat import chat_router
 from .verify import verify_router
@@ -91,6 +93,14 @@ api.add_router("/email", mail_router)
 # contact/newsletter capture in. auth=None on every route by design — the
 # caller is the static marketing site's server, which has no session.
 api.add_router("/marketing", marketing_router)
+# Org self-service (apps/api/orgs.py): members, roles, invitations. Session auth;
+# the invite-preview route is auth=None so an invitee can see who invited them
+# before signing up.
+api.add_router("/org", orgs_router)
+# Billing (apps/billing): Stripe checkout, customer portal, and the webhook that
+# is the source of truth for Subscription state. The webhook is auth=None and
+# CSRF-exempt — it is signature-verified instead.
+api.add_router("/billing", billing_router)
 
 
 # ---------------------------------------------------------------------------

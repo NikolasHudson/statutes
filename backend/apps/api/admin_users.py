@@ -19,6 +19,14 @@ with the target and the old→new values, so the append-only trail answers
 "who changed whose account". Deactivation is a full kill-switch: sessions die
 via ``ModelBackend.get_user`` and API keys / MCP OAuth tokens are filtered on
 ``user.is_active`` at verification time.
+
+**Comping.** ``User.tier`` is no longer writable here: since billing landed it is
+a derived cache of :func:`apps.tenancy.services.effective_plan`, so setting the
+column would grant nothing and be reverted by the ``reconcile_tiers`` cron. Staff
+now grant a plan by comping — ``comped_plan`` on the PATCH writes a comped
+Subscription on the user's personal org via :func:`apps.tenancy.comping.set_comped_plan`,
+and the tier follows from it. A plan that Stripe owns is refused with a 409: real
+customers' plans change in Stripe, never by hand.
 """
 
 from __future__ import annotations
@@ -26,6 +34,7 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal, InvalidOperation
 
+from django.db import transaction
 from django.db.models import Count, Max, Q, Sum
 from django.utils import timezone
 from ninja import Router, Schema
@@ -36,6 +45,7 @@ from apps.accounts.models import APIKey, Tier, User
 from apps.api.accounts import _get_profile
 from apps.api.admin_usage import StaffSessionAuth, _usd
 from apps.api.usage import user_budget_status
+from apps.tenancy.comping import CompingRefused, plan_state, set_comped_plan
 
 admin_users_router = Router(auth=StaffSessionAuth())
 
@@ -114,12 +124,40 @@ class AdminUsageSnapshot(Schema):
     last_llm_activity: dt.datetime | None
 
 
+class AdminOrgGrantOut(Schema):
+    """A plan the user gets from an org OTHER than their personal one."""
+
+    org_id: int
+    org_name: str
+    plan: str
+
+
+class AdminPlanOut(Schema):
+    """The comped-vs-paid picture of the user's personal (billing) org.
+
+    ``comped_plan`` is what a staff comp writes and is NOT ``user.tier``: the tier
+    is the max plan across every org the user belongs to, so a firm's member is
+    ``firm`` with no comp at all (``other_grants`` says why).
+    """
+
+    comped_plan: str  # "free" = not comped
+    source: str  # comped | stripe | none
+    status: str  # subscription status, "none" when there is no row
+    editable: bool  # False = Stripe owns this plan; PATCHing it is a 409
+    org_id: int | None
+    org_name: str
+    org_status: str
+    other_grants: list[AdminOrgGrantOut]
+
+
 class AdminUserDetail(Schema):
     user: AdminUserRow
     first_name: str
     last_name: str
     # Per-user override of the tier's monthly budget; null = tier default.
     monthly_budget_override_usd: float | None
+    # Where user.tier comes from, and whether staff may change it here.
+    plan: AdminPlanOut
     profile: AdminProfileOut
     api_keys: list[AdminKeyOut]
     usage: AdminUsageSnapshot
@@ -133,10 +171,14 @@ class AdminUserPatch(Schema):
     """All optional — the client sends only what changes (``exclude_unset``
     distinguishes "omitted" from "set to null", which clears the budget)."""
 
-    tier: str | None = None
+    # The staff-granted plan on the user's personal org. "free" un-comps.
+    comped_plan: str | None = None
     monthly_budget_usd: float | None = None
     is_active: bool | None = None
     is_staff: bool | None = None
+    # Retired. Declared only so a stale client that still sends it gets a loud
+    # 400 instead of a silent no-op — tier is derived from billing now.
+    tier: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +203,23 @@ def _can_edit(actor: User, target: User) -> bool:
 
 def _month_start(now: dt.datetime) -> dt.datetime:
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _plan_out(user: User) -> AdminPlanOut:
+    state = plan_state(user)
+    return AdminPlanOut(
+        comped_plan=state.comped_plan,
+        source=state.source,
+        status=state.status,
+        editable=state.editable,
+        org_id=state.org_id,
+        org_name=state.org_name,
+        org_status=state.org_status,
+        other_grants=[
+            AdminOrgGrantOut(org_id=g.org_id, org_name=g.org_name, plan=g.plan)
+            for g in state.other_grants
+        ],
+    )
 
 
 def _row(
@@ -327,6 +386,7 @@ def user_detail(request, user_id: int):
             if target.monthly_budget_usd is not None
             else None
         ),
+        plan=_plan_out(target),
         profile=AdminProfileOut(
             organization=profile.organization,
             role=profile.role,
@@ -387,65 +447,105 @@ def update_user(request, user_id: int, payload: AdminUserPatch):
         # A superuser account is deactivated from the shell, deliberately —
         # not from a browser tab where one click strands the whole admin.
         raise HttpError(400, "superuser accounts cannot be deactivated here")
+    if "tier" in data:
+        # A stale SPA bundle. Writing the column would grant nothing and be
+        # reverted by reconcile_tiers, so fail loudly rather than lie.
+        raise HttpError(
+            400,
+            "tier is derived from billing and is no longer writable — send "
+            "comped_plan to grant (or revoke) a staff comp",
+        )
 
     changes: dict[str, dict] = {}
     update_fields: list[str] = []
 
-    if "tier" in data:
-        new_tier = data["tier"] or ""
-        if new_tier not in Tier.values:
-            raise HttpError(400, f"unknown tier {new_tier!r}")
-        if new_tier != target.tier:
-            changes["tier"] = {"old": target.tier, "new": new_tier}
-            target.tier = new_tier
-            update_fields.append("tier")
+    # One transaction for the whole PATCH: the comp writes through the tenancy
+    # service (a subscription row + every affected member's tier), so a later
+    # validation error must not leave a plan granted with nothing else applied.
+    with transaction.atomic():
+        # --- The comp. First, because it is the only field that can 409. ---
+        if "comped_plan" in data:
+            new_plan = data["comped_plan"] or ""
+            if new_plan not in Tier.values:
+                raise HttpError(400, f"unknown plan {new_plan!r}")
+            before = plan_state(target)
+            if new_plan != before.comped_plan:
+                if not before.editable:
+                    # A Stripe-backed plan is Stripe's. (set_comped_plan refuses
+                    # it too — same fence, with the HTTP status attached.)
+                    raise HttpError(
+                        409,
+                        "this account's plan is billed through Stripe — change "
+                        "or cancel it in Stripe, not here",
+                    )
+                old_tier = target.tier
+                try:
+                    set_comped_plan(target, new_plan, actor=actor)
+                except CompingRefused as exc:
+                    raise HttpError(409, str(exc)) from exc
+                changes["comped_plan"] = {
+                    "old": before.comped_plan,
+                    "new": new_plan,
+                    "org_id": before.org_id,
+                }
+                # ...and the tier it derived. set_comped_plan already wrote that
+                # column (via sync_user_tier), so it is NOT in update_fields.
+                if target.tier != old_tier:
+                    changes["tier"] = {
+                        "old": old_tier,
+                        "new": target.tier,
+                        "derived": True,
+                    }
 
-    if "monthly_budget_usd" in data:
-        raw = data["monthly_budget_usd"]
-        if raw is None:
-            new_budget = None
-        else:
-            try:
-                new_budget = Decimal(str(raw)).quantize(Decimal("0.01"))
-            except InvalidOperation as exc:
-                raise HttpError(400, "invalid budget amount") from exc
-            if new_budget < 0 or new_budget > _MAX_BUDGET_USD:
-                raise HttpError(
-                    400, f"budget must be between 0 and {_MAX_BUDGET_USD}"
-                )
-        if new_budget != target.monthly_budget_usd:
-            changes["monthly_budget_usd"] = {
-                "old": (
-                    float(target.monthly_budget_usd)
-                    if target.monthly_budget_usd is not None
-                    else None
-                ),
-                "new": float(new_budget) if new_budget is not None else None,
-            }
-            target.monthly_budget_usd = new_budget
-            update_fields.append("monthly_budget_usd")
+        if "monthly_budget_usd" in data:
+            raw = data["monthly_budget_usd"]
+            if raw is None:
+                new_budget = None
+            else:
+                try:
+                    new_budget = Decimal(str(raw)).quantize(Decimal("0.01"))
+                except InvalidOperation as exc:
+                    raise HttpError(400, "invalid budget amount") from exc
+                if new_budget < 0 or new_budget > _MAX_BUDGET_USD:
+                    raise HttpError(
+                        400, f"budget must be between 0 and {_MAX_BUDGET_USD}"
+                    )
+            if new_budget != target.monthly_budget_usd:
+                changes["monthly_budget_usd"] = {
+                    "old": (
+                        float(target.monthly_budget_usd)
+                        if target.monthly_budget_usd is not None
+                        else None
+                    ),
+                    "new": float(new_budget) if new_budget is not None else None,
+                }
+                target.monthly_budget_usd = new_budget
+                update_fields.append("monthly_budget_usd")
 
-    for flag in ("is_active", "is_staff"):
-        if flag in data:
-            new_val = bool(data[flag])
-            if new_val != getattr(target, flag):
-                changes[flag] = {"old": getattr(target, flag), "new": new_val}
-                setattr(target, flag, new_val)
-                update_fields.append(flag)
+        for flag in ("is_active", "is_staff"):
+            if flag in data:
+                new_val = bool(data[flag])
+                if new_val != getattr(target, flag):
+                    changes[flag] = {"old": getattr(target, flag), "new": new_val}
+                    setattr(target, flag, new_val)
+                    update_fields.append(flag)
 
-    if update_fields:
-        target.save(update_fields=update_fields)
-        record_event(
-            event_type=AuditEvent.Event.ADMIN_USER_CHANGE,
-            request=request,
-            actor=actor,
-            outcome=AuditEvent.Outcome.SUCCESS,
-            detail={
-                "target_user_id": target.id,
-                "target_email": target.email,
-                "changes": changes,
-            },
-        )
+        if update_fields:
+            target.save(update_fields=update_fields)
+        # `changes` can be non-empty with NO update_fields: a comp writes the
+        # tier through the tenancy service, not through this row.
+        if changes:
+            record_event(
+                event_type=AuditEvent.Event.ADMIN_USER_CHANGE,
+                request=request,
+                actor=actor,
+                outcome=AuditEvent.Outcome.SUCCESS,
+                detail={
+                    "target_user_id": target.id,
+                    "target_email": target.email,
+                    "changes": changes,
+                },
+            )
 
     return user_detail(request, user_id)
 

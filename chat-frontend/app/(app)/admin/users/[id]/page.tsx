@@ -1,11 +1,16 @@
 "use client";
 
 // Admin · User detail — manage one account over /api/admin/users/{id}.
-// Left: account controls (tier, monthly budget override, deactivate/staff
+// Left: account controls (comped plan, monthly budget override, deactivate/staff
 // toggles behind an inline confirm) + API keys with admin revoke. Right:
 // usage snapshot, profile, and the recent security-event trail. The server
 // re-checks every guardrail (staffness, superuser fence, self-lockout) on
 // each write; can_edit/can_edit_staff_flag here only decide what to render.
+//
+// Tier is NOT editable: it is a derived cache of the billing state. What staff
+// grant is a COMP — a staff-granted subscription on the user's personal org
+// (detail.plan) — and the tier follows from it. A plan Stripe bills (source:
+// "stripe") is read-only here; changing it is a 409, surfaced in the banner.
 
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
@@ -27,6 +32,7 @@ import {
 import { AccountError } from "@/lib/iowa-account";
 import {
 	type AdminAuditEvent,
+	type AdminPlanSource,
 	type AdminUserDetail,
 	type AdminUserPatch,
 	getAdminUser,
@@ -60,12 +66,31 @@ function fmtWhen(iso: string | null): string {
 	});
 }
 
-const TIER_OPTIONS = [
-	{ value: "free", label: "Trial" },
+// The comp control's options. "free" is not a plan — it is the absence of one,
+// i.e. un-comping (the backend deletes the comped subscription).
+const PLAN_OPTIONS = [
+	{ value: "free", label: "Not comped" },
 	{ value: "solo", label: "Solo" },
 	{ value: "firm", label: "Firm" },
 	{ value: "custom", label: "Custom" },
 ];
+
+const PLAN_LABELS: Record<UsageTier, string> = {
+	free: "Free",
+	solo: "Solo",
+	firm: "Firm",
+	custom: "Custom",
+};
+
+// How the user came by their plan — the comped-vs-paid distinction.
+const SOURCE_TAGS: Record<
+	AdminPlanSource,
+	{ label: string; kind: TagKind } | null
+> = {
+	comped: { label: "Comped", kind: "yellow" },
+	stripe: { label: "Paid · Stripe", kind: "green" },
+	none: null,
+};
 
 const EVENT_LABELS: Record<string, string> = {
 	login_success: "Login",
@@ -186,6 +211,7 @@ export default function AdminUserDetailPage() {
 		label: u.tier,
 		kind: "gray" as TagKind,
 	};
+	const sourceTag = SOURCE_TAGS[detail.plan.source];
 
 	return (
 		<Wrap>
@@ -207,6 +233,7 @@ export default function AdminUserDetailPage() {
 							</span>
 						)}
 						<Tag kind={tierTag.kind}>{tierTag.label}</Tag>
+						{sourceTag && <Tag kind={sourceTag.kind}>{sourceTag.label}</Tag>}
 						{u.is_superuser ? (
 							<Tag kind="outline">Superuser</Tag>
 						) : u.is_staff ? (
@@ -322,8 +349,12 @@ function Wrap({ children }: { children: React.ReactNode }) {
 }
 
 // ---------------------------------------------------------------------------
-// Account controls — tier + budget save together; the dangerous flags
+// Account controls — comped plan + budget save together; the dangerous flags
 // (deactivate, staff) each sit behind an inline confirm.
+//
+// The plan control edits the COMP, not the tier: it writes a staff-granted
+// subscription on the user's personal org, which the tier is then derived from.
+// For a Stripe-paying customer it is read-only — that plan is Stripe's.
 // ---------------------------------------------------------------------------
 
 function AccountControls({
@@ -334,7 +365,11 @@ function AccountControls({
 	onSave: (patch: AdminUserPatch) => Promise<void>;
 }) {
 	const u = detail.user;
-	const [tier, setTier] = useState<UsageTier>(u.tier);
+	const plan = detail.plan;
+	const paid = plan.source === "stripe";
+	const planLocked = !detail.can_edit || !plan.editable;
+
+	const [comped, setComped] = useState<UsageTier>(plan.comped_plan);
 	const [budget, setBudget] = useState(
 		detail.monthly_budget_override_usd === null
 			? ""
@@ -344,18 +379,19 @@ function AccountControls({
 
 	// Re-sync the form when a save (or admin toggle) returns fresh state.
 	useEffect(() => {
-		setTier(u.tier);
+		setComped(plan.comped_plan);
 		setBudget(
 			detail.monthly_budget_override_usd === null
 				? ""
 				: String(detail.monthly_budget_override_usd),
 		);
 		setBudgetInvalid(false);
-	}, [u.tier, detail.monthly_budget_override_usd]);
+	}, [plan.comped_plan, detail.monthly_budget_override_usd]);
 
 	const parsedBudget = budget.trim() === "" ? null : Number(budget);
-	const dirty =
-		tier !== u.tier || parsedBudget !== detail.monthly_budget_override_usd;
+	const planDirty = comped !== plan.comped_plan;
+	const budgetDirty = parsedBudget !== detail.monthly_budget_override_usd;
+	const dirty = planDirty || budgetDirty;
 
 	const submit = () => {
 		if (
@@ -366,19 +402,31 @@ function AccountControls({
 			return;
 		}
 		setBudgetInvalid(false);
-		void onSave({ tier, monthly_budget_usd: parsedBudget });
+		// Only send what changed: a plan the server considers Stripe-owned 409s,
+		// so an unchanged plan must not ride along with a budget edit.
+		const patch: AdminUserPatch = {};
+		if (planDirty) patch.comped_plan = comped;
+		if (budgetDirty) patch.monthly_budget_usd = parsedBudget;
+		void onSave(patch);
 	};
 
 	return (
 		<Panel title="Account controls">
 			<div className="flex flex-col gap-5 p-4">
+				{paid && (
+					<Notification kind="info" title="Billed through Stripe">
+						This account pays for {PLAN_LABELS[plan.comped_plan]} ({plan.status}
+						) through Stripe. Change or cancel it in Stripe or the customer
+						portal — a plan edit here is refused.
+					</Notification>
+				)}
 				<div className="flex flex-wrap items-end gap-4">
 					<SelectField
-						label="Tier"
-						value={tier}
-						disabled={!detail.can_edit}
-						onChange={(e) => setTier(e.target.value as UsageTier)}
-						options={TIER_OPTIONS}
+						label={paid ? "Plan (billed by Stripe)" : "Comped plan"}
+						value={comped}
+						disabled={planLocked}
+						onChange={(e) => setComped(e.target.value as UsageTier)}
+						options={PLAN_OPTIONS}
 						className="w-40"
 					/>
 					<TextField
@@ -404,6 +452,22 @@ function AccountControls({
 					<p className="text-[var(--cds-danger-text,#da1e28)] text-xs">
 						Budget must be a non-negative number (leave blank for the tier
 						default).
+					</p>
+				)}
+				<p className="text-[var(--cds-helper)] text-xs">
+					Comping grants a plan by hand: it writes a staff-granted subscription
+					on {plan.org_name || "the user’s personal organization"} — no Stripe,
+					no invoice. The tier ({PLAN_LABELS[u.tier] ?? u.tier}) is derived from
+					billing, so this is the only way to grant one. <em>Not comped</em>{" "}
+					removes the comp.
+				</p>
+				{plan.other_grants.length > 0 && (
+					<p className="text-[var(--cds-helper)] text-xs">
+						Also granted{" "}
+						{plan.other_grants
+							.map((g) => `${PLAN_LABELS[g.plan] ?? g.plan} by ${g.org_name}`)
+							.join(", ")}
+						. Removing the comp will not drop them below that.
 					</p>
 				)}
 				<p className="text-[var(--cds-helper)] text-xs">

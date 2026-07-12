@@ -11,8 +11,9 @@ Three jobs, one module:
 * **Attribution** — :func:`collect_usage` is a context manager the HTTP /
   worker entry points wrap around a turn. While active, emissions buffer
   into a per-request sink and flush as ``LlmUsage`` rows attributed to the
-  user (and stamped with one shared ``request_id`` = one turn). Outside any
-  collector (cron jobs, shell), emissions write immediately as
+  user (and stamped with one shared ``request_id`` = one turn, plus the
+  user's billing org for future org-level reporting — budgets stay per-user).
+  Outside any collector (cron jobs, shell), emissions write immediately as
   unattributed rows so platform totals stay complete.
 
   Confidentiality: this table is deliberately CONTENT-FREE — numbers only,
@@ -150,7 +151,8 @@ def emit_usage(
             return
         from apps.api.models import LlmUsage
 
-        LlmUsage.objects.create(user=None, request_id=None, **event)
+        # Unattributed (cron/shell): no user, therefore no billing org.
+        LlmUsage.objects.create(user=None, org=None, request_id=None, **event)
     except Exception:  # noqa: BLE001 — accounting must never break the caller
         logger.exception("emit_usage failed")
 
@@ -173,6 +175,21 @@ def emit_completion_usage(feature: str, completion, fallback_model: str = "") ->
         logger.exception("emit_completion_usage failed")
 
 
+def _billing_org_id(user) -> int | None:
+    """The user's billing org, stamped onto each row for future org-level
+    reporting. Read-only and best-effort: a user without a personal org (a shell-
+    created account) simply gets a null org, and any error here must not cost us
+    the usage row."""
+    try:
+        from apps.tenancy.services import billing_org
+
+        org = billing_org(user)
+        return org.pk if org is not None else None
+    except Exception:  # noqa: BLE001 — accounting must never break the caller
+        logger.exception("billing_org lookup failed")
+        return None
+
+
 @contextmanager
 def collect_usage(user, relabel: dict[str, str] | None = None):
     """Attribute every emission inside the block to ``user`` as one turn.
@@ -193,9 +210,11 @@ def collect_usage(user, relabel: dict[str, str] | None = None):
 
                 request_id = uuid.uuid4()
                 relabel = relabel or {}
+                org_id = _billing_org_id(user)
                 LlmUsage.objects.bulk_create(
                     LlmUsage(
                         user=user,
+                        org_id=org_id,
                         request_id=request_id,
                         feature=relabel.get(e["feature"], e["feature"]),
                         model=e["model"],

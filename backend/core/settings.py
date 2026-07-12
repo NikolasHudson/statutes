@@ -108,6 +108,42 @@ env = environ.Env(
     # month-to-date recorded cost crosses this, chat/verify return 503 for
     # everyone (staff included) until the 1st. 0 disables the ceiling.
     CHAT_GLOBAL_MONTHLY_BUDGET_USD=(float, 500.0),
+    # Billing (apps.tenancy.services). How long a ``past_due`` subscription keeps
+    # granting its plan after the first failed payment — the dunning grace window.
+    # Past it, the org grants ``free`` and every existing tier gate enforces that
+    # with no extra code. The STRIPE_* keys live with apps/billing.
+    BILLING_PAST_DUE_GRACE_DAYS=(int, 7),
+    # The billing launch switch: when True, the interactive surfaces (chat,
+    # verify, research search, API keys/MCP, email assistant) require a paid
+    # plan — there is no free tier, only the Stripe trial. Default False so
+    # beta/dev/CI keep working; flipping it in prod IS the end of open beta,
+    # so comp/notify existing users first (apps/tenancy/comping.py).
+    BILLING_REQUIRE_PAID=(bool, False),
+    # --- Stripe (apps.billing) ---------------------------------------------
+    # Every one of these defaults to empty so dev, CI and the test suite boot
+    # with no Stripe account at all: apps/billing treats an empty
+    # STRIPE_SECRET_KEY as "billing not configured" and the Stripe-calling
+    # endpoints answer 503 instead of exploding (GET /api/billing/subscription
+    # still serves DB state — a comped subscription has no Stripe object).
+    STRIPE_SECRET_KEY=(str, ""),
+    STRIPE_PUBLISHABLE_KEY=(str, ""),
+    STRIPE_WEBHOOK_SECRET=(str, ""),
+    # Price IDs, NOT prices. Dollar amounts live in Stripe and are never
+    # hardcoded in Python — these map price_id → plan (apps/billing/plans.py).
+    # FIRM_SEAT is the optional per-seat line item that rides alongside the
+    # FIRM base price; when it is set, it is the item whose quantity seat sync
+    # moves. Leave it empty for a flat per-seat firm price.
+    STRIPE_PRICE_SOLO=(str, ""),
+    STRIPE_PRICE_FIRM=(str, ""),
+    STRIPE_PRICE_FIRM_SEAT=(str, ""),
+    # Card-up-front trial length applied at Checkout, first subscription per org
+    # only (an org that ever held a Stripe subscription doesn't trial again).
+    # 0 disables trials entirely.
+    STRIPE_TRIAL_DAYS=(int, 7),
+    # Where Stripe Checkout / the Billing Portal send the browser back to. Empty
+    # = derive it (APP_URL, else the first CORS origin, else EMAIL_LINK_BASE_URL);
+    # set it explicitly in prod. The "/account/billing" path is appended.
+    STRIPE_RETURN_BASE_URL=(str, ""),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
@@ -127,6 +163,8 @@ OPENAI_API_KEY = env("OPENAI_API_KEY")
 CHAT_DAILY_USER_LIMIT = env("CHAT_DAILY_USER_LIMIT")
 CHAT_MONTHLY_GLOBAL_LIMIT = env("CHAT_MONTHLY_GLOBAL_LIMIT")
 CHAT_GLOBAL_MONTHLY_BUDGET_USD = env("CHAT_GLOBAL_MONTHLY_BUDGET_USD")
+BILLING_PAST_DUE_GRACE_DAYS = env("BILLING_PAST_DUE_GRACE_DAYS")
+BILLING_REQUIRE_PAID = env("BILLING_REQUIRE_PAID")
 CHAT_TRACE_CAPTURE = env("CHAT_TRACE_CAPTURE")
 CHAT_TRACE_RETENTION_DAYS = env("CHAT_TRACE_RETENTION_DAYS")
 RAG_ABSTAIN_BLOCKING = env("RAG_ABSTAIN_BLOCKING")
@@ -172,6 +210,25 @@ if POSTMARK_SERVER_TOKEN:
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
+# ---------------------------------------------------------------------------
+# Stripe (apps.billing). All optional: with STRIPE_SECRET_KEY unset the app
+# boots, the suite passes, and /api/billing/{checkout,portal,webhook} return a
+# clean 503 "billing not configured". Subscription state is still readable —
+# a backfilled/comped Subscription row has no Stripe object behind it at all.
+#
+# STRIPE_PRICE_* are Stripe price IDs (price_...), never amounts: the price
+# points live in the Stripe dashboard, and apps/billing/plans.py maps
+# price_id → plan (free/solo/firm/custom) in both directions.
+# ---------------------------------------------------------------------------
+STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY")
+STRIPE_PUBLISHABLE_KEY = env("STRIPE_PUBLISHABLE_KEY")
+STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET")
+STRIPE_PRICE_SOLO = env("STRIPE_PRICE_SOLO")
+STRIPE_PRICE_FIRM = env("STRIPE_PRICE_FIRM")
+STRIPE_PRICE_FIRM_SEAT = env("STRIPE_PRICE_FIRM_SEAT")
+STRIPE_TRIAL_DAYS = env("STRIPE_TRIAL_DAYS")
+STRIPE_RETURN_BASE_URL = env("STRIPE_RETURN_BASE_URL")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -189,6 +246,7 @@ INSTALLED_APPS = [
     "apps.corpus",
     "apps.tenancy",
     "apps.api",
+    "apps.billing",
     "apps.mail",
     "apps.marketing",
     "apps.citations",

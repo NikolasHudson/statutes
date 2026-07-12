@@ -185,6 +185,19 @@ class LlmUsage(models.Model):
         related_name="llm_usage",
     )
 
+    # The user's billing org at capture time (apps.tenancy.services.billing_org),
+    # snapshotted so later org moves don't rewrite history. Null for background
+    # traffic and for users with no personal org. Present for FUTURE org-level
+    # reporting only — budget enforcement is still per-user (apps.api.usage).
+    org = models.ForeignKey(
+        "tenancy.Organization",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=True,
+        related_name="llm_usage",
+    )
+
     # One UUID per collected turn; null for uncollected background emissions.
     request_id = models.UUIDField(null=True, blank=True)
 

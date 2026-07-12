@@ -17,6 +17,7 @@ import {
 	useState,
 } from "react";
 import { CarbonSignIn } from "@/components/carbon/sign-in";
+import { PaywallScreen } from "@/components/paywall";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { csrfHeaders } from "@/lib/csrf";
@@ -31,6 +32,10 @@ export type AuthUser = {
 	last_name: string;
 	tier: string;
 	onboarding_completed: boolean;
+	// False when billing enforcement is on and the account holds no live plan
+	// (see BILLING_REQUIRE_PAID server-side). Optional so a cached pre-field
+	// response defaults to allowed; the server 402s regardless.
+	paid_access?: boolean;
 	// Staff flag from /api/auth/me — gates the Admin nav + /admin routes.
 	is_staff?: boolean;
 	// Gates the staff-flag controls on /admin/users. Display-only — the
@@ -59,11 +64,24 @@ const PUBLIC_PATHS = ["/terms", "/privacy"];
 // way — a public, signed-out-readable prototype for iteration, as are the
 // Carbon design explorations: the browse Library home (/browse-carbon-mockup)
 // and the full app-in-Carbon suite (/app-carbon-mockup).
+//
+// /invite/<token> is public for a real reason: an org invitation usually lands
+// with someone who has no account yet, and they must be able to see who invited
+// them (via the unauthenticated preview endpoint) before signing up. The page
+// renders outside this provider in every auth state and runs its own
+// /api/auth/me check; accepting still requires a session, enforced server-side.
+//
+// /start is the signup→checkout wizard the marketing pricing page links to.
+// Its visitor has no account yet by definition — the wizard creates one on
+// step 02 (its own /api/auth/me check, like /invite) and every billing call it
+// makes is session-authenticated server-side.
 const PUBLIC_PREFIXES = [
 	"/home-mockup",
 	"/casebook-mockup",
 	"/browse-carbon-mockup",
 	"/app-carbon-mockup",
+	"/invite",
+	"/start",
 ];
 
 function isPublicPath(pathname: string): boolean {
@@ -81,6 +99,17 @@ const LEGACY_PREFIXES = ["/classic", "/browse", "/cases", "/verify"];
 
 function isLegacyPath(pathname: string): boolean {
 	return LEGACY_PREFIXES.some(
+		(p) => pathname === p || pathname.startsWith(`${p}/`),
+	);
+}
+
+// Routes an unpaid account may still use: billing lives under /account, and
+// /org is how a firm member sees whose subscription they're waiting on. The
+// public prefixes (incl. /start) never reach the paywall check at all.
+const PAYWALL_EXEMPT_PREFIXES = ["/account", "/org"];
+
+function isPaywallExempt(pathname: string): boolean {
+	return PAYWALL_EXEMPT_PREFIXES.some(
 		(p) => pathname === p || pathname.startsWith(`${p}/`),
 	);
 }
@@ -138,6 +167,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
 	// since landing on a public page doesn't consume the once-per-session key).
 	useEffect(() => {
 		if (status !== "signed-in" || !user) return;
+		// An unpaid account is headed for the paywall, not the onboarding
+		// wizard — don't burn the once-per-session nudge on it.
+		if (user.paid_access === false) return;
 		if (user.onboarding_completed) return;
 		if (
 			pathname === "/onboarding" ||
@@ -196,6 +228,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
 			return <SignInScreen onSignedIn={onSignedIn} />;
 		}
 		return <CarbonSignIn onSignedIn={onSignedIn} />;
+	}
+
+	// No live plan → paywall instead of the app (except the billing/org
+	// surfaces the user needs in order to fix exactly that).
+	if (user && user.paid_access === false && !isPaywallExempt(pathname)) {
+		return <PaywallScreen user={user} onUser={setUser} signOut={signOut} />;
 	}
 
 	return (

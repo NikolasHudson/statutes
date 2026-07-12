@@ -199,12 +199,38 @@ export type AdminAuditEvent = {
 	detail: Record<string, unknown>;
 };
 
+// Where the user's tier comes from. `tier` is a derived cache of the billing
+// state, so the thing staff actually edit is the COMPED plan: a staff-granted
+// subscription on the user's personal org. `source: "stripe"` means a real
+// paying customer — their plan is changed in Stripe, and PATCHing it here 409s.
+export type AdminPlanSource = "comped" | "stripe" | "none";
+
+export type AdminOrgGrant = {
+	org_id: number;
+	org_name: string;
+	plan: UsageTier;
+};
+
+export type AdminUserPlan = {
+	comped_plan: UsageTier; // "free" = not comped
+	source: AdminPlanSource;
+	status: string; // subscription status; "none" when there is no row
+	editable: boolean; // false = Stripe owns it
+	org_id: number | null;
+	org_name: string;
+	org_status: string;
+	// Orgs OTHER than their personal one that grant them a plan (a firm seat) —
+	// why a user can be `firm` with no comp, and why un-comping may not drop them.
+	other_grants: AdminOrgGrant[];
+};
+
 export type AdminUserDetail = {
 	user: AdminUserRow;
 	first_name: string;
 	last_name: string;
 	// Per-user override of the tier's monthly budget; null = tier default.
 	monthly_budget_override_usd: number | null;
+	plan: AdminUserPlan;
 	profile: AdminUserProfile;
 	api_keys: AdminApiKey[];
 	usage: {
@@ -220,8 +246,10 @@ export type AdminUserDetail = {
 };
 
 // All optional; monthly_budget_usd: null clears the per-user override.
+// `tier` is NOT patchable — it is derived from billing; comp with comped_plan
+// ("free" un-comps). A Stripe-billed plan refuses the change with a 409.
 export type AdminUserPatch = {
-	tier?: UsageTier;
+	comped_plan?: UsageTier;
 	monthly_budget_usd?: number | null;
 	is_active?: boolean;
 	is_staff?: boolean;

@@ -42,6 +42,7 @@ from apps.api.chat import (
 from apps.api.trace_capture import record_chat_trace
 from apps.api.usage import FEATURE_CHAT, FEATURE_EMAIL, collect_usage
 from apps.tenancy.entitlement import is_entitled
+from apps.tenancy.services import has_paid_access
 from django.conf import settings as django_settings
 
 from . import render
@@ -132,6 +133,22 @@ def _process(inbound: InboundEmail) -> None:
             f"{address.product.support_email or 'support'}.",
         )
         _finish(inbound, InboundEmail.Status.REJECTED, "not entitled")
+        return
+
+    # No free tier (BILLING_REQUIRE_PAID): the assistant spends LLM budget, so
+    # a sender whose account holds no live plan gets one polite pointer at the
+    # billing page instead of an answer.
+    if not has_paid_access(user):
+        _notify_once(
+            inbound,
+            address,
+            user,
+            "no-subscription",
+            "Your account doesn't have an active plan, so the email assistant "
+            "can't answer. Start your free trial or manage your subscription "
+            "under Account → Billing in the app.",
+        )
+        _finish(inbound, InboundEmail.Status.REJECTED, "no active plan")
         return
 
     answered_today = InboundEmail.objects.filter(

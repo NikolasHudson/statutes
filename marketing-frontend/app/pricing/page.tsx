@@ -3,10 +3,12 @@
 // tiles, ruled FAQ rows, ink CTA band. Chrome + primitives come from
 // components/marketing/carbon.tsx.
 //
-// Hudson is in beta, so "Beta access" is the live/highlighted tier and the paid
-// tiers are shown as planned ("what pricing will look like"). Honest framing:
-// pricing is announced before launch; nobody gets charged without notice.
-// Server component (carries <metadata>).
+// Launch pricing per PRICING_STRATEGY.md (2026-07-11): Solo $49/mo ($490/yr),
+// Firm $149/mo incl. 3 seats +$39/seat, Enterprise custom. Every paid plan
+// starts with a 7-day card-up-front trial — there is no free tier. Honest
+// framing: while billing is dark (NEXT_PUBLIC_BILLING_LIVE unset) the page says
+// plainly that these are announced launch prices and beta users get notice
+// before any charge. Server component (carries <metadata>).
 
 import { CheckIcon } from "lucide-react";
 import type { Metadata } from "next";
@@ -26,13 +28,14 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = {
 	title: "Pricing — Hudson Legal Technologies",
 	description:
-		"Hudson is in beta. See what's included now and where pricing is headed — you won't be charged without notice.",
+		"Solo $49/month, Firm $149/month including 3 seats. Every plan starts with a 7-day free trial — no surprise charges.",
 };
 
 type Tier = {
 	name: string;
 	price: string;
 	cadence?: string;
+	subPrice?: string;
 	tagline: string;
 	features: string[];
 	cta: { label: string; href: string; disabled?: boolean };
@@ -40,46 +43,66 @@ type Tier = {
 	badge?: string;
 };
 
+// Self-serve checkout is built but stays dark until Stripe is live. Until
+// NEXT_PUBLIC_BILLING_LIVE is set, the trial CTAs fall back to beta signup
+// (Solo) and the consult form (Firm) instead of the app's checkout page.
+const BILLING_LIVE = process.env.NEXT_PUBLIC_BILLING_LIVE === "1";
+
 const TIERS: Tier[] = [
 	{
-		name: "Beta access",
-		price: "In beta",
-		tagline:
-			"Full access today. Pricing is announced before launch — never a surprise charge.",
-		features: [
-			"Full corpus — Iowa Code, Court Rules & caselaw",
-			"Grounded, cited answers with verification",
-			"Hybrid search across all sources",
-			"Use in the browser and via MCP",
-		],
-		cta: { label: "Get started", href: APP_URL },
-		featured: true,
-		badge: "Available now",
-	},
-	{
-		name: "Pro",
-		price: "$29",
+		name: "Solo",
+		price: "$49",
 		cadence: "/ month",
+		subPrice: "or $490 / year — two months free",
 		tagline: "For the individual practitioner who lives in research.",
 		features: [
-			"Everything in Beta access",
-			"Higher usage limits",
-			"Priority answers & support",
-			"Saved research & history",
+			"Unlimited research chat with cited, verified answers",
+			"Full search — Iowa Code, admin code, Acts & caselaw",
+			"Citator with treatment & supersession notes",
+			"MCP connector, saved research & the email assistant",
 		],
-		cta: { label: "Coming soon", href: "#", disabled: true },
+		// /start is the app's signup→checkout wizard; ?plan pre-selects the plan.
+		cta: BILLING_LIVE
+			? {
+					label: "Start 7-day free trial",
+					href: `${APP_URL}/start?plan=solo`,
+				}
+			: { label: "Get started", href: APP_URL },
+		featured: true,
+		badge: "7-day free trial",
 	},
 	{
-		name: "Team & Firm",
-		price: "Custom",
-		tagline: "For firms standardizing how the team uses AI.",
+		name: "Firm",
+		price: "$149",
+		cadence: "/ month",
+		subPrice: "includes 3 seats · $39 / month per added seat",
+		tagline: "For firms standardizing how the team does research.",
 		features: [
-			"Everything in Pro",
-			"Seats, roles & SSO",
+			"Everything in Solo",
+			"Brief cite-check with PDF & DOCX upload",
+			"Org console — seats, roles & invitations",
+			"Firm-wide usage dashboard & priority support",
+		],
+		cta: BILLING_LIVE
+			? {
+					label: "Start 7-day free trial",
+					href: `${APP_URL}/start?plan=firm`,
+				}
+			: { label: "Talk to us", href: `${CONSULTING_HREF}#contact` },
+		badge: "7-day free trial",
+	},
+	{
+		name: "Enterprise",
+		price: "Custom",
+		tagline: "Bar associations, county attorneys, legal aid & government.",
+		features: [
+			"Everything in Firm",
 			"Custom corpus & integrations",
-			"Onboarding & dedicated support",
+			"SSO & onboarding",
+			"Dedicated support",
 		],
 		cta: { label: "Talk to us", href: `${CONSULTING_HREF}#contact` },
+		badge: "Custom",
 	},
 ];
 
@@ -87,12 +110,22 @@ export default function PricingPage() {
 	return (
 		<CarbonPage>
 			<PageHero
-				eyebrow="Pricing — Now in beta"
+				eyebrow="Pricing"
 				title="Simple pricing, honest terms."
-				lede="Hudson is in open beta. Here's what's included today and where pricing is headed — you'll never be charged without notice."
+				lede={
+					BILLING_LIVE
+						? "Every plan starts with a 7-day free trial — card up front, a reminder email before your first charge, cancel anytime during the trial."
+						: "These are our launch prices, announced ahead of time as promised. Hudson is still in open beta: billing hasn't started, and you'll get clear notice before anything is ever charged."
+				}
 				actions={
 					<>
-						<SolidLink href={APP_URL}>Get started</SolidLink>
+						{BILLING_LIVE ? (
+							<SolidLink href={`${APP_URL}/start`}>
+								Start 7-day free trial
+							</SolidLink>
+						) : (
+							<SolidLink href={APP_URL}>Get started</SolidLink>
+						)}
 						<HairlineLink href={`${CONSULTING_HREF}#contact`}>
 							Talk to us
 						</HairlineLink>
@@ -127,8 +160,10 @@ function Tiers() {
 				</div>
 
 				<p className="mt-8 text-[13px] text-muted-foreground">
-					Paid tiers are indicative while we're in beta and may change before
-					launch. Current users will get plenty of notice.
+					"Unlimited" means fair professional use — generous monthly usage
+					allowances, never a per-question meter.
+					{!BILLING_LIVE &&
+						" Prices take effect when billing launches; current beta users get clear notice well before any charge."}
 				</p>
 			</div>
 		</section>
@@ -166,6 +201,11 @@ function TierTile({ tier }: { tier: Tier }) {
 					<span className="text-muted-foreground text-sm">{tier.cadence}</span>
 				)}
 			</div>
+			{tier.subPrice && (
+				<p className="mt-1.5 text-[13px] text-muted-foreground tabular-nums">
+					{tier.subPrice}
+				</p>
+			)}
 			<p className="mt-3 text-muted-foreground text-sm leading-relaxed">
 				{tier.tagline}
 			</p>
@@ -212,16 +252,24 @@ function TierTile({ tier }: { tier: Tier }) {
 
 const FAQS: { q: string; a: string }[] = [
 	{
-		q: "What does beta access include?",
-		a: "The full product — the whole corpus, cited answers, verification, and MCP access. We'll announce pricing before launch and give you plenty of notice before anything changes.",
+		q: "How does the 7-day trial work?",
+		a: "You enter a card up front and get full access to your plan for 7 days. We email you a reminder before the trial ends, and you can cancel in one click any time during it — cancel and you're never charged.",
 	},
 	{
-		q: "What happens when beta ends?",
-		a: "We'll introduce paid plans with clear notice well ahead of any change. You won't wake up to a surprise charge.",
+		q: "What happens to beta access?",
+		a: "Beta ends when billing launches. Everyone using Hudson today will get clear written notice — weeks, not days — before anyone is charged. We promised pricing would be announced before launch; this page is that announcement.",
 	},
 	{
 		q: "Do you offer plans for firms?",
-		a: "Yes — Team & Firm plans cover seats, SSO, a custom corpus, and onboarding. Reach out and we'll scope it with you.",
+		a: "Yes — Firm is $149/month and includes 3 seats, with additional seats at $39/month each. You get an org console for seats, roles, and invitations, a firm-wide usage dashboard, and cite-check uploads. Adding a seat prorates automatically.",
+	},
+	{
+		q: "Do you offer annual billing?",
+		a: "Solo is $490/year — two months free. For firm annual billing or invoicing, talk to us and we'll set it up.",
+	},
+	{
+		q: "Do I need an account to read the law?",
+		a: "No. Statute, rule, and case pages stay publicly readable. An account is for the interactive layer — research chat, search, the citator, MCP, and the email assistant.",
 	},
 	{
 		q: "Is my research used to train models?",
@@ -262,12 +310,17 @@ function CtaBand() {
 					<div className="max-w-2xl">
 						<h2 className="font-light text-3xl sm:text-4xl">Start today.</h2>
 						<p className="mt-4 text-[#c6c6c6] text-lg leading-relaxed">
-							Beta access is open now. Ask your first question and follow the
-							citation to the source.
+							{BILLING_LIVE
+								? "Start your 7-day free trial. Ask your first question and follow the citation to the source."
+								: "Beta access is open now. Ask your first question and follow the citation to the source."}
 						</p>
 					</div>
 					<div className="flex shrink-0 flex-col gap-3 sm:flex-row">
-						<SolidLink href={APP_URL}>Get started</SolidLink>
+						{BILLING_LIVE ? (
+							<SolidLink href={`${APP_URL}/start`}>Start free trial</SolidLink>
+						) : (
+							<SolidLink href={APP_URL}>Get started</SolidLink>
+						)}
 						<HairlineLink href={`${CONSULTING_HREF}#contact`}>
 							Talk to our team
 						</HairlineLink>
