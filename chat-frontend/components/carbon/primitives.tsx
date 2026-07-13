@@ -25,7 +25,8 @@ import {
 } from "lucide-react";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
-import { createContext, useContext, useId, useState } from "react";
+import { createContext, useContext, useEffect, useId, useState } from "react";
+import { appHost } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 const plexSans = IBM_Plex_Sans({
@@ -250,16 +251,26 @@ export type NavGroup = {
 export function SideNav({
 	groups,
 	active,
-	footer = "corpus.nick.law · beta",
+	footer,
 	className,
 }: {
 	groups: NavGroup[];
 	active: string;
+	// Defaults to the host the app is served from. Left undefined rather than
+	// computed in the signature because the fallback needs `window`: see below.
 	footer?: React.ReactNode;
 	// Positioning/visibility overrides (e.g. the v2 shell's mobile drawer /
 	// desktop collapse) — merged after the defaults so they win conflicts.
 	className?: string;
 }) {
+	// The public mockup routes render this nav on the server, where appHost()
+	// has no window and no NEXT_PUBLIC_APP_URL to read, so resolving it during
+	// render would hydrate a different string than it served. Fill it in after
+	// mount instead, when the two agree.
+	const [host, setHost] = useState("");
+	useEffect(() => setHost(appHost()), []);
+	const content = footer ?? (host ? `${host} · beta` : "beta");
+
 	return (
 		<nav
 			className={cn(
@@ -311,12 +322,12 @@ export function SideNav({
 			</div>
 
 			<div className="border-[var(--cds-border)] border-t">
-				{typeof footer === "string" ? (
+				{typeof content === "string" ? (
 					<p className="px-4 py-4 font-mono text-[11px] text-[var(--cds-helper)]">
-						{footer}
+						{content}
 					</p>
 				) : (
-					footer
+					content
 				)}
 			</div>
 		</nav>

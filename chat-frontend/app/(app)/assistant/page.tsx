@@ -46,6 +46,7 @@ import {
 	streamVerify,
 	type VerifySummary,
 } from "@/lib/iowa-verify";
+import { BRAND_NAME } from "@/lib/brand";
 import { loadThreads, saveThreads } from "@/lib/thread-store";
 import { cn } from "@/lib/utils";
 
@@ -475,7 +476,7 @@ export default function V2AssistantPage() {
 				{/* Header — scope + model */}
 				<header className="flex h-14 shrink-0 items-center gap-3 border-[var(--cds-border)] border-b px-5 sm:px-8">
 					<p className="min-w-0 truncate text-sm">
-						<span className="text-[var(--cds-text-2)]">Iowa Legal Corpus</span>
+						<span className="text-[var(--cds-text-2)]">{BRAND_NAME}</span>
 						<span className="mx-2 text-[var(--cds-helper)]">/</span>
 						<span className="font-semibold">{activeSourceName}</span>
 					</p>

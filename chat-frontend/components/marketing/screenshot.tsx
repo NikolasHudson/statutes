@@ -9,14 +9,15 @@
 // public/marketing/corpus/README.md.
 
 import { ImageIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { appHost } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 export function Screenshot({
 	src,
 	alt,
 	label,
-	url = "corpus.nick.law",
+	url,
 	aspect = "16 / 10",
 	className,
 }: {
@@ -25,13 +26,21 @@ export function Screenshot({
 	alt: string;
 	/** Human label shown in the placeholder before the image is added. */
 	label: string;
-	/** Faux address-bar text. */
+	/** Faux address-bar text. Defaults to the app's own host. */
 	url?: string;
 	/** CSS aspect-ratio for the viewport, e.g. "16 / 10". */
 	aspect?: string;
 	className?: string;
 }) {
 	const [failed, setFailed] = useState(false);
+
+	// These pages are server-rendered, and the app's host is only knowable from
+	// `window` unless NEXT_PUBLIC_APP_URL is set — so resolve it after mount
+	// rather than during render, which would hydrate a different address than
+	// the server sent.
+	const [host, setHost] = useState("");
+	useEffect(() => setHost(appHost()), []);
+	const address = url ?? host;
 
 	return (
 		<div
@@ -46,7 +55,7 @@ export function Screenshot({
 				<span className="size-2.5 rounded-full bg-[#febc2e]" />
 				<span className="size-2.5 rounded-full bg-[#28c840]" />
 				<div className="mx-auto w-full max-w-xs truncate rounded-md bg-background px-3 py-1 text-center font-medium text-[11px] text-muted-foreground">
-					{url}
+					{address}
 				</div>
 				{/* keeps the address bar visually centered against the dots */}
 				<span aria-hidden className="w-[42px] shrink-0" />

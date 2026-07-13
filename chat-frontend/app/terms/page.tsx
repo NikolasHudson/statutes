@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BRAND_NAME, COMPANY_NAME } from "@/lib/brand";
 
 // Terms of Service — the full text behind the onboarding Terms step and the
 // links on the sign-in screen. This is a public, static server component
@@ -14,9 +15,8 @@ const TOS_VERSION = "2026-06-10";
 const EFFECTIVE_DATE = "June 10, 2026";
 
 export const metadata: Metadata = {
-	title: "Terms of Service — Iowa Legal Corpus",
-	description:
-		"Terms of Service and data practices for the Iowa Legal Corpus research service.",
+	title: `Terms of Service — ${BRAND_NAME}`,
+	description: `Terms of Service and data practices for the ${BRAND_NAME} research service.`,
 };
 
 const SECTIONS: { id: string; title: string }[] = [
@@ -110,15 +110,15 @@ export default function TermsPage() {
 				<Section id="acceptance" title="1. Acceptance of these Terms">
 					<p>
 						These Terms of Service (the &ldquo;Terms&rdquo;) are an agreement
-						between you and Hudson Legal Tech (&ldquo;we,&rdquo;
-						&ldquo;us&rdquo;), the operator of the Iowa Legal Corpus research
-						service available at corpus.nick.law, including its web application,
-						APIs, and MCP server (together, the &ldquo;Service&rdquo;). By
-						creating an account, accepting the Terms during onboarding, or using
-						the Service, you agree to be bound by them. If you are using the
-						Service on behalf of a firm or other organization, you represent
-						that you have authority to bind it, and &ldquo;you&rdquo; includes
-						that organization.
+						between you and {COMPANY_NAME} (&ldquo;we,&rdquo; &ldquo;us&rdquo;),
+						the operator of the {BRAND_NAME} research service, including its web
+						application, APIs, and MCP server (together, the
+						&ldquo;Service&rdquo;), regardless of the domain at which we make it
+						available. By creating an account, accepting the Terms during
+						onboarding, or using the Service, you agree to be bound by them. If
+						you are using the Service on behalf of a firm or other organization,
+						you represent that you have authority to bind it, and
+						&ldquo;you&rdquo; includes that organization.
 					</p>
 					<p>If you do not agree to these Terms, do not use the Service.</p>
 				</Section>
@@ -386,8 +386,8 @@ export default function TermsPage() {
 				</Section>
 
 				<p className="mt-12 border-t pt-6 text-muted-foreground text-xs">
-					© {new Date().getFullYear()} Hudson Legal Tech · Iowa Legal Corpus ·
-					Version {TOS_VERSION}
+					© {new Date().getFullYear()} {COMPANY_NAME} · {BRAND_NAME} · Version{" "}
+					{TOS_VERSION}
 				</p>
 			</div>
 		</main>

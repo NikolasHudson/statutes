@@ -36,6 +36,8 @@ from typing import Iterable, Iterator
 
 from striprtf.striprtf import rtf_to_text
 
+from core.brand import BRAND_NAME, CRAWLER_CONTACT
+
 
 log = logging.getLogger(__name__)
 
@@ -61,7 +63,7 @@ SECTION_HTML_URL = "https://www.legis.iowa.gov/docs/ico/section/{year}/{slug}.ht
 SECTION_RTF_URL = "https://www.legis.iowa.gov/docs/ico/section/{year}/{slug}.rtf"
 
 DEFAULT_USER_AGENT = (
-    "iowa-corpus-scraper/0.1 (Iowa Legal Corpus project; nick@nickhudson.me)"
+    f"iowa-corpus-scraper/0.1 ({BRAND_NAME}; {CRAWLER_CONTACT})"
 )
 
 # Slug pattern: digits, optional letter suffix. Covers "1", "12C", "455B".

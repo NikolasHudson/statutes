@@ -1,10 +1,17 @@
-// Product page for Corpus MCP — the Iowa legal corpus as a production MCP
-// endpoint, in the Carbon register (see /products/corpus for the pattern).
+// Page for the MCP endpoint — Hudson Corpus as a production MCP surface, in the
+// Carbon register (see /products/corpus for the pattern). MCP is a *door* into
+// Hudson Corpus, not a separately-branded product: name it for what it is.
 //
 // Copy is grounded in the shipped server (backend/apps/mcp_server): ten
-// read-only tools, X-API-Key auth, stateless JSON at corpus.nick.law/mcp.
-// Claude Desktop connects through the mcp-remote shim; claude.ai web Custom
-// Connectors need OAuth we don't implement yet, so we don't claim it.
+// read-only tools, stateless JSON at the app's /mcp endpoint, and two ways in —
+// an OAuth 2.0 Bearer token or a static X-API-Key (auth.py accepts either).
+//
+// The OAuth server is real (oauth.py: RFC 8414 discovery, RFC 7591 dynamic
+// client registration, authorization code + PKCE S256, refresh with rotation,
+// RFC 7009 revocation) — but it is only REACHABLE once the app spec routes
+// /oauth and /.well-known to Django (they fall through to the SPA today; see
+// DOMAIN_AND_BRAND_PLAN landmine #10). Ship this page only alongside that
+// ingress rule, or the copy below advertises a 404.
 
 import {
 	BadgeCheckIcon,
@@ -26,11 +33,11 @@ import {
 } from "@/components/marketing/carbon";
 import { CONSULTING_HREF } from "@/components/marketing/chrome";
 import { ProductFamily } from "@/components/marketing/product-family";
-import { APP_URL, MCP_URL } from "@/lib/site";
+import { APP_HOST, APP_URL, MCP_SERVER_ID, MCP_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-	title: "Corpus MCP — The Iowa legal corpus in your AI tools",
+	title: "MCP endpoint — Hudson Corpus in your AI tools",
 	description:
 		"A production MCP endpoint over the Iowa Code, Court Rules, and caselaw. Ten grounded, read-only tools — citation lookup, hybrid search, version history, brief auditing — for Claude and any MCP client.",
 };
@@ -55,7 +62,7 @@ export default function McpProductPage() {
 function Hero() {
 	return (
 		<PageHero
-			eyebrow="Products — Corpus MCP"
+			eyebrow="Hudson Corpus — MCP endpoint"
 			title={
 				<>
 					The Iowa legal corpus,
@@ -87,18 +94,25 @@ function Hero() {
 // 01 — Connect: the config is the product shot
 // ---------------------------------------------------------------------------
 
+// The env var holding the key in the user's own config. The name is a local
+// convention, not part of the protocol, so derive it from the connector key
+// rather than spelling the brand out a second time: hudson-corpus →
+// HUDSON_CORPUS_KEY. The \${…} below is a literal dollar-brace in the rendered
+// JSON (mcp-remote expands it from "env"), not a template interpolation.
+const KEY_ENV = `${MCP_SERVER_ID.replace(/-/g, "_").toUpperCase()}_KEY`;
+
 const DESKTOP_CONFIG = `{
   "mcpServers": {
-    "iowa-legal-corpus": {
+    "${MCP_SERVER_ID}": {
       "command": "npx",
       "args": ["-y", "mcp-remote", "${MCP_URL}",
-               "--header", "X-API-Key:\${IOWA_LEGAL_CORPUS_KEY}"],
-      "env": { "IOWA_LEGAL_CORPUS_KEY": "<your key>" }
+               "--header", "X-API-Key:\${${KEY_ENV}}"],
+      "env": { "${KEY_ENV}": "<your key>" }
     }
   }
 }`;
 
-const CLAUDE_CODE_CMD = `claude mcp add --transport http iowa-legal-corpus \\
+const CLAUDE_CODE_CMD = `claude mcp add --transport http ${MCP_SERVER_ID} \\
   ${MCP_URL} --header "X-API-Key: <your key>"`;
 
 function CodeFrame({ caption, code }: { caption: string; code: string }) {
@@ -106,7 +120,7 @@ function CodeFrame({ caption, code }: { caption: string; code: string }) {
 		<figure className="border border-border bg-card">
 			<figcaption className="flex items-center justify-between gap-4 border-border border-b px-4 py-2.5 font-mono text-[11px] text-muted-foreground">
 				<span className="truncate">{caption}</span>
-				<span className="shrink-0">corpus.nick.law/mcp</span>
+				<span className="shrink-0">{APP_HOST}/mcp</span>
 			</figcaption>
 			<pre className="overflow-x-auto bg-[#161616] p-5 font-mono text-[13px] text-[#e0e0e0] leading-relaxed">
 				<code>{code}</code>
@@ -121,11 +135,10 @@ function Connect() {
 			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
 				<SectionHead n="01" label="Connect" title="One config block away." />
 				<p className="mt-10 max-w-xl text-[17px] text-foreground/80 leading-[1.75]">
-					Create a key in your account, paste one block of config, and the whole
-					corpus shows up in your assistant's tool list. Claude Desktop connects
-					through the{" "}
-					<span className="font-mono text-[0.95em]">mcp-remote</span> shim;
-					Claude Code and other HTTP-native clients connect directly.
+					Two ways in. Clients that speak OAuth 2.0 discover the endpoint,
+					register themselves, and send you through a consent screen — no key to
+					copy. Everything else sends a key you create in your account. Either
+					way the whole corpus shows up in your assistant's tool list.
 				</p>
 				<div className="mt-12 grid gap-6 lg:grid-cols-2">
 					<CodeFrame
@@ -138,8 +151,9 @@ function Connect() {
 							code={CLAUDE_CODE_CMD}
 						/>
 						<p className="border-border border-t pt-5 text-[14px] text-foreground/85 leading-relaxed">
-							Every request is authenticated with your{" "}
-							<span className="font-mono text-[0.95em]">X-API-Key</span> —
+							Every request carries either an OAuth{" "}
+							<span className="font-mono text-[0.95em]">Bearer</span> token or
+							an <span className="font-mono text-[0.95em]">X-API-Key</span> —
 							stateless JSON over HTTPS, so it works the same from a laptop, a
 							CI job, or an agent fleet.
 						</p>
@@ -258,8 +272,8 @@ const GUARANTEES: Guarantee[] = [
 	},
 	{
 		icon: KeyRoundIcon,
-		title: "Keyed, tiered access",
-		body: "Keys are created and revoked in your account. Beta keys include lookup and search; the full toolset comes with paid tiers at launch.",
+		title: "OAuth 2.0 or a key",
+		body: "A full OAuth 2.0 authorization server — dynamic client registration, PKCE, a consent screen, refresh and revocation — or a static key you create and revoke in your account.",
 	},
 	{
 		icon: ShieldCheckIcon,

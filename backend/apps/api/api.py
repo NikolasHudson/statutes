@@ -1,4 +1,4 @@
-"""Public REST surface for the Iowa Legal Corpus.
+"""Public REST surface for Hudson Corpus.
 
 Mirrors the MCP tool surface so that anything an LLM can do via MCP, a
 human-built integration can do via HTTP. The only intentional asymmetry:
@@ -16,6 +16,8 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from ninja import NinjaAPI, Query
 from ninja.errors import HttpError
+
+from core.brand import BRAND_NAME
 
 from apps.corpus.models import Node, NodeVersion
 from apps.corpus.services.lookups import (
@@ -70,7 +72,7 @@ from .serializers import (
 )
 
 
-api = NinjaAPI(title="Iowa Legal Corpus", version="0.2")
+api = NinjaAPI(title=BRAND_NAME, version="0.2")
 api.add_router("", chat_router)
 api.add_router("", verify_router)
 api.add_router("/auth", auth_router)
@@ -123,7 +125,14 @@ def public_config(request):
     wins so the same code works on a real deploy."""
     import os
 
-    explicit = os.environ.get("MCP_HOST")
+    from django.conf import settings
+
+    # settings.MCP_HOST, not os.environ: the var was in no env schema and in no
+    # App Platform spec, so this endpoint answered {"mcp_host": null} in prod and
+    # the account page had nothing to put in the install snippet. It now defaults
+    # to APP_URL + /mcp, so it is never empty and the Codespaces branch below is
+    # unreachable on any real deploy.
+    explicit = settings.MCP_HOST
     if explicit:
         return {"mcp_host": explicit, "source": "explicit"}
 

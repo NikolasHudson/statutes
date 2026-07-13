@@ -23,6 +23,12 @@ import {
 	MCP_PRODUCT_HREF,
 	PRODUCT_HREF,
 } from "@/components/marketing/chrome";
+import {
+	type CorpusStats,
+	corpusSourceNames,
+	fetchCorpusStats,
+	formatCount,
+} from "@/lib/api";
 import { APP_URL, MCP_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +38,8 @@ export const metadata: Metadata = {
 		"One grounded Iowa legal corpus, three doors: Hudson Corpus in the browser, a production MCP endpoint for AI tools, and an assistant that answers your email — every answer verified against the effective text.",
 };
 
-export default function ProductsIndexPage() {
+export default async function ProductsIndexPage() {
+	const stats = await fetchCorpusStats();
 	return (
 		<CarbonPage>
 			<PageHero
@@ -44,7 +51,7 @@ export default function ProductsIndexPage() {
 						Three doors.
 					</>
 				}
-				lede="Everything we ship runs on the same grounded system — the Iowa Code, Court Rules, and caselaw, with every answer verified against the effective text before you see it. Choose the door that fits how you work: a browser, your AI tools, or your inbox."
+				lede="Everything we ship runs on the same grounded system — the Iowa Code, the administrative rules, the court rules, and the caselaw, with every answer verified against the effective text before you see it. Choose the door that fits how you work: a browser, your AI tools, or your inbox."
 				actions={
 					<>
 						<SolidLink href={APP_URL}>Open Hudson Corpus</SolidLink>
@@ -55,7 +62,7 @@ export default function ProductsIndexPage() {
 			<CorpusBand />
 			<McpBand />
 			<EmailBand />
-			<SharedFoundation />
+			<SharedFoundation stats={stats} />
 		</CarbonPage>
 	);
 }
@@ -140,7 +147,7 @@ function CorpusBand() {
 }
 
 // ---------------------------------------------------------------------------
-// 02 — Corpus MCP
+// 02 — The MCP endpoint (a door into Hudson Corpus, not a separate product)
 // ---------------------------------------------------------------------------
 
 const MCP_TOOL_NAMES = [
@@ -163,7 +170,7 @@ function McpBand() {
 				<SectionHead
 					n="02"
 					label="For your AI stack"
-					title="Corpus MCP. The corpus, inside your tools."
+					title="Hudson Corpus, inside your tools."
 					tone="dark"
 				/>
 				<div className="mt-12 grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-20">
@@ -180,7 +187,7 @@ function McpBand() {
 						dark
 						specs={[
 							{ term: "Surface", detail: "MCP · streamable HTTP" },
-							{ term: "Auth", detail: "X-API-Key" },
+							{ term: "Auth", detail: "OAuth 2.0 · X-API-Key" },
 							{ term: "Best for", detail: "Agents & integrations" },
 						]}
 					/>
@@ -197,7 +204,7 @@ function McpBand() {
 				</div>
 				<div className="mt-12">
 					<TextLink href={MCP_PRODUCT_HREF} tone="dark">
-						Explore Corpus MCP
+						Explore the MCP endpoint
 					</TextLink>
 				</div>
 			</div>
@@ -248,22 +255,28 @@ function EmailBand() {
 // 04 — The shared foundation + CTA
 // ---------------------------------------------------------------------------
 
-const FOUNDATION: { title: string; body: string }[] = [
-	{
-		title: "One verified corpus",
-		body: "Iowa Code, Court Rules, and caselaw — 105,734 documents, semantically indexed, with treatment flags on decisions.",
-	},
-	{
-		title: "One verification gate",
-		body: "Every surface runs the same deterministic citation-and-quote check before an answer reaches you.",
-	},
-	{
-		title: "One source of truth",
-		body: "Everything traces to the official publication — effective dates, session laws, and links to legis.iowa.gov.",
-	},
-];
+// The corpus line is fetched, not typed: the literal that used to live here
+// (105,734 documents, three sources) had gone stale in the direction that hurts
+// most — it understated the breadth we lead on. See lib/api.ts.
+function foundation(stats: CorpusStats): { title: string; body: string }[] {
+	return [
+		{
+			title: "One verified corpus",
+			body: `${corpusSourceNames(stats)} — ${formatCount(stats.documents)} documents, semantically indexed, with treatment flags on decisions.`,
+		},
+		{
+			title: "One verification gate",
+			body: "Every surface runs the same deterministic citation-and-quote check before an answer reaches you.",
+		},
+		{
+			title: "One source of truth",
+			body: "Everything traces to the official publication — effective dates, session laws, and links to legis.iowa.gov.",
+		},
+	];
+}
 
-function SharedFoundation() {
+function SharedFoundation({ stats }: { stats: CorpusStats }) {
+	const FOUNDATION = foundation(stats);
 	return (
 		<section className={cn("text-white", INK)}>
 			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-24">
@@ -284,7 +297,8 @@ function SharedFoundation() {
 						</h2>
 						<p className="mt-4 text-[#c6c6c6] text-lg leading-relaxed">
 							The app is open in beta; MCP keys come with your account; the
-							email assistant is piloting with Iowa practitioners.
+							email assistant is in limited pilot — access is granted per
+							address.
 						</p>
 					</div>
 					<div className="flex shrink-0 flex-col gap-3 sm:flex-row">

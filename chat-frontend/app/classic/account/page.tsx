@@ -70,6 +70,7 @@ import {
 	SidebarRail,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { BRAND_NAME, MCP_SERVER_ID, mcpUrl } from "@/lib/brand";
 import {
 	AccountError,
 	type APIKey,
@@ -1150,21 +1151,27 @@ function ApiKeysSection() {
 
 const PATH_FALLBACK = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin";
 
+// The env var the client substitutes into the header, derived from the connector
+// key so the two can never drift apart: "hudson-corpus" → HUDSON_CORPUS_KEY.
+const MCP_ENV_KEY = `${MCP_SERVER_ID.toUpperCase().replaceAll("-", "_")}_KEY`;
+
 function claudeDesktopSnippet(rawKey: string, mcpHost: string) {
 	return JSON.stringify(
 		{
 			mcpServers: {
-				"iowa-legal-corpus": {
+				[MCP_SERVER_ID]: {
 					command: "npx",
 					args: [
 						"-y",
 						"mcp-remote",
 						mcpHost,
 						"--header",
-						"X-API-Key:${IOWA_LEGAL_CORPUS_KEY}",
+						// Escaped: the ${...} is literal text the MCP client expands, not
+						// a template substitution of ours.
+						`X-API-Key:\${${MCP_ENV_KEY}}`,
 					],
 					env: {
-						IOWA_LEGAL_CORPUS_KEY: rawKey,
+						[MCP_ENV_KEY]: rawKey,
 						PATH: PATH_FALLBACK,
 					},
 				},
@@ -1176,9 +1183,7 @@ function claudeDesktopSnippet(rawKey: string, mcpHost: string) {
 }
 
 function McpConfigSection() {
-	const [mcpHost, setMcpHost] = useState<string>(
-		"https://your-host.example.com/mcp",
-	);
+	const [mcpHost, setMcpHost] = useState<string>("");
 	const [mcpSource, setMcpSource] = useState<
 		"explicit" | "codespaces" | "unset"
 	>("unset");
@@ -1186,6 +1191,18 @@ function McpConfigSection() {
 
 	useEffect(() => {
 		let cancelled = false;
+		// Seed from this app's own origin before asking the server: the MCP endpoint
+		// is served from the same origin as this page, so window.location is the one
+		// source that cannot be stale. The old seed was a literal
+		// "https://your-host.example.com/mcp" — if the server pinned no MCP_HOST and
+		// wasn't a Codespace (i.e. production), users copied a snippet pointing at a
+		// host that does not exist.
+		//
+		// Resolved here rather than during render because mcpUrl() reads
+		// window.location whenever NEXT_PUBLIC_APP_URL is unset (dev): seeding state
+		// with it would hydrate the server's window-less "/mcp" against the browser's
+		// absolute URL and tear the snippet's text node.
+		setMcpHost(mcpUrl());
 		fetchPublicConfig()
 			.then((cfg) => {
 				if (cancelled) return;
@@ -1193,7 +1210,7 @@ function McpConfigSection() {
 				setMcpSource(cfg.source);
 			})
 			.catch(() => {
-				/* leave the placeholder host */
+				/* keep the same-origin fallback */
 			});
 		return () => {
 			cancelled = true;
@@ -1216,7 +1233,7 @@ function McpConfigSection() {
 			<SectionHeader
 				id="mcp"
 				title="MCP config"
-				description="Drop this into Claude Desktop or Cursor to give your AI tools live access to the Iowa Legal Corpus via your API key."
+				description={`Drop this into Claude Desktop or Cursor to give your AI tools live access to ${BRAND_NAME} via your API key.`}
 			/>
 
 			<div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -1227,7 +1244,7 @@ function McpConfigSection() {
 							? "Pinned by the server's public config."
 							: mcpSource === "codespaces"
 								? "Auto-detected from the running Codespace."
-								: "We couldn't auto-detect a host — set MCP_HOST on the server or edit the snippet below."
+								: "Defaulted to the origin serving this page. Pin MCP_HOST on the server to override."
 					}
 				>
 					<Input value={mcpHost} onChange={(e) => setMcpHost(e.target.value)} />

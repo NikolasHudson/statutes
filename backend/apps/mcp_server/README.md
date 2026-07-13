@@ -1,4 +1,4 @@
-# MCP server — Iowa Legal Corpus
+# MCP server — Hudson Corpus
 
 Exposes the same surface as the public REST API (`apps/api/`) over the
 [Model Context Protocol](https://modelcontextprotocol.io/), so an LLM
@@ -52,7 +52,9 @@ run code on the box." Don't expose the stdio endpoint over a network.
 
 ## Production deployment (DigitalOcean App Platform)
 
-Live at **`https://corpus.nick.law/mcp`**. The server is its own App Platform
+Served at **`/mcp` on the app's public origin** — whatever `APP_URL` /
+`MCP_OAUTH_ISSUER` are set to for the environment; the examples below use
+`https://app.example.com` as a stand-in. The server is its own App Platform
 `service` component (`mcp` in `.do/app.yaml`), reusing the Django image and
 overriding the run command:
 
@@ -93,22 +95,26 @@ for claude.ai web Custom Connectors). See `MCP_PRODUCTION_PLAN.md`.
 ## Claude Desktop install (hosted HTTP server)
 
 Sign in to the frontend at `/#/login`, create a key on the API keys page,
-and copy the JSON snippet from the post-creation dialog. It looks like:
+and copy the JSON snippet from the post-creation dialog — it is generated
+against the live origin, so prefer it over the shape sketched here:
 
 ```json
 {
   "mcpServers": {
-    "iowa-legal-corpus": {
+    "hudson-corpus": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://corpus.nick.law/mcp",
-               "--header", "X-API-Key:${IOWA_LEGAL_CORPUS_KEY}"],
+      "args": ["-y", "mcp-remote", "https://app.example.com/mcp",
+               "--header", "X-API-Key:${HUDSON_CORPUS_KEY}"],
       "env": {
-        "IOWA_LEGAL_CORPUS_KEY": "<the-raw-key>"
+        "HUDSON_CORPUS_KEY": "<the-raw-key>"
       }
     }
   }
 }
 ```
+
+The connector key is `core.brand.MCP_SERVER_ID` and is frozen — clients
+store it locally, so it never changes again even if the brand does.
 
 In Claude Desktop, open **Settings → Developer → Edit Config**, paste the
 JSON, save, and restart. All ten tools should appear in the message

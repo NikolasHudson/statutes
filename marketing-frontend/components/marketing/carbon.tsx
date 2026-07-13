@@ -15,7 +15,7 @@
 import { ArrowRightIcon } from "lucide-react";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
-import { APP_URL } from "@/lib/site";
+import { APP_HOST, APP_URL, PRIVACY_URL, TERMS_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { CarbonNav, CarbonWordmark } from "./carbon-nav";
 import {
@@ -268,11 +268,13 @@ export function TextLink({
 
 // Screenshot frame: hairline border + mono caption bar (replaces the rounded
 // mac-dots Screenshot component on Carbon pages). `aspect` crops tall shots.
+// `url` is the address bar of the shot: defaults to the app's host, since every
+// capture so far is of the app — pass it explicitly for anything else.
 export function Frame({
 	src,
 	alt,
 	caption,
-	url = "corpus.nick.law",
+	url = APP_HOST,
 	aspect,
 	className,
 }: {
@@ -318,7 +320,7 @@ const FOOTER_COLS: {
 		heading: "Product",
 		links: [
 			{ label: "Hudson Corpus", href: PRODUCT_HREF },
-			{ label: "Corpus MCP", href: MCP_PRODUCT_HREF },
+			{ label: "MCP endpoint", href: MCP_PRODUCT_HREF },
 			{ label: "Email assistant", href: EMAIL_PRODUCT_HREF },
 			{ label: "Open the app", href: APP_URL },
 		],
@@ -341,9 +343,13 @@ const FOOTER_COLS: {
 	},
 	{
 		heading: "Legal",
+		// Both live on the app origin and both resolve: /privacy redirects to
+		// /terms#privacy, which is where the data practices actually are. There is
+		// no standalone privacy policy yet — when one is written, PRIVACY_URL is
+		// the single place this footer, and both lead forms, learn about it.
 		links: [
-			{ label: "Terms of Service", href: `${APP_URL}/terms` },
-			{ label: "Privacy", href: `${APP_URL}/privacy` },
+			{ label: "Terms of Service", href: TERMS_URL },
+			{ label: "Privacy", href: PRIVACY_URL },
 		],
 	},
 ];

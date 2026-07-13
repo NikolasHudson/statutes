@@ -6,6 +6,10 @@
 // passes the same deterministic verification gate as chat, citations are
 // linked only when they resolve, and official PDFs attach only on request.
 // The product is in pilot — the CTA is "request access", not sign-up.
+//
+// The pilot is genuinely LIMITED (a handful of allowlisted addresses, all ours
+// so far). Nothing on this page may imply a body of third-party users we do not
+// have: say "access is granted per address", never "in pilot with practitioners".
 
 import {
 	BadgeCheckIcon,
@@ -27,9 +31,8 @@ import {
 } from "@/components/marketing/carbon";
 import { CONSULTING_HREF, CONTACT_HREF } from "@/components/marketing/chrome";
 import { ProductFamily } from "@/components/marketing/product-family";
+import { ASSISTANT_ADDRESS } from "@/lib/site";
 import { cn } from "@/lib/utils";
-
-const ASSISTANT_ADDRESS = "assistant@mail.nick.law";
 
 export const metadata: Metadata = {
 	title: "Email assistant — Verified legal research in your inbox",
@@ -297,8 +300,9 @@ function CtaBand() {
 							Put verified research where you already work.
 						</h2>
 						<p className="mt-4 text-[#c6c6c6] text-lg leading-relaxed">
-							The email assistant is in pilot with Iowa practitioners. Tell us
-							about your practice and we'll set your addresses up.
+							The email assistant is in limited pilot — access is granted per
+							address. Tell us about your practice and we'll set your addresses
+							up.
 						</p>
 					</div>
 					<div className="flex shrink-0 flex-col gap-3 sm:flex-row">

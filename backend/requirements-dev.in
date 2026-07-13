@@ -7,6 +7,9 @@
 -r requirements.in
 django-extensions>=3.2,<5
 ipython>=8.0,<10
+# Lets `manage.py test --parallel` pickle tracebacks from worker processes;
+# without it failures in parallel runs lose their tracebacks.
+tblib>=3.0
 # Dependency CVE scanner. Pinned to match the version run in CI
 # (.github/workflows/dependency-scan.yml) so local and CI results agree.
 # Run locally with: pip-audit -r requirements.txt

@@ -6,12 +6,14 @@ from __future__ import annotations
 import tempfile
 from datetime import date
 from pathlib import Path
+from unittest import mock
 
 from django.core import mail
 from django.core.cache import cache
 from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 
+from apps.marketing import api as marketing_api
 from apps.marketing.models import Article, ContactSubmission, NewsletterSubscriber
 
 CONTACT_PAYLOAD = {
@@ -52,10 +54,109 @@ class ContactApiTests(TestCase):
         resp = self.post({**CONTACT_PAYLOAD, "message": "   "})
         self.assertEqual(resp.status_code, 400)
 
-    def test_throttle_kicks_in(self):
-        for _ in range(5):
-            self.assertEqual(self.post(CONTACT_PAYLOAD).status_code, 200)
-        self.assertEqual(self.post(CONTACT_PAYLOAD).status_code, 429)
+    @override_settings(CONTACT_NOTIFY_EMAIL="owner@example.com")
+    def test_throttled_submission_still_persists_the_lead(self):
+        """The regression this module exists to prevent.
+
+        The throttle used to 429 *before* the insert, so an over-limit lead was
+        destroyed: no row, no email, no retry. Past the notify limit the row must
+        still be written — only the heads-up email is suppressed, because the
+        admin row is the durable record and our inbox is the thing being flooded.
+        """
+        with mock.patch.object(marketing_api, "_CONTACT_NOTIFY_LIMIT", 2):
+            statuses = [self.post(CONTACT_PAYLOAD).status_code for _ in range(5)]
+
+        self.assertEqual(statuses, [200] * 5)
+        self.assertEqual(ContactSubmission.objects.count(), 5)  # every lead kept
+        self.assertEqual(len(mail.outbox), 2)  # only the notifications are capped
+
+    def test_store_limit_is_the_only_hard_stop(self):
+        """Well above any human, and it exists to bound the table, not the funnel."""
+        with mock.patch.object(marketing_api, "_CONTACT_STORE_LIMIT", 3):
+            statuses = [self.post(CONTACT_PAYLOAD).status_code for _ in range(4)]
+
+        self.assertEqual(statuses, [200, 200, 200, 429])
+        self.assertEqual(ContactSubmission.objects.count(), 3)
+
+    def test_throttle_counts_clients_not_proxies(self):
+        """Two visitors behind our own edge get their own buckets: the counter is
+        keyed on the address the edge appended, not on the connecting proxy."""
+        with mock.patch.object(marketing_api, "_CONTACT_STORE_LIMIT", 1):
+            for client_addr in ("203.0.113.9", "203.0.113.10"):
+                resp = self.client.post(
+                    "/api/marketing/contact",
+                    CONTACT_PAYLOAD,
+                    content_type="application/json",
+                    HTTP_X_FORWARDED_FOR=client_addr,
+                    REMOTE_ADDR="10.0.0.1",
+                )
+                self.assertEqual(resp.status_code, 200)
+        self.assertEqual(ContactSubmission.objects.count(), 2)
+
+    @override_settings(MARKETING_PROXY_TOKEN="s3cret-token")
+    def test_marketing_proxys_asserted_ip_is_honoured_only_with_the_secret(self):
+        """The lead reaches Django from the marketing container, so the visitor's
+        address is not a property of the connection we see. The proxy asserts it in
+        X-Real-Client-IP and proves the assertion with a shared secret.
+
+        The proxy sources that value from CF-Connecting-IP (which Cloudflare
+        overwrites, so a visitor cannot forge it) and deliberately does NOT relay
+        X-Forwarded-For — relaying an appended chain would let a visitor pick the
+        IP their leads are throttled and recorded under, which is the forgery the
+        whole change closes.
+        """
+        self.client.post(
+            "/api/marketing/contact",
+            CONTACT_PAYLOAD,
+            content_type="application/json",
+            HTTP_X_REAL_CLIENT_IP="198.51.100.7",
+            HTTP_X_MARKETING_PROXY_TOKEN="s3cret-token",
+            REMOTE_ADDR="192.0.2.50",  # the marketing container's egress address
+        )
+        self.client.post(
+            "/api/marketing/contact",
+            {**CONTACT_PAYLOAD, "email": "spoofer@example.com"},
+            content_type="application/json",
+            HTTP_X_REAL_CLIENT_IP="198.51.100.7",
+            HTTP_X_MARKETING_PROXY_TOKEN="wrong-token",
+            REMOTE_ADDR="192.0.2.50",
+        )
+        # A stranger who found the endpoint and simply typed the header, no token.
+        self.client.post(
+            "/api/marketing/contact",
+            {**CONTACT_PAYLOAD, "email": "stranger@example.com"},
+            content_type="application/json",
+            HTTP_X_REAL_CLIENT_IP="8.8.8.8",
+            REMOTE_ADDR="192.0.2.50",
+        )
+        stored = {row.email: row.ip for row in ContactSubmission.objects.all()}
+        self.assertEqual(stored["jane@example.com"], "198.51.100.7")
+        # Without a valid token the caller is the box that connected, and its claim
+        # about whom it is forwarding for buys it nothing.
+        self.assertEqual(stored["spoofer@example.com"], "192.0.2.50")
+        self.assertEqual(stored["stranger@example.com"], "192.0.2.50")
+
+    @override_settings(MARKETING_PROXY_TOKEN="s3cret-token")
+    def test_a_visitor_cannot_pick_their_own_lead_throttle_bucket(self):
+        """The point of attributing leads correctly: the throttle must bind. A
+        visitor rotating a header they control must not mint a fresh bucket, or the
+        50/hour store cap is decorative."""
+        with mock.patch.object(marketing_api, "_CONTACT_STORE_LIMIT", 3):
+            for n in range(5):
+                resp = self.client.post(
+                    "/api/marketing/contact",
+                    {**CONTACT_PAYLOAD, "email": f"flood{n}@example.com"},
+                    content_type="application/json",
+                    # The chain as Django really receives it: the attacker's rotated
+                    # padding on the left, then the address our own edge APPENDED
+                    # (here, the marketing container's egress). The edge always
+                    # appends — that is the whole reason the right-most entry, and
+                    # not the left-most, is the one worth reading.
+                    HTTP_X_FORWARDED_FOR=f"10.9.9.{n}, 192.0.2.50",
+                    HTTP_X_REAL_CLIENT_IP=f"10.8.8.{n}",  # no token -> ignored
+                    REMOTE_ADDR="10.0.0.1",
+                )
+        self.assertEqual(resp.status_code, 429, resp.content)
 
     @override_settings(CONTACT_NOTIFY_EMAIL="owner@example.com")
     def test_notification_email_sent_when_configured(self):
@@ -63,6 +164,29 @@ class ContactApiTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Jane Attorney", mail.outbox[0].subject)
         self.assertEqual(mail.outbox[0].to, ["owner@example.com"])
+
+    def test_lead_is_stored_when_notifications_are_off(self):
+        """CONTACT_NOTIFY_EMAIL unset is production's state today: the row is the
+        record, and losing it because nobody configured a mailbox is not a trade
+        we make."""
+        with self.assertLogs("apps.marketing.api", level="WARNING") as logs:
+            self.assertEqual(self.post(CONTACT_PAYLOAD).status_code, 200)
+        self.assertEqual(ContactSubmission.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertIn("CONTACT_NOTIFY_EMAIL is unset", "\n".join(logs.output))
+
+    @override_settings(CONTACT_NOTIFY_EMAIL="owner@example.com")
+    def test_notification_failure_is_logged_at_error_and_the_lead_survives(self):
+        """Postmark rejecting an unverified CONTACT_FROM_EMAIL (what a mail-domain
+        move produces) must not look like success to us as well as to the visitor."""
+        with mock.patch.object(
+            marketing_api, "send_mail", side_effect=RuntimeError("sender not verified")
+        ):
+            with self.assertLogs("apps.marketing.api", level="ERROR") as logs:
+                self.assertEqual(self.post(CONTACT_PAYLOAD).status_code, 200)
+
+        self.assertEqual(ContactSubmission.objects.count(), 1)
+        self.assertIn("notification email FAILED", "\n".join(logs.output))
 
 
 class SubscribeApiTests(TestCase):

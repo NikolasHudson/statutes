@@ -1,0 +1,22 @@
+# The Docker build context is this directory (App Platform sets it from the
+# component's source_dir), and `COPY . .` would otherwise sweep in whatever is
+# lying around a developer's checkout.
+#
+# The dangerous one is .env.local: it is gitignored, so it never shows up in a
+# diff, and it sets NEXT_PUBLIC_APP_URL=http://localhost:3000 and
+# NEXT_PUBLIC_BILLING_LIVE=1. Next loads .env.local ahead of the process env,
+# so a local or CI `docker build` would bake a production image whose every CTA
+# points at localhost and whose pricing page links to live Stripe checkout —
+# while the build-args we passed sit there, silently overridden. Keep .env.example
+# (documentation only, never read by the build).
+node_modules
+.next
+out
+.env*
+!.env.example
+*.tsbuildinfo
+.git
+.gitignore
+*.log
+Dockerfile
+.dockerignore

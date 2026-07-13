@@ -1,0 +1,227 @@
+name: hudson-marketing
+region: nyc
+# The marketing site is a SEPARATE App Platform app from `statutes`, not another
+# component inside it. The reason is cookie scope, not tidiness: marketing is
+# where third-party JavaScript eventually lives (analytics, ad pixels, a chat
+# widget), and cookies are host-scoped — a compromised vendor tag on
+# hudsonlegal.tech cannot read a session cookie scoped to app.hudsonlegal.tech,
+# because the browser will not send it. One app cannot give us two origins:
+# `statutes`' ingress is path-based with a `/` catch-all onto chat-frontend, so
+# attaching the apex there would serve the CHAT APP at hudsonlegal.tech.
+#
+# Same warning as .do/app.yaml applies once this app exists: do NOT
+# `doctl apps update --spec` straight from this file. A value-less `type: SECRET`
+# does not preserve the existing value on update — it re-encrypts it to an EMPTY
+# string. Always start from the live spec, which carries the EV[...] ciphertext:
+#   doctl apps spec get <app-id> > /tmp/spec.yaml
+#   # edit /tmp/spec.yaml, then:
+#   doctl apps update <app-id> --spec /tmp/spec.yaml
+# This file is safe to `doctl apps create --spec` ONCE (there is nothing to
+# preserve yet); after that it is the human-readable source of intent.
+
+# Domains live in the spec, never panel-attached: re-applying a spec wipes
+# panel-attached domains. That is how corpus.nick.law was lost once already.
+#
+# www is listed even though it only ever 301s. It has to be: without it App
+# Platform issues no TLS certificate for www, and the handshake fails BEFORE any
+# redirect can run — a browser typing "www.hudsonlegal.tech" gets a cert error,
+# not our apex.
+#
+# `zone:` is deliberately OMITTED. That key means "App Platform manages this
+# zone in DigitalOcean DNS"; our zone is at Cloudflare. Setting it validates
+# cleanly and then silently does nothing, which is the worst kind of config.
+#
+# ---------------------------------------------------------------------------
+# CLOUDFLARE PROXY MODE (orange vs grey cloud) — NICK'S CALL, please read.
+#
+# What I VERIFIED against the live system on 2026-07-13:
+#   * corpus.nick.law is ORANGE-CLOUDED (proxied) and has been working in prod:
+#       dig +short A corpus.nick.law -> 104.21.54.137, 172.67.138.250 (CF anycast)
+#       dig +short NS nick.law       -> rick/leanna.ns.cloudflare.com
+#       curl -sI https://corpus.nick.law/api/health
+#         -> server: cloudflare + cf-ray  AND  x-do-app-origin: 7de0b917-...
+#     So Cloudflare terminates TLS with its own certificate and App Platform is
+#     the origin behind it. An orange cloud in front of App Platform is therefore
+#     a CONFIGURATION WE ALREADY RUN, not a hypothetical.
+#   * hudsonlegal.tech's zone is already at Cloudflare (same nameservers) but has
+#     NO A/CNAME records yet — nothing is deployed, so nothing is proven about it.
+#
+# What I am INFERRING, and what the honest trade-off is:
+#   * Orange cloud gives us CF-Connecting-IP on every request. The backend depends
+#     on that header for lead-IP attribution (marketing/app/api/*/route.ts copies
+#     it into X-Real-Client-IP), so with a grey cloud the contact/newsletter
+#     throttles fall back to keying on this container's egress address — one
+#     bucket for the whole internet. Orange is what makes lead throttling real.
+#   * The usual argument FOR grey cloud is DO's certificate issuance: App Platform
+#     provisions a Let's Encrypt cert via an HTTP-01 challenge at
+#     /.well-known/acme-challenge, and a proxied zone can interfere with the
+#     challenge (or make the DO-issued cert redundant, since CF serves its own to
+#     the browser either way). corpus.nick.law's cert was issued while the record
+#     was proxied, so this is evidently survivable here; if App Platform ever
+#     reports the domain as "pending"/unverified, grey-cloud the record until the
+#     cert issues, then flip it back to orange.
+#   * Orange also means CF caching sits in front of the ISR'd marketing pages. That
+#     is a feature (fast apex) with a footgun (a stale /articles after a publish).
+#     Cache rules are a Cloudflare-side concern, not something this spec controls.
+#
+# I did NOT test cert issuance on a proxied hudsonlegal.tech, and I am not going to
+# assert a rule I have not run. Recommendation: bring the apex up ORANGE, and if
+# the DO panel will not verify the domain, grey-cloud it just long enough for the
+# cert to issue.
+# ---------------------------------------------------------------------------
+domains:
+- domain: hudsonlegal.tech
+  type: PRIMARY
+- domain: www.hudsonlegal.tech
+  type: ALIAS
+ingress:
+  rules:
+  # There is NO automatic ALIAS -> PRIMARY redirect on App Platform. Without this
+  # rule the identical site answers on both hosts: duplicate content, split SEO,
+  # and every canonical/OG tag (built from NEXT_PUBLIC_SITE_URL, i.e. the apex)
+  # disagreeing with the host that actually served the page.
+  #
+  # Host matching works — `match.authority` is real, but `exact` only; `prefix`
+  # is rejected. It must sit ABOVE the `/` catch-all, since rules are evaluated
+  # top-down and first match wins.
+  - match:
+      authority:
+        exact: www.hudsonlegal.tech
+      path:
+        prefix: /
+    redirect:
+      authority: hudsonlegal.tech
+      scheme: https
+      redirect_code: 301
+  - match:
+      path:
+        prefix: /
+    component:
+      name: marketing
+      preserve_path_prefix: true
+services:
+# Next.js marketing site. SSR, not a static export: it has server-side proxy
+# routes (/api/contact, /api/subscribe) and ISR on /articles.
+- name: marketing
+  # dockerfile_path is relative to the REPO ROOT; source_dir is the Docker BUILD
+  # CONTEXT. They are not the same base, and both are load-bearing here.
+  dockerfile_path: /marketing-frontend/Dockerfile
+  source_dir: /marketing-frontend
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    # Same repo and branch as the `statutes` app, so EVERY push to main rebuilds
+    # and restarts marketing too — even a commit that touches only the backend.
+    # App Platform has no source_dir-based build skipping. Accepted deliberately:
+    # the alternative is a manual deploy step we would forget, and a marketing
+    # restart costs nothing (no sessions, no queue). It does mean a red backend
+    # commit and a red marketing build arrive together.
+    deploy_on_push: true
+  http_port: 8080
+  instance_count: 1
+  # Static-ish SSR with ISR; the heavy work is prerendered at build. 0.5GB is the
+  # same slug chat-frontend runs on and has headroom.
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  # HTTP health check so an up-but-broken Next process is pulled from rotation
+  # rather than relying on a bare TCP probe (which a hung Node still passes).
+  health_check:
+    http_path: /
+    timeout_seconds: 5
+    failure_threshold: 3
+  envs:
+  # ---- BUILD_TIME: baked into the bundle; a wrong value has NO runtime fix ----
+  #
+  # Two rules, and violating either produces a GREEN build serving a broken site.
+  #
+  # 1. Every var here must have a matching `ARG` in marketing-frontend/Dockerfile.
+  #    App Platform passes BUILD_TIME envs as `--build-arg`, and a Dockerfile with
+  #    no matching ARG silently discards them. (chat-frontend/Dockerfile declared
+  #    zero ARGs for its entire life — see the note on that component in app.yaml.)
+  #
+  # 2. Values must be LITERALS, never App Platform bindables (${APP_URL},
+  #    ${APP_DOMAIN}, ${db.*}). Bindables are RUNTIME-only for a Dockerfile build:
+  #    they pass `doctl apps spec validate` and arrive at the build as the EMPTY
+  #    STRING. Writing ${APP_DOMAIN} here would look right and ship a sitemap of
+  #    localhost URLs.
+  #
+  # marketing-frontend/lib/site.ts hard-fails a production build when any of the
+  # first three is missing, which is what converts "silently wrong site" into
+  # "red build".
+  - key: NEXT_PUBLIC_SITE_URL
+    scope: BUILD_TIME
+    value: https://hudsonlegal.tech
+  # TRANSITIONAL (Tranche 2): the app has NOT moved yet — it is live at
+  # corpus.nick.law and does not answer on app.hudsonlegal.tech (no DNS). CTAs,
+  # the MCP install snippet and the API origin must point at the host that
+  # actually serves today, or (a) every CTA is a dead link and (b) the
+  # build-time fetches (corpus stats, articles, sitemap) fail on ENOTFOUND and
+  # the deploy goes RED. In Tranche 3, when the app moves, flip these three
+  # values (NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_ASSISTANT_ADDRESS, API_ORIGIN) to
+  # their app.hudsonlegal.tech / mail.hudsonlegal.tech forms and re-apply.
+  - key: NEXT_PUBLIC_APP_URL
+    scope: BUILD_TIME
+    value: https://corpus.nick.law
+  - key: NEXT_PUBLIC_ASSISTANT_ADDRESS
+    scope: BUILD_TIME
+    value: assistant@mail.nick.law
+  # Empty until Stripe is live. Set to "1" in the same change that flips billing
+  # on — it swaps /pricing from pre-launch framing to CTAs that link straight
+  # into self-serve checkout, so setting it early points buyers at a checkout
+  # that cannot take their money.
+  #
+  # `doctl apps spec validate` normalizes value: "" away entirely (the key comes
+  # back with a scope and no value). Harmless here: the Dockerfile's
+  # `ENV NEXT_PUBLIC_BILLING_LIVE=$NEXT_PUBLIC_BILLING_LIVE` pins it to the empty
+  # string whether or not the build-arg is passed, and site.ts tests it for
+  # truthiness. The key is kept explicit so the flip is an edit, not a discovery.
+  - key: NEXT_PUBLIC_BILLING_LIVE
+    scope: BUILD_TIME
+    value: ""
+  # ---- RUN_AND_BUILD_TIME ----------------------------------------------------
+  #
+  # API_ORIGIN needs BOTH scopes, and picking either one alone fails silently:
+  #   BUILD_TIME only -> the form proxies (/api/contact, /api/subscribe) have no
+  #                      backend origin at runtime and every submission 500s.
+  #   RUN_TIME only   -> /articles' generateStaticParams and /sitemap.xml
+  #                      prerender against nothing, shipping an article-less
+  #                      sitemap and a corpus count of zero.
+  # The browser never calls the backend cross-origin — these proxies relay
+  # server-side — which is exactly why this apex needs NO entry in the backend's
+  # CORS_ALLOWED_ORIGINS. Adding one would fold it into CSRF_TRUSTED_ORIGINS
+  # (settings.py) with CORS_ALLOW_CREDENTIALS=True, making the marketing site a
+  # credentialed, CSRF-trusted origin against the app. Do not "fix" the forms
+  # that way.
+  # TRANSITIONAL (Tranche 2): corpus.nick.law until the app moves. See the note
+  # on NEXT_PUBLIC_APP_URL above — flip to https://app.hudsonlegal.tech in Tranche 3.
+  - key: API_ORIGIN
+    scope: RUN_AND_BUILD_TIME
+    value: https://corpus.nick.law
+  # ---- RUN_TIME secret -------------------------------------------------------
+  #
+  # Shared secret proving to the backend that a /api/marketing/* POST really came
+  # from this proxy, so it can trust the visitor's address this proxy asserts
+  # (X-Real-Client-IP) instead of keying the lead on this container's egress IP.
+  #
+  # MUST match MARKETING_PROXY_TOKEN on the `statutes` app — two apps, two separate
+  # encrypted values, one string. It was missing from .do/app.yaml until 2026-07-13,
+  # which made the whole feature inert (the backend read "" and ignored the header);
+  # if you set it on only one app, that is the failure you get, silently. No
+  # plaintext committed; set it in the App Platform UI on BOTH apps. Keep it ASCII.
+  #
+  # The route handlers send the address from CF-Connecting-IP — which Cloudflare
+  # overwrites, so a visitor cannot forge it — and deliberately do NOT relay the
+  # X-Forwarded-For chain, which is appended to and would let a visitor choose the
+  # IP their submissions are throttled and recorded under. If this apex is ever
+  # grey-clouded, CF-Connecting-IP may be absent, the handlers send nothing, and
+  # lead attribution degrades to the container address (safe, just blunt). See the
+  # Cloudflare note at the top of this file.
+  #
+  # It is not an authentication gate: every /api/marketing/* endpoint is auth=None
+  # by design (that is also why django-ninja applies no CSRF to them, which is what
+  # lets the proxies post at all). A wrong or missing token degrades IP attribution;
+  # it does not break the forms. The backend additionally confines what this token
+  # authorises to /api/marketing/* paths, so a leak cannot be used to assert a
+  # source IP against the login lockout or the audit trail.
+  - key: MARKETING_PROXY_TOKEN
+    scope: RUN_TIME
+    type: SECRET

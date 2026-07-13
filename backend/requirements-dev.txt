@@ -519,10 +519,17 @@ django==5.1.15 \
     # via
     #   -c requirements.txt
     #   -r requirements.in
+    #   django-anymail
     #   django-axes
     #   django-cors-headers
     #   django-extensions
     #   django-ninja
+django-anymail[postmark]==13.1 \
+    --hash=sha256:63e48402ec8258f17640eb73c8c64141f16d2f8ae7d448d0fb1c66e82b7cbcf6 \
+    --hash=sha256:b51783176f8a8382e958808151551558e4a46d1375fbc343742d1ebd06ce8e9e
+    # via
+    #   -c requirements.txt
+    #   -r requirements.in
 django-axes==8.3.1 \
     --hash=sha256:d57e923c0ba33cf45275253dd1313c3a3ff04bec686b38d677beb2b3d43c7bcd \
     --hash=sha256:f7887582fd12713064f1602091ff6152752becae5e891a15bf802746cab0f51a
@@ -978,11 +985,12 @@ license-expression==30.4.4 \
     --hash=sha256:421788fdcadb41f049d2dc934ce666626265aeccefddd25e162a26f23bcbf8a4 \
     --hash=sha256:73448f0aacd8d0808895bdc4b2c8e01a8d67646e4188f887375398c761f340fd
     # via cyclonedx-python-lib
-markdown-it-py==4.2.0 \
-    --hash=sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49 \
-    --hash=sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a
+markdown-it-py==3.0.0 \
+    --hash=sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1 \
+    --hash=sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb
     # via
     #   -c requirements.txt
+    #   -r requirements.in
     #   rich
 matplotlib-inline==0.2.2 \
     --hash=sha256:3c821cf1c209f59fb2d2d64abbf5b23b67bcb2210d663f9918dd851c6da1fcf6 \
@@ -2033,9 +2041,11 @@ requests==2.34.2 \
     # via
     #   -c requirements.txt
     #   cachecontrol
+    #   django-anymail
     #   langsmith
     #   pip-audit
     #   requests-toolbelt
+    #   stripe
     #   voyageai
 requests-toolbelt==1.0.0 \
     --hash=sha256:7681a0a3d047012b5bdc0ee37d7f8f07ebe76ab08caeccfc3921ce23c88d5bc6 \
@@ -2225,12 +2235,22 @@ starlette==1.3.1 \
     #   -c requirements.txt
     #   mcp
     #   sse-starlette
+stripe==15.3.0 \
+    --hash=sha256:99c427d306d9348123e73da3f4f2cae0a5732cac9b703155dba0418e32d3cf1c \
+    --hash=sha256:ff05524255f51bf7df0e5bc4a99dbd0f737afd05587b7657c82e0d99c7fc45a4
+    # via
+    #   -c requirements.txt
+    #   -r requirements.in
 striprtf==0.0.32 \
     --hash=sha256:7f375a375d99a2700842173168c90c9b545cb244241ffc5d868ed9f6baf9155f \
     --hash=sha256:9f695fea9662cb4ffccf2b56286b3e77028c0a61e87258719584e681e0144869
     # via
     #   -c requirements.txt
     #   -r requirements.in
+tblib==3.2.2 \
+    --hash=sha256:26bdccf339bcce6a88b2b5432c988b266ebbe63a4e593f6b578b1d2e723d2b76 \
+    --hash=sha256:e9a652692d91bf4f743d4a15bc174c0b76afc750fe8c7b6d195cc1c1d6d2ccec
+    # via -r requirements-dev.in
 tenacity==9.1.4 \
     --hash=sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55 \
     --hash=sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a
@@ -2302,6 +2322,7 @@ typing-extensions==4.15.0 \
     #   pydantic-core
     #   referencing
     #   starlette
+    #   stripe
     #   typing-inspection
 typing-inspection==0.4.2 \
     --hash=sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7 \
@@ -2316,6 +2337,7 @@ urllib3==2.7.0 \
     --hash=sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897
     # via
     #   -c requirements.txt
+    #   django-anymail
     #   requests
 uuid-utils==0.16.0 \
     --hash=sha256:04af9966ecd82b78eeba5725e29aa1e86fb8eb84b5443dd6a9935f9fadb6678e \

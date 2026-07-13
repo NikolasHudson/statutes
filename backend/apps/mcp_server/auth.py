@@ -68,9 +68,11 @@ class BearerPrincipal:
 def _resource_metadata_url(scope: dict) -> str:
     """The RFC 9728 Protected Resource Metadata URL advertised on 401s.
 
-    ``MCP_OAUTH_ISSUER`` pins the public origin in prod (the MCP service can
-    sit behind path-based ingress where the request Host is an internal
-    hostname); otherwise it derives from the request's Host header."""
+    ``MCP_OAUTH_ISSUER`` pins the public origin in prod (e.g.
+    ``https://app.example.com``; the MCP service can sit behind path-based
+    ingress where the request Host is an internal hostname); otherwise it
+    derives from the request's Host header and therefore floats with it. Same
+    env var as :func:`oauth.issuer` — pin it and both agree."""
     configured = os.environ.get("MCP_OAUTH_ISSUER", "").strip()
     if configured:
         base = configured.rstrip("/")

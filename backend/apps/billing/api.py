@@ -148,23 +148,21 @@ def _trial_days(org: Organization) -> int:
     return 0 if ever_billed else days
 
 
-def _return_base_url(request) -> str:
-    """Base URL Stripe returns the browser to.
+def _return_base_url() -> str:
+    """Base URL Stripe returns the browser to: ``APP_URL``, or the Stripe-specific
+    override when one is set. Two settings, no guessing tail.
 
-    Explicit setting wins. Then ``APP_URL`` if some other module has defined it,
-    then the first CORS origin (the SPA's dev origin), then the email link base —
-    which is already the app's public URL in prod. Belt and braces, because a
-    Checkout session with a broken return URL strands a customer who has just paid.
+    It used to fall through ``CORS_ALLOWED_ORIGINS[0]`` — which meant that adding a
+    second CORS origin (the natural-looking fix the first time a cross-origin form
+    is wired up) silently retargeted every ``success_url`` / ``cancel_url`` /
+    portal ``return_url`` at a site that has no ``/account/billing`` on it,
+    stranding a customer who had just paid. ``APP_URL`` always has a value, so
+    there is nothing left to derive.
+
+    ``apps/api/orgs._app_base_url`` resolves invite links the same way; the two
+    must never send a user to two different front doors.
     """
-    for candidate in (
-        getattr(settings, "STRIPE_RETURN_BASE_URL", ""),
-        getattr(settings, "APP_URL", ""),
-        *(getattr(settings, "CORS_ALLOWED_ORIGINS", []) or []),
-        getattr(settings, "EMAIL_LINK_BASE_URL", ""),
-    ):
-        if candidate:
-            return str(candidate).rstrip("/")
-    return request.build_absolute_uri("/").rstrip("/")
+    return str(settings.STRIPE_RETURN_BASE_URL or settings.APP_URL).rstrip("/")
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +235,7 @@ def create_checkout(request, payload: CheckoutIn):
     client = _client()
     customer_id = _ensure_customer(client, org, request.user)
 
-    base = _return_base_url(request)
+    base = _return_base_url()
     metadata = {"org_id": str(org.pk), "plan": plan}
     subscription_data: dict = {"metadata": metadata}
     trial_days = _trial_days(org)
@@ -299,7 +297,7 @@ def create_portal(request):
         raise HttpError(400, "this organization has no billing account yet")
 
     client = _client()
-    base = _return_base_url(request)
+    base = _return_base_url()
     try:
         session = client.billing_portal.Session.create(
             customer=org.stripe_customer_id,

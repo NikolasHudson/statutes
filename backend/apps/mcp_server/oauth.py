@@ -45,6 +45,8 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
+from core.brand import BRAND_NAME
+
 from .models import (
     AUTH_CODE_TTL_SECONDS,
     ACCESS_TOKEN_TTL_SECONDS,
@@ -75,9 +77,12 @@ _VERIFIER_RE = re.compile(r"^[A-Za-z0-9\-._~]{43,128}$")
 def issuer(request: HttpRequest | None = None) -> str:
     """The authorization server's issuer identifier (RFC 8414).
 
-    ``MCP_OAUTH_ISSUER`` pins it explicitly in prod (e.g.
-    ``https://corpus.nick.law``); otherwise it derives from the request so dev
-    servers and tests self-describe correctly. No trailing slash, ever — the
+    ``MCP_OAUTH_ISSUER`` pins it explicitly in prod (the app's public origin,
+    e.g. ``https://app.example.com``); otherwise it derives from the request so
+    dev servers and tests self-describe correctly. Unpinned, the issuer floats
+    with the request Host — fine for a single-host dev box, wrong for an app
+    served on more than one hostname, where a client's tokens would be bound to
+    whichever origin it happened to arrive on. No trailing slash, ever — the
     metadata URLs and the canonical resource are built by concatenation."""
     configured = os.environ.get("MCP_OAUTH_ISSUER", "").strip()
     if configured:
@@ -150,7 +155,7 @@ def protected_resource_metadata(request: HttpRequest) -> JsonResponse:
             "authorization_servers": [base],
             "scopes_supported": SUPPORTED_SCOPES,
             "bearer_methods_supported": ["header"],
-            "resource_name": "Iowa Legal Corpus MCP Server",
+            "resource_name": f"{BRAND_NAME} MCP Server",
         }
     )
 
@@ -290,7 +295,7 @@ def _error_page(request, description: str, status: int = 400) -> HttpResponse:
     return render(
         request,
         "mcp_server/oauth_error.html",
-        {"description": description},
+        {"description": description, "brand_name": BRAND_NAME},
         status=status,
     )
 
@@ -400,6 +405,7 @@ def authorize(request: HttpRequest) -> HttpResponse:
                 "params": params,
                 "scope_display": params["scope"] or "mcp",
                 "user": request.user,
+                "brand_name": BRAND_NAME,
             },
         )
 

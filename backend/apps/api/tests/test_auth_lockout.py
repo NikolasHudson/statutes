@@ -162,19 +162,50 @@ class AuditTrailTests(TestCase):
         self.assertEqual(row.actor_email, "new@example.com")
         self.assertEqual(row.source_ip, "203.0.113.7")
 
-    def test_source_ip_prefers_x_forwarded_for(self):
+    @override_settings(TRUST_CF_CONNECTING_IP=True)
+    def test_source_ip_is_the_address_cloudflare_stamped(self):
+        """Production's real shape (verified 2026-07-13): the app sits behind
+        Cloudflare AND the App Platform edge — two appending proxies, not one. So
+        the audited address comes from CF-Connecting-IP, which Cloudflare overwrites
+        and a caller therefore cannot forge, rather than from a position in a
+        forwarded chain whose length nobody has measured.
+
+        This assertion has now been wrong twice: first it read the LEFT-most XFF
+        entry (the forgeable one — SECURITY_AUDIT_2026-07 finding #5), then it read
+        the right-most under a one-hop model that prod contradicts, which would have
+        audited Cloudflare's own address on every request. apps/accounts/tests/
+        test_client_ip.py carries the adversarial cases.
+        """
         _post(
             Client(),
             "/api/auth/register",
             {"email": "xff@example.com", "password": self.PASSWORD},
-            HTTP_X_FORWARDED_FOR="198.51.100.4, 10.0.0.1",
+            HTTP_CF_CONNECTING_IP="203.0.113.9",
+            # Padding the caller controls, plus the hops our infrastructure adds.
+            # Neither may move the answer.
+            HTTP_X_FORWARDED_FOR="198.51.100.4, 172.68.1.1, 10.0.0.1",
             REMOTE_ADDR="10.0.0.1",
         )
         row = AuditEvent.objects.get(
             event_type=AuditEvent.Event.REGISTER, actor_email="xff@example.com"
         )
-        # Behind the DO proxy the real client is the left-most XFF entry.
-        self.assertEqual(row.source_ip, "198.51.100.4")
+        self.assertEqual(row.source_ip, "203.0.113.9")
+
+    def test_source_ip_falls_back_to_the_forwarded_chain(self):
+        """With Cloudflare trust off (dev, and any deploy that has not opted in),
+        the address is the last entry our own infrastructure wrote — never the
+        left-most, which is whatever the caller typed."""
+        _post(
+            Client(),
+            "/api/auth/register",
+            {"email": "fallback@example.com", "password": self.PASSWORD},
+            HTTP_X_FORWARDED_FOR="198.51.100.4, 203.0.113.9",
+            REMOTE_ADDR="10.0.0.1",
+        )
+        row = AuditEvent.objects.get(
+            event_type=AuditEvent.Event.REGISTER, actor_email="fallback@example.com"
+        )
+        self.assertEqual(row.source_ip, "203.0.113.9")
 
     def test_password_and_profile_and_key_events(self):
         client = self._logged_in_client()

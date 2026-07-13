@@ -27,6 +27,7 @@ import {
 	ToggleRow,
 	useTheme,
 } from "@/components/carbon/primitives";
+import { BRAND_NAME, MCP_SERVER_ID, mcpUrl } from "@/lib/brand";
 import {
 	type APIKey,
 	type CreatedAPIKey,
@@ -792,19 +793,37 @@ function ApiKeysSection() {
 }
 
 function McpSection() {
-	const [host, setHost] = useState<string | null>(null);
+	const [mcpHost, setMcpHost] = useState("");
 	const [copied, setCopied] = useState(false);
 
 	useEffect(() => {
+		let cancelled = false;
+		// Seed from this app's own origin, then let the server's pinned config win.
+		//
+		// Resolved HERE, on mount, and not during render: mcpUrl() reads
+		// window.location.origin whenever NEXT_PUBLIC_APP_URL is unset (i.e. dev),
+		// so computing it in the render body made SSR emit "/mcp" while the client
+		// produced "http://localhost:3000/mcp" — a React hydration mismatch on every
+		// single load of /account. Starting from "" means server and client agree on
+		// the first paint, and the real value lands in the effect. Same fix the
+		// legacy /classic/account page already carries.
+		setMcpHost(mcpUrl());
 		fetchPublicConfig()
-			.then((c) => setHost(c.mcp_host))
-			.catch(() => setHost(null));
+			.then((c) => {
+				if (cancelled) return;
+				if (c.mcp_host) setMcpHost(c.mcp_host);
+			})
+			.catch(() => {
+				/* keep the same-origin fallback */
+			});
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
-	const mcpHost = host || "https://corpus.nick.law/mcp";
 	const snippet = `{
   "mcpServers": {
-    "iowa-legal-corpus": {
+    "${MCP_SERVER_ID}": {
       "command": "npx",
       "args": ["mcp-remote", "${mcpHost}",
                "--header", "X-API-Key: YOUR_RAW_KEY"]
@@ -826,7 +845,7 @@ function McpSection() {
 		<Section
 			id="mcp"
 			title="MCP config"
-			desc="Drop this into Claude Desktop or Cursor to give your AI tools live access to the Iowa Legal Corpus via your API key."
+			desc={`Drop this into Claude Desktop or Cursor to give your AI tools live access to ${BRAND_NAME} via your API key.`}
 		>
 			<div className="flex items-end gap-3">
 				<TextField

@@ -15,6 +15,33 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+
+# These ARGs are load-bearing and this file went its whole life without them.
+#
+# App Platform passes every BUILD_TIME-scoped env to a Dockerfile build as
+# `--build-arg`, and a Dockerfile with no matching `ARG` line SILENTLY DISCARDS
+# it: no warning, exit 0, green deploy. So both vars below have been the EMPTY
+# STRING in every bundle we have ever shipped. NEXT_PUBLIC_* are inlined at build
+# and cannot be supplied at runtime, so a RUN_TIME env in the spec would not have
+# saved them either.
+#
+# What that actually cost: NEXT_PUBLIC_MARKETING_URL (components/funnel-chrome.tsx,
+# app/(app)/admin/articles/editor.tsx) is "" — every link from the app back to the
+# marketing site is already broken, invisible only because marketing has never been
+# deployed. NEXT_PUBLIC_APP_URL (lib/brand.ts) is "" too; appOrigin() self-heals
+# from window.location in the browser, which is why nothing looked wrong, but it
+# has no window during SSR — so any surface that renders an absolute self-URL
+# server-side emits a relative one and then hydrates over it.
+#
+# Values must be LITERALS in the spec, never App Platform bindables (${APP_URL},
+# ${APP_DOMAIN}): those are runtime-only for a Dockerfile build. They pass
+# `doctl apps spec validate` and arrive here empty — i.e. exactly the failure this
+# block exists to fix.
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_MARKETING_URL
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_MARKETING_URL=$NEXT_PUBLIC_MARKETING_URL
+
 # basePath is applied in next.config.ts when NODE_ENV=production so
 # the static asset paths and router know they live at /chat/*.
 RUN npm run build

@@ -20,6 +20,7 @@ import { CarbonSignIn } from "@/components/carbon/sign-in";
 import { PaywallScreen } from "@/components/paywall";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BRAND_NAME } from "@/lib/brand";
 import { csrfHeaders } from "@/lib/csrf";
 import { clearThreadStores } from "@/lib/thread-store";
 import { useCredentialsForm } from "@/lib/use-credentials-form";
@@ -288,7 +289,7 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (u: AuthUser) => void }) {
 	const cta = mode === "register" ? "Create account" : "Sign in";
 	const subhead =
 		mode === "register"
-			? "Get an API key to use the Iowa Legal Corpus from Claude Desktop or your own integration."
+			? `Get an API key to use ${BRAND_NAME} from Claude Desktop or your own integration.`
 			: "Sign in to chat with the Iowa Code and Court Rules.";
 	const otherLabel =
 		mode === "register"

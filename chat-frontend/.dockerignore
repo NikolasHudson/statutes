@@ -1,0 +1,23 @@
+# The Docker build context is this directory (App Platform sets it from the
+# component's source_dir), and `COPY . .` would otherwise sweep in whatever is
+# lying around a developer's checkout.
+#
+# .env.local is the one that bites, and only started biting now that the
+# Dockerfile declares ARG/ENV NEXT_PUBLIC_MARKETING_URL: this checkout's
+# .env.local sets it to http://localhost:3001, it is gitignored so it never shows
+# up in a diff, and Next loads .env.local AHEAD of the process env. A local or CI
+# `docker build` would therefore bake a production image whose every link back to
+# the marketing site points at localhost — while the build-args we passed sit
+# there, silently overridden. Keep .env.example (documentation only, never read by
+# the build).
+node_modules
+.next
+out
+.env*
+!.env.example
+*.tsbuildinfo
+.git
+.gitignore
+*.log
+Dockerfile
+.dockerignore

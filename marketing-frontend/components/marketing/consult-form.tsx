@@ -11,6 +11,7 @@
 import { ArrowRightIcon, CheckCircle2Icon, Loader2Icon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { PRIVACY_URL } from "@/lib/site";
 
 const INPUT_CLASS =
 	"h-12 w-full rounded-none border-0 border-b border-[#8d8d8d] bg-[#f4f4f4] px-4 text-sm placeholder:text-muted-foreground focus:outline-2 focus:outline-[#0f62fe] focus:-outline-offset-2";
@@ -167,6 +168,21 @@ export function ConsultForm({
 				</p>
 			)}
 			<p className="mt-3 text-[12px] text-muted-foreground">{caption}</p>
+			{/* This form collects a named lawyer's contact details. Say what happens
+			    to them and link the policy that governs it. PRIVACY_URL is absolute
+			    (the policy lives on the app origin, not this one) — a bare /privacy
+			    would 404 here. */}
+			<p className="mt-2 text-[12px] text-muted-foreground leading-relaxed">
+				We use what you send only to reply and to keep a record of the
+				conversation — never to train models, never sold, never shared. See our{" "}
+				<a
+					href={PRIVACY_URL}
+					className="text-[#0f62fe] underline underline-offset-2"
+				>
+					privacy &amp; data practices
+				</a>
+				.
+			</p>
 		</form>
 	);
 }

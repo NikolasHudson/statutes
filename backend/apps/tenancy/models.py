@@ -115,9 +115,26 @@ class Product(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    def _normalize_hostname(self) -> None:
+        # Hosts are matched case-insensitively: ProductResolutionMiddleware
+        # lowercases request.get_host(), so a row stored as "Clerk.Example.com"
+        # would match nothing — and a host that matches nothing resolves to the
+        # UNLOCKED flagship, making the typo a silent scope-lock bypass rather
+        # than a visible 404. Normalize so the two sides cannot drift.
+        # Empty stays NULL: the unique index must allow many host-less products.
+        self.hostname = (self.hostname or "").strip().lower() or None
+
+    def clean_fields(self, exclude=None):
+        # Normalize BEFORE validation, not only in save(): hostname is unique, and
+        # a ModelForm (the admin) runs validate_unique() against the raw value. Given
+        # an existing "clerk.example.com", the input "Clerk.Example.com" would find no
+        # clash, validate, and only then be lowercased by save() — surfacing as an
+        # unhandled IntegrityError 500 instead of a "already exists" field error.
+        self._normalize_hostname()
+        super().clean_fields(exclude=exclude)
+
     def save(self, *args, **kwargs):
-        if not self.hostname:
-            self.hostname = None
+        self._normalize_hostname()
         super().save(*args, **kwargs)
 
     @property

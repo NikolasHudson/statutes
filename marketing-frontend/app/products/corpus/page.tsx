@@ -30,21 +30,46 @@ import {
 	PRODUCTS_INDEX_HREF,
 } from "@/components/marketing/chrome";
 import { ProductFamily } from "@/components/marketing/product-family";
+import {
+	type CorpusStats,
+	corpusSourceProse,
+	fetchCorpusStats,
+} from "@/lib/api";
 import { APP_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = {
-	title: "Hudson Corpus — Grounded legal research",
-	description:
-		"A grounded, citable research assistant for the Iowa Code, Court Rules, and caselaw. Every answer traced to the effective text, with verified citations.",
-};
+// Every source list on this page is DERIVED, like / and /products already do.
+//
+// All three used to be hand-typed as "the Iowa Code, Court Rules, and caselaw",
+// silently dropping the Iowa Administrative Code — 17,690 rules, live on prod
+// since 2026-07-10. /products renders the API-derived "Caselaw · Code ·
+// Administrative Code · Court Rules" and links straight here, so a visitor
+// clicking a source list that advertises admin rules landed on the product page
+// that never mentioned them. That understates our own corpus-breadth lead, which
+// is the worst direction to be wrong in.
+const FALLBACK_SOURCES = "Code, Administrative Code, Court Rules & caselaw";
 
-export default function CorpusProductPage() {
+function sourceList(stats: CorpusStats): string {
+	return corpusSourceProse(stats) || FALLBACK_SOURCES;
+}
+
+// Async: the description states the corpus as fact, so it is fetched, not typed.
+// Next dedupes this fetch against the page's own call in the same render pass.
+export async function generateMetadata(): Promise<Metadata> {
+	const stats = await fetchCorpusStats();
+	return {
+		title: "Hudson Corpus — Grounded legal research",
+		description: `A grounded, citable research assistant for the Iowa ${sourceList(stats)}. Every answer traced to the effective text, with verified citations.`,
+	};
+}
+
+export default async function CorpusProductPage() {
+	const stats = await fetchCorpusStats();
 	return (
 		<CarbonPage>
-			<Hero />
+			<Hero stats={stats} />
 			<HeroShot />
-			<FeatureSections />
+			<FeatureSections stats={stats} />
 			<CapabilityGrid />
 			<CtaBand />
 			<ProductFamily current="corpus" n="05" />
@@ -56,7 +81,7 @@ export default function CorpusProductPage() {
 // Hero — dark leadspace; the primary product shot follows in a light band
 // ---------------------------------------------------------------------------
 
-function Hero() {
+function Hero({ stats }: { stats: CorpusStats }) {
 	return (
 		<PageHero
 			eyebrow="Products — Hudson Corpus"
@@ -67,7 +92,7 @@ function Hero() {
 					with the citation built in.
 				</>
 			}
-			lede="One assistant over the Iowa Code, Court Rules, and caselaw — every answer traced to the currently-effective text, every citation verified before you see it."
+			lede={`One assistant over the Iowa ${sourceList(stats)} — every answer traced to the currently-effective text, every citation verified before you see it.`}
 			actions={
 				<>
 					<SolidLink href={APP_URL}>Start researching</SolidLink>
@@ -110,50 +135,52 @@ type FeatureBlock = {
 	caption: string;
 };
 
-const BLOCKS: FeatureBlock[] = [
-	{
-		n: "01",
-		label: "Browse",
-		title: "The whole corpus, one library.",
-		body: "Statutes, rules, and decisions in a single, navigable workspace — search across everything or drill into one source.",
-		points: [
-			"Iowa Code, Court Rules & caselaw side by side",
-			"Jump from a search hit straight into context",
-			"Live counts so you know the coverage",
-		],
-		shot: "/marketing/corpus/browse.png",
-		alt: "The Hudson Corpus library / browse view",
-		caption: "Browse — the unified library",
-	},
-	{
-		n: "02",
-		label: "Read",
-		title: "Read the source, not a summary.",
-		body: "Open the effective text with its citation, effective date, and enacting session law attached — and follow inline links to the official publication.",
-		points: [
-			"Currently-in-force text, version-aware",
-			"Citation & effective date on every provision",
-			"One click to the official source",
-		],
-		shot: "/marketing/corpus/reader.png",
-		alt: "The Hudson Corpus statute / case reader",
-		caption: "Reader — the effective text",
-	},
-	{
-		n: "03",
-		label: "Search",
-		title: "Search that finds what you mean.",
-		body: "Full-text, trigram, and vector embeddings fused with Reciprocal Rank Fusion — type a citation number or describe the issue and the on-point provision surfaces either way.",
-		points: [
-			"Keyword precision + semantic recall",
-			"Filter by source, court, and date",
-			"Ranked, cited results — not ten blue links",
-		],
-		shot: "/marketing/corpus/search.png",
-		alt: "The Hudson Corpus search results view",
-		caption: "Search — hybrid results",
-	},
-];
+function blocks(stats: CorpusStats): FeatureBlock[] {
+	return [
+		{
+			n: "01",
+			label: "Browse",
+			title: "The whole corpus, one library.",
+			body: "Statutes, rules, and decisions in a single, navigable workspace — search across everything or drill into one source.",
+			points: [
+				`Iowa ${sourceList(stats)} side by side`,
+				"Jump from a search hit straight into context",
+				"Live counts so you know the coverage",
+			],
+			shot: "/marketing/corpus/browse.png",
+			alt: "The Hudson Corpus library / browse view",
+			caption: "Browse — the unified library",
+		},
+		{
+			n: "02",
+			label: "Read",
+			title: "Read the source, not a summary.",
+			body: "Open the effective text with its citation, effective date, and enacting session law attached — and follow inline links to the official publication.",
+			points: [
+				"Currently-in-force text, version-aware",
+				"Citation & effective date on every provision",
+				"One click to the official source",
+			],
+			shot: "/marketing/corpus/reader.png",
+			alt: "The Hudson Corpus statute / case reader",
+			caption: "Reader — the effective text",
+		},
+		{
+			n: "03",
+			label: "Search",
+			title: "Search that finds what you mean.",
+			body: "Full-text, trigram, and vector embeddings fused with Reciprocal Rank Fusion — type a citation number or describe the issue and the on-point provision surfaces either way.",
+			points: [
+				"Keyword precision + semantic recall",
+				"Filter by source, court, and date",
+				"Ranked, cited results — not ten blue links",
+			],
+			shot: "/marketing/corpus/search.png",
+			alt: "The Hudson Corpus search results view",
+			caption: "Search — hybrid results",
+		},
+	];
+}
 
 function FeatureSection({ b, dark }: { b: FeatureBlock; dark: boolean }) {
 	return (
@@ -208,10 +235,10 @@ function FeatureSection({ b, dark }: { b: FeatureBlock; dark: boolean }) {
 	);
 }
 
-function FeatureSections() {
+function FeatureSections({ stats }: { stats: CorpusStats }) {
 	return (
 		<>
-			{BLOCKS.map((b, i) => (
+			{blocks(stats).map((b, i) => (
 				<FeatureSection key={b.n} b={b} dark={i % 2 === 0} />
 			))}
 		</>

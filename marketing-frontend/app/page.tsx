@@ -25,7 +25,14 @@ import {
 	PRODUCTS_INDEX_HREF,
 } from "@/components/marketing/chrome";
 import { HeroCodeRain } from "@/components/marketing/hero-code-rain";
-import { GET_STARTED_URL } from "@/lib/site";
+import {
+	type CorpusSource,
+	type CorpusStats,
+	corpusSourceNames,
+	fetchCorpusStats,
+	formatCount,
+} from "@/lib/api";
+import { APP_HOST, GET_STARTED_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -35,11 +42,15 @@ export const metadata: Metadata = {
 		"We build research systems for the practice of law. Every answer is grounded in effective, citable text and verified before it reaches you.",
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+	// Every number on this page comes off the live corpus (see lib/api.ts). The
+	// figures that used to sit here as literals were 18k documents and a whole
+	// source out of date, and understated the breadth that is our actual lead.
+	const stats = await fetchCorpusStats();
 	return (
 		<CarbonPage>
-			<Hero />
-			<Flagship />
+			<Hero stats={stats} />
+			<Flagship stats={stats} />
 			<Principles />
 			<WhatWeDo />
 			<CtaBand />
@@ -51,14 +62,28 @@ export default function HomePage() {
 // Hero — the company speaks; the numbers close the band
 // ---------------------------------------------------------------------------
 
-const FACTS: { value: string; label: string }[] = [
-	{ value: "105,734", label: "Documents in the corpus" },
-	{ value: "496K", label: "Passages, semantically searchable" },
-	{ value: "3", label: "Sources unified — code, rules, caselaw" },
-	{ value: "100%", label: "Answers tied to citable sources" },
-];
+// The statutory tiers and the caselaw tier, counted separately: they sum to the
+// total, and a lawyer reads "46,752 statutes and rules" very differently from
+// "76,672 decisions". The 100% is a property of the design (the verification
+// gate), not a measurement, so it is the one tile that is not fetched.
+function facts(stats: CorpusStats): { value: string; label: string }[] {
+	const of = (kind: CorpusSource["kind"]) =>
+		stats.sources
+			.filter((s) => s.kind === kind)
+			.reduce((n, s) => n + s.entries, 0);
+	return [
+		{ value: formatCount(stats.documents), label: "Documents in the corpus" },
+		{
+			value: formatCount(of("statutes")),
+			label: "Statutes, administrative rules and court rules",
+		},
+		{ value: formatCount(of("caselaw")), label: "Iowa decisions" },
+		{ value: "100%", label: "Answers tied to citable sources" },
+	];
+}
 
-function Hero() {
+function Hero({ stats }: { stats: CorpusStats }) {
+	const FACTS = facts(stats);
 	return (
 		<section className={cn("relative overflow-hidden text-white", INK)}>
 			{/* Statute text → binary, painting the whole band… */}
@@ -119,12 +144,17 @@ function Hero() {
 // 01 — Flagship: Hudson Corpus, with the real product and a spec sheet
 // ---------------------------------------------------------------------------
 
-const SPECS: { term: string; detail: string }[] = [
-	{ term: "Jurisdiction", detail: "Iowa" },
-	{ term: "Sources", detail: "Code · Court rules · Caselaw" },
-	{ term: "Status", detail: "Live in beta" },
-	{ term: "Access", detail: "Web · MCP · Email" },
-];
+// The source list is rendered from the same payload as the counts, so it cannot
+// drift from what we actually serve — and it grows by itself the day a new
+// source is ingested to production.
+function specs(stats: CorpusStats): { term: string; detail: string }[] {
+	return [
+		{ term: "Jurisdiction", detail: "Iowa" },
+		{ term: "Sources", detail: corpusSourceNames(stats) || "—" },
+		{ term: "Status", detail: "Live in beta" },
+		{ term: "Access", detail: "Web · MCP · Email" },
+	];
+}
 
 const CAPABILITIES: { title: string; body: string }[] = [
 	{
@@ -137,7 +167,7 @@ const CAPABILITIES: { title: string; body: string }[] = [
 	},
 	{
 		title: "A unified corpus",
-		body: "Statutes, court rules, and caselaw in one searchable system — semantic and keyword retrieval over 496,000 passages.",
+		body: "Statutes, administrative rules, court rules, and caselaw in one searchable system — semantic and keyword retrieval, fused and reranked.",
 	},
 	{
 		title: "Open integration",
@@ -145,7 +175,8 @@ const CAPABILITIES: { title: string; body: string }[] = [
 	},
 ];
 
-function Flagship() {
+function Flagship({ stats }: { stats: CorpusStats }) {
+	const SPECS = specs(stats);
 	return (
 		<section className="bg-background">
 			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
@@ -182,7 +213,7 @@ function Flagship() {
 				<figure className="mt-16 border border-border bg-card">
 					<figcaption className="flex items-center justify-between border-border border-b px-4 py-2.5 font-mono text-[11px] text-muted-foreground">
 						<span>Hudson Corpus — Assistant</span>
-						<span>corpus.nick.law</span>
+						<span>{APP_HOST}</span>
 					</figcaption>
 					{/* biome-ignore lint/performance/noImgElement: static marketing capture, no next/image needed */}
 					<img

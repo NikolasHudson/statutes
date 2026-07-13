@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import environ
@@ -9,6 +10,96 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
     CORS_ALLOWED_ORIGINS=(list, ["http://localhost:5173"]),
     CSRF_TRUSTED_ORIGINS=(list, []),
+    # The app's own public origin: the single front door, and the base of every
+    # URL we hand a human. Stripe Checkout/portal return URLs
+    # (apps/billing/api._return_base_url) and org invite links
+    # (apps/api/orgs._app_base_url) both resolve to exactly this and nothing
+    # else — a guessed base URL strands a user who has just paid, or on a page
+    # that doesn't exist. The default is today's production origin so no box
+    # needs a new .env entry to boot; set it in the App Platform spec when the
+    # app changes host.
+    APP_URL=(str, "https://corpus.nick.law"),
+    # MCP OAuth 2.0 issuer (apps/mcp_server/{oauth,auth}.py, which read it from
+    # os.environ directly — this entry exists so the var is discoverable and
+    # settable from .env). Empty means the issuer FLOATS WITH THE REQUEST HOST:
+    # tokens minted under one hostname stop validating under another, so on a
+    # multi-host deploy prod must pin it to the app origin.
+    MCP_OAUTH_ISSUER=(str, ""),
+    # The public MCP endpoint, served to the frontend by GET /api/config and
+    # pasted by the user into claude_desktop_config.json. Empty = derive it from
+    # APP_URL, which is what every real deploy wants (the MCP door is a path on
+    # the app host, routed there by App Platform ingress); the override exists for
+    # a tunnel/forwarded-port setup where the two origins genuinely differ.
+    # Until now this was read straight from os.environ and was in no spec, so
+    # /api/config answered {"mcp_host": null} in production and the account page
+    # had no host to put in the snippet.
+    MCP_HOST=(str, ""),
+    # FALLBACK ONLY — read apps/accounts/audit.client_ip before touching this.
+    #
+    # How many proxies WE run between the public internet and Django. Each one
+    # APPENDS the address it accepted the connection from to X-Forwarded-For, so
+    # only the last N entries are ours to trust. An earlier version of this comment
+    # asserted "on App Platform that is the single edge hop"; that was never
+    # measured and prod contradicts it — corpus.nick.law is orange-clouded, so a
+    # request crosses Cloudflare AND the App Platform edge (verified 2026-07-13:
+    # Cloudflare anycast A records + cf-ray + x-do-app-origin on one response).
+    #
+    # The value is deliberately left at 1 rather than "corrected" to 2, because a
+    # second guess is not better than the first: nothing echoes the origin-side
+    # header, so the true count is unmeasured. It is safe to leave low — too LOW
+    # degrades to a proxy address (one shared bucket), too HIGH reads an entry the
+    # client TYPED, and only the latter is a forgery. In production this branch is
+    # not reached at all: TRUST_CF_CONNECTING_IP resolves the address first.
+    #
+    # To measure it for real (needed only if CF trust is ever turned off): the
+    # security log now carries xff_len on every auth event — see
+    # apps/accounts/audit.proxy_chain_shape. Log in once, read xff_len, and set
+    # this to (xff_len - <entries the client sent, i.e. 0 for an honest browser>).
+    TRUSTED_PROXY_COUNT=(int, 1),
+    # Trust Cloudflare's CF-Connecting-IP as the client address.
+    #
+    # This is THE client-IP control in production, and it is the one header in the
+    # chain a browser cannot lie about: Cloudflare OVERWRITES CF-Connecting-IP on
+    # ingress, and unlike X-Forwarded-For it does not depend on counting hops. It
+    # is sound here only because ALLOWED_HOSTS already forecloses the bypass:
+    # the app's bare *.ondigitalocean.app hostname is publicly reachable, but every
+    # security-relevant path on it answers 400 DisallowedHost (verified 2026-07-13
+    # against prod: /api/auth/login, /api/auth/register, /api/marketing/contact and
+    # /admin/login/ all 400; only /api/health answers, because HealthCheckMiddleware
+    # short-circuits it ahead of host validation for the container probe). So the
+    # only route to a path that calls client_ip runs through Cloudflare.
+    #
+    # Default OFF, and it MUST stay off anywhere Cloudflare is not genuinely in
+    # front — with no CF in the path this header is just another string a client
+    # can type. Turned on explicitly in .do/app.yaml, never by default.
+    TRUST_CF_CONNECTING_IP=(bool, False),
+    # Shared secret proving a request came from the marketing site's own
+    # server-side route handlers (marketing-frontend/app/api/{contact,subscribe}).
+    # Those relay leads from a container, so the visitor's address is not a
+    # property of the connection we see: the handler copies it into X-Real-Client-IP
+    # and this token proves the copy is ours. Without it every lead on earth arrives
+    # from the marketing container's egress IP and shares one throttle bucket.
+    #
+    # It authorises asserting a source IP, so audit.client_ip additionally confines
+    # it to /api/marketing/* — a leaked token must not become the ability to forge
+    # an address into the login lockout or the audit trail.
+    #
+    # Unset = the header is ignored entirely, so dev and any deploy that forgets it
+    # still work; they just fall back to the connecting address. Set the SAME value
+    # on BOTH apps. It is a secret, never NEXT_PUBLIC_. Keep it ASCII.
+    MARKETING_PROXY_TOKEN=(str, ""),
+    # Host → Product resolution (core/middleware.ProductResolutionMiddleware).
+    # An unrecognised Host resolves to product=None, and product=None IS the
+    # unlocked full-corpus flagship — so a white-label host that reaches DNS and
+    # ALLOWED_HOSTS before its Product row exists would serve the whole flagship
+    # with the scope lock silently gone. STRICT refuses (404) any Host that is
+    # neither a Product.hostname nor an explicit FLAGSHIP_HOSTS entry.
+    # Default OFF = today's behaviour exactly. Do NOT turn it on in the same
+    # change that first populates FLAGSHIP_HOSTS: an incomplete list locks out
+    # the flagship itself. (/api/health is answered by HealthCheckMiddleware
+    # ahead of this, so the pod-IP probe is safe either way.)
+    PRODUCT_HOST_STRICT=(bool, False),
+    FLAGSHIP_HOSTS=(list, []),
     REDIS_URL=(str, ""),
     OPENAI_API_KEY=(str, ""),
     # Per-user daily chat message cap and a global monthly hard ceiling.
@@ -88,6 +179,9 @@ env = environ.Env(
     EMAIL_REQUIRE_SENDER_AUTH=(bool, True),
     # Where emailed citation links point for the flagship assistant address
     # (a scoped product's address uses its own Product.hostname instead).
+    # LOAD-BEARING DEFAULT: the live App Platform spec does not set this, so
+    # prod runs on the value below. Moving the app without also setting this
+    # explicitly in the spec silently keeps mailing links to the old host.
     EMAIL_LINK_BASE_URL=(str, "https://corpus.nick.law"),
     # PR7: the *currency* axis, orthogonal to fidelity — is the case the user's
     # premise rests on still GOOD LAW? Deterministic (reads the PR3 treatment flag
@@ -99,8 +193,19 @@ env = environ.Env(
     # to MAX_PREMISES retrieve_context calls pre-draft. Set False to disable.
     RAG_CURRENCY_CHECK=(bool, True),
     # Marketing-site contact form (apps.marketing): where to send the "new
-    # submission" heads-up email, and the (Postmark-verified) From it uses.
-    # NOTIFY unset = no email; the admin row is always the durable record.
+    # submission" heads-up email, and the From it uses.
+    #
+    # NOTIFY unset = NO EMAIL AT ALL — leads land in the Django admin and nobody
+    # is told they exist. That is the state of production today (it is in no
+    # spec), so it is not a hypothetical default: set it, or the funnel is a
+    # table you have to remember to open. Absent it, a prod boot warns (below)
+    # and every stored submission logs a warning.
+    #
+    # FROM must be a sender Postmark has VERIFIED for the sending domain. It
+    # isn't a cosmetic label: Postmark rejects an unverified signature, send_mail
+    # raises, apps/marketing/api.py logs it and still answers 200 — the visitor
+    # sees a thank-you and we hear nothing. The default below belongs to the old
+    # mail domain, so the domain move must set this in the same breath.
     CONTACT_NOTIFY_EMAIL=(str, ""),
     CONTACT_FROM_EMAIL=(str, "assistant@mail.nick.law"),
     # Whole-platform monthly LLM spend ceiling in USD (apps.api.usage). The
@@ -140,9 +245,9 @@ env = environ.Env(
     # only (an org that ever held a Stripe subscription doesn't trial again).
     # 0 disables trials entirely.
     STRIPE_TRIAL_DAYS=(int, 7),
-    # Where Stripe Checkout / the Billing Portal send the browser back to. Empty
-    # = derive it (APP_URL, else the first CORS origin, else EMAIL_LINK_BASE_URL);
-    # set it explicitly in prod. The "/account/billing" path is appended.
+    # Stripe-specific override of APP_URL for Checkout / Billing Portal return
+    # URLs. Empty (the normal case) = APP_URL, full stop; there is no guessing
+    # tail. The "/account/billing" path is appended.
     STRIPE_RETURN_BASE_URL=(str, ""),
 )
 environ.Env.read_env(BASE_DIR / ".env")
@@ -176,20 +281,37 @@ RAG_WEB_CURRENCY_CHECK = env("RAG_WEB_CURRENCY_CHECK")
 RAG_WEB_CURRENCY_BUDGET = env("RAG_WEB_CURRENCY_BUDGET")
 RAG_WEB_CURRENCY_TIMEOUT = env("RAG_WEB_CURRENCY_TIMEOUT")
 RAG_WEB_CURRENCY_MAX_AGE_DAYS = env("RAG_WEB_CURRENCY_MAX_AGE_DAYS")
+RAG_PREMISE_CHECK = env("RAG_PREMISE_CHECK")
+RAG_CURRENCY_CHECK = env("RAG_CURRENCY_CHECK")
 
 # Tests must NEVER make live LLM/web calls through the flag-gated verification
 # layers — the suites inject fake checkers explicitly. Turning a flag on in
 # .env (e.g. for the dev UI) must not leak real OpenAI/web traffic into
-# `manage.py test`, so the flags are forced off under the test runner.
+# `manage.py test`, so the flags are forced off under the test runner. The
+# env() reads above must stay above this block or they silently undo it.
 import sys  # noqa: E402
 
-if "test" in sys.argv:
+# The SUBCOMMAND must be `test` — not merely the word "test" appearing anywhere in
+# argv. `"test" in sys.argv` also matches `manage.py changepassword test` (a user
+# named "test"), which would hash that user's real password with MD5 below and
+# persist it. Prod migrations and management commands here are hand-run against the
+# live DB, so that is a reachable way to write a junk hash into production.
+IS_TEST_RUN = len(sys.argv) > 1 and sys.argv[1] == "test"
+
+if IS_TEST_RUN:
     RAG_CLAIM_NLI = False
     RAG_PREMISE_CHECK = False
     RAG_APPLICABILITY_CHECK = False
     RAG_WEB_CURRENCY_CHECK = False
-RAG_PREMISE_CHECK = env("RAG_PREMISE_CHECK")
-RAG_CURRENCY_CHECK = env("RAG_CURRENCY_CHECK")
+    # The dev .env turns billing on to exercise the paywall in the UI, but that
+    # leaks into the test runner and 402s every suite written before billing —
+    # the sole cause of the ~21 "pre-existing" failures. Tests that WANT the
+    # paywall turn it on with override_settings (apps/api/tests/test_paywall.py).
+    BILLING_REQUIRE_PAID = False
+    # PBKDF2 takes >1s per hash on the dev droplet; with users created in
+    # per-test setUp that was ~20 min of suite time. Tests don't care about
+    # hash strength.
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 DOCLING_SERVICE_URL = env("DOCLING_SERVICE_URL")
 DOCLING_TIMEOUT = env("DOCLING_TIMEOUT")
 
@@ -204,6 +326,20 @@ EMAIL_REQUIRE_SENDER_AUTH = env("EMAIL_REQUIRE_SENDER_AUTH")
 EMAIL_LINK_BASE_URL = env("EMAIL_LINK_BASE_URL")
 CONTACT_NOTIFY_EMAIL = env("CONTACT_NOTIFY_EMAIL")
 CONTACT_FROM_EMAIL = env("CONTACT_FROM_EMAIL")
+# Contact notifications OFF is a silent failure mode by construction: the visitor
+# still gets a 200 and the row is still written, so nothing anywhere goes red — we
+# just never look. Say so at boot, once, where the App Platform runtime log will
+# carry it. A warning and not a hard fail: a missing notification address must
+# never be the reason the site cannot serve requests, and dev/CI have no mailbox.
+if not DEBUG and not IS_TEST_RUN and not CONTACT_NOTIFY_EMAIL:
+    import warnings  # noqa: E402
+
+    warnings.warn(
+        "CONTACT_NOTIFY_EMAIL is unset: marketing contact submissions will be "
+        "stored in the admin and NOBODY will be emailed about them.",
+        RuntimeWarning,
+        stacklevel=1,
+    )
 if POSTMARK_SERVER_TOKEN:
     EMAIL_BACKEND = "anymail.backends.postmark.EmailBackend"
     ANYMAIL = {"POSTMARK_SERVER_TOKEN": POSTMARK_SERVER_TOKEN}
@@ -228,6 +364,41 @@ STRIPE_PRICE_FIRM = env("STRIPE_PRICE_FIRM")
 STRIPE_PRICE_FIRM_SEAT = env("STRIPE_PRICE_FIRM_SEAT")
 STRIPE_TRIAL_DAYS = env("STRIPE_TRIAL_DAYS")
 STRIPE_RETURN_BASE_URL = env("STRIPE_RETURN_BASE_URL")
+
+# The app's public origin. Every user-facing link we generate server-side hangs
+# off this one value — see the schema note above.
+APP_URL = env("APP_URL")
+# The schema default is the PRODUCTION origin, so a prod box is correct with no
+# config. That default is wrong for dev, though: before APP_URL existed, dev
+# resolved these links through CORS_ALLOWED_ORIGINS[0] (the local SPA), so
+# inheriting the prod default would point a dev Stripe checkout and a dev invite
+# email at corpus.nick.law. Absent an explicit APP_URL, dev keeps its own origin.
+# Checked against os.environ, not env(), because env() cannot distinguish "unset"
+# from "set to the default"; read_env() has already folded .env into os.environ.
+if DEBUG and "APP_URL" not in os.environ:
+    APP_URL = "http://localhost:3000"
+# Registered, not consumed here: apps/mcp_server reads it from os.environ (which
+# read_env() has already populated from .env). Pin it in prod — see the schema.
+MCP_OAUTH_ISSUER = env("MCP_OAUTH_ISSUER")
+# The MCP door is a path on the app host (App Platform routes /mcp to Django), so
+# it follows APP_URL by default and the cutover has one host to set, not two.
+MCP_HOST = env("MCP_HOST") or f"{APP_URL.rstrip('/')}/mcp"
+
+# Read by core/middleware.ProductResolutionMiddleware. These must be declared here
+# even though the middleware reads them defensively: Django settings do not fall
+# through to os.environ, so without these two lines the switch is inert and setting
+# it in the App Platform spec would do nothing, silently.
+PRODUCT_HOST_STRICT = env("PRODUCT_HOST_STRICT")
+FLAGSHIP_HOSTS = env("FLAGSHIP_HOSTS")
+
+# Who the client is — see apps/accounts/audit.client_ip, and the schema notes
+# above. Every IP-keyed security control in the app (login lockout, registration
+# throttle, marketing lead throttle, audit source_ip) resolves through that one
+# helper and these two values; they are the difference between a throttle that
+# counts people and one that counts proxies.
+TRUSTED_PROXY_COUNT = env("TRUSTED_PROXY_COUNT")
+TRUST_CF_CONNECTING_IP = env("TRUST_CF_CONNECTING_IP")
+MARKETING_PROXY_TOKEN = env("MARKETING_PROXY_TOKEN")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -359,10 +530,16 @@ AXES_USERNAME_FORM_FIELD = "email"
 # resets the counter for that IP+account (AXES_RESET_ON_SUCCESS).
 AXES_COOLOFF_TIME = env("AXES_COOLOFF_TIME_HOURS", default=1)
 AXES_RESET_ON_SUCCESS = True
-# Behind the DO App Platform proxy the real client IP is in X-Forwarded-For
-# (left-most entry). Tell axes to trust exactly that single proxy hop.
-AXES_IPWARE_PROXY_COUNT = 1
-AXES_IPWARE_META_PRECEDENCE_ORDER = ["HTTP_X_FORWARDED_FOR", "REMOTE_ADDR"]
+# Source IP. This used to be AXES_IPWARE_PROXY_COUNT=1 — dead configuration:
+# django-ipware is not installed (it is nobody's dependency here), so axes fell
+# through to its REMOTE_ADDR branch and, behind the App Platform proxy, locked
+# out on the *proxy's* address. With AXES_LOCKOUT_PARAMETERS keyed on
+# (ip_address, username) and ip_address constant for the whole internet, the
+# lockout degenerates to per-username: five wrong guesses from anywhere lock a
+# named account, and no attacker address is ever recorded. Point axes at the one
+# helper that discounts the hops properly, so axes, the registration throttle,
+# the marketing lead throttle and the audit trail all agree on who the client is.
+AXES_CLIENT_IP_CALLABLE = "apps.accounts.audit.client_ip"
 # Lockout store. In prod we use the shared Redis cache so the count holds across
 # the multiple App Platform processes and survives deploys, exactly like the
 # chat quota / API rate limiter (AxesCacheHandler reads AXES_CACHE="default").
@@ -407,6 +584,15 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# EXACTLY ONE ENTRY: the app's own origin. This list is not a list of "sites we
+# like" — CORS_ALLOW_CREDENTIALS is True and the list is folded into
+# CSRF_TRUSTED_ORIGINS below, so every entry is an origin that may send cookies
+# to this API *and* is trusted to originate state-changing POSTs against it.
+# The marketing site does NOT belong here and does not need to: its forms post
+# to their own Next route handlers, which call the API server-side
+# (marketing-frontend/app/api/{contact,subscribe}/route.ts → API_ORIGIN), so no
+# browser ever makes a cross-origin call to Django. Adding an origin here to
+# "fix" a marketing form hands that origin a credentialed, CSRF-trusted channel.
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
 # The session routes are CSRF-protected (apps/api/session_auth.py). For an
@@ -453,6 +639,20 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SAMESITE = "Lax"
     CSRF_COOKIE_SAMESITE = "Lax"
+    # __Host- prefix: the browser refuses the cookie unless it is Secure,
+    # path-scoped to "/", and carries NO Domain attribute. That last clause is
+    # the point — on a multi-tenant apex any sibling subdomain can otherwise set
+    # a Domain=.<apex> cookie that shadows csrftoken/sessionid in our own
+    # requests (cookie tossing), and the prefix makes that impossible rather than
+    # merely unlikely. Hence also: SESSION_COOKIE_DOMAIN / CSRF_COOKIE_DOMAIN
+    # stay unset, both because __Host- forbids Domain and because a dot-domain
+    # cookie is a tenant-isolation break in its own right.
+    # DEBUG-gated because the rule is enforced silently: over plain HTTP (dev)
+    # the browser drops a __Host- cookie with no error and login just stops
+    # working. Renaming the cookies invalidates every live session — a forced
+    # logout, which is free only while the user base is us.
+    SESSION_COOKIE_NAME = "__Host-sessionid"
+    CSRF_COOKIE_NAME = "__Host-csrftoken"
     SECURE_HSTS_SECONDS = 31_536_000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True

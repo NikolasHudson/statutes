@@ -22,7 +22,12 @@ import {
 	SolidLink,
 } from "@/components/marketing/carbon";
 import { CONSULTING_HREF } from "@/components/marketing/chrome";
-import { APP_URL } from "@/lib/site";
+import {
+	type CorpusStats,
+	corpusSourceProse,
+	fetchCorpusStats,
+} from "@/lib/api";
+import { APP_URL, BRAND_NAME } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -48,65 +53,89 @@ type Tier = {
 // (Solo) and the consult form (Firm) instead of the app's checkout page.
 const BILLING_LIVE = process.env.NEXT_PUBLIC_BILLING_LIVE === "1";
 
-const TIERS: Tier[] = [
-	{
-		name: "Solo",
-		price: "$49",
-		cadence: "/ month",
-		subPrice: "or $490 / year — two months free",
-		tagline: "For the individual practitioner who lives in research.",
-		features: [
-			"Unlimited research chat with cited, verified answers",
-			"Full search — Iowa Code, admin code, Acts & caselaw",
-			"Citator with treatment & supersession notes",
-			"MCP connector, saved research & the email assistant",
-		],
-		// /start is the app's signup→checkout wizard; ?plan pre-selects the plan.
-		cta: BILLING_LIVE
-			? {
-					label: "Start 7-day free trial",
-					href: `${APP_URL}/start?plan=solo`,
-				}
-			: { label: "Get started", href: APP_URL },
-		featured: true,
-		badge: "7-day free trial",
-	},
-	{
-		name: "Firm",
-		price: "$149",
-		cadence: "/ month",
-		subPrice: "includes 3 seats · $39 / month per added seat",
-		tagline: "For firms standardizing how the team does research.",
-		features: [
-			"Everything in Solo",
-			"Brief cite-check with PDF & DOCX upload",
-			"Org console — seats, roles & invitations",
-			"Firm-wide usage dashboard & priority support",
-		],
-		cta: BILLING_LIVE
-			? {
-					label: "Start 7-day free trial",
-					href: `${APP_URL}/start?plan=firm`,
-				}
-			: { label: "Talk to us", href: `${CONSULTING_HREF}#contact` },
-		badge: "7-day free trial",
-	},
-	{
-		name: "Enterprise",
-		price: "Custom",
-		tagline: "Bar associations, county attorneys, legal aid & government.",
-		features: [
-			"Everything in Firm",
-			"Custom corpus & integrations",
-			"SSO & onboarding",
-			"Dedicated support",
-		],
-		cta: { label: "Talk to us", href: `${CONSULTING_HREF}#contact` },
-		badge: "Custom",
-	},
-];
+// The tier list is a function of the LIVE corpus, not a hand-typed literal.
+//
+// The Solo bullet used to read "Full search — Iowa Code, admin code, Acts &
+// caselaw". Prod serves `iowa-acts` with entries: 0 — the Acts are ingested on
+// dev only — so that was a false claim on the one page where money changes
+// hands, and precisely the failure the derived-stats machinery in lib/api.ts was
+// built to make impossible (/ and /products already derive their source lists;
+// /pricing was left hand-typed). Deriving it means the page cannot lie today and
+// picks the Acts up by itself the day they land on prod.
+function tiers(stats: CorpusStats): Tier[] {
+	const sources = corpusSourceProse(stats);
+	return [
+		{
+			name: "Solo",
+			price: "$49",
+			cadence: "/ month",
+			subPrice: "or $490 / year — two months free",
+			tagline: "For the individual practitioner who lives in research.",
+			features: [
+				"Unlimited research chat with cited, verified answers",
+				// Degraded fetch (dev, no backend) → name no sources rather than print
+				// an empty list as if it were a claim.
+				sources
+					? `Full search — Iowa ${sources}`
+					: "Full search across the Iowa corpus",
+				// Was "Citator with treatment & supersession notes". Treatment is real
+				// and live: a deterministic classifier over the caselaw citation graph
+				// (apps/corpus/services/treatment.py), cached per decision and already
+				// shipped on /results. Supersession notes are NOT: CaseResearchNote.Kind
+				// .ACT_SUPERSESSION is written by backfill_acts_code_edges from the
+				// session-law amended table, so it is downstream of the Iowa Acts — and
+				// prod has zero. Claim the half that is true.
+				"Citator — negative-treatment flags on decisions",
+				"MCP connector, saved research & the email assistant",
+			],
+			// /start is the app's signup→checkout wizard; ?plan pre-selects the plan.
+			cta: BILLING_LIVE
+				? {
+						label: "Start 7-day free trial",
+						href: `${APP_URL}/start?plan=solo`,
+					}
+				: { label: "Get started", href: APP_URL },
+			featured: true,
+			badge: "7-day free trial",
+		},
+		{
+			name: "Firm",
+			price: "$149",
+			cadence: "/ month",
+			subPrice: "includes 3 seats · $39 / month per added seat",
+			tagline: "For firms standardizing how the team does research.",
+			features: [
+				"Everything in Solo",
+				"Brief cite-check with PDF & DOCX upload",
+				"Org console — seats, roles & invitations",
+				"Firm-wide usage dashboard & priority support",
+			],
+			cta: BILLING_LIVE
+				? {
+						label: "Start 7-day free trial",
+						href: `${APP_URL}/start?plan=firm`,
+					}
+				: { label: "Talk to us", href: `${CONSULTING_HREF}#contact` },
+			badge: "7-day free trial",
+		},
+		{
+			name: "Enterprise",
+			price: "Custom",
+			tagline: "Bar associations, county attorneys, legal aid & government.",
+			features: [
+				"Everything in Firm",
+				"Custom corpus & integrations",
+				"SSO & onboarding",
+				"Dedicated support",
+			],
+			cta: { label: "Talk to us", href: `${CONSULTING_HREF}#contact` },
+			badge: "Custom",
+		},
+	];
+}
 
-export default function PricingPage() {
+export default async function PricingPage() {
+	const stats = await fetchCorpusStats();
 	return (
 		<CarbonPage>
 			<PageHero
@@ -115,7 +144,7 @@ export default function PricingPage() {
 				lede={
 					BILLING_LIVE
 						? "Every plan starts with a 7-day free trial — card up front, a reminder email before your first charge, cancel anytime during the trial."
-						: "These are our launch prices, announced ahead of time as promised. Hudson is still in open beta: billing hasn't started, and you'll get clear notice before anything is ever charged."
+						: `These are our launch prices, announced ahead of time as promised. ${BRAND_NAME} is still in open beta: billing hasn't started, and you'll get clear notice before anything is ever charged.`
 				}
 				actions={
 					<>
@@ -132,7 +161,7 @@ export default function PricingPage() {
 					</>
 				}
 			/>
-			<Tiers />
+			<Tiers stats={stats} />
 			<Faq />
 			<CtaBand />
 		</CarbonPage>
@@ -143,7 +172,7 @@ export default function PricingPage() {
 // 01 — Tiers: one ruled tile row, hairline feature lists, CTA on the baseline
 // ---------------------------------------------------------------------------
 
-function Tiers() {
+function Tiers({ stats }: { stats: CorpusStats }) {
 	return (
 		<section className="bg-background">
 			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
@@ -154,7 +183,7 @@ function Tiers() {
 				/>
 
 				<div className="mt-14 grid divide-y divide-border border border-border lg:grid-cols-3 lg:divide-x lg:divide-y-0">
-					{TIERS.map((t) => (
+					{tiers(stats).map((t) => (
 						<TierTile key={t.name} tier={t} />
 					))}
 				</div>
@@ -257,7 +286,7 @@ const FAQS: { q: string; a: string }[] = [
 	},
 	{
 		q: "What happens to beta access?",
-		a: "Beta ends when billing launches. Everyone using Hudson today will get clear written notice — weeks, not days — before anyone is charged. We promised pricing would be announced before launch; this page is that announcement.",
+		a: `Beta ends when billing launches. Everyone using ${BRAND_NAME} today will get clear written notice — weeks, not days — before anyone is charged. We promised pricing would be announced before launch; this page is that announcement.`,
 	},
 	{
 		q: "Do you offer plans for firms?",
@@ -267,9 +296,14 @@ const FAQS: { q: string; a: string }[] = [
 		q: "Do you offer annual billing?",
 		a: "Solo is $490/year — two months free. For firm annual billing or invoicing, talk to us and we'll set it up.",
 	},
+	// This used to promise that "statute, rule, and case pages stay publicly
+	// readable." They are not: AuthGate's PUBLIC_PREFIXES covers neither /browse
+	// nor /cases, so a signed-out visitor hits the sign-in wall. Opening them up
+	// is a GTM decision, not a copy fix — until it is made, the page says what is
+	// actually true.
 	{
 		q: "Do I need an account to read the law?",
-		a: "No. Statute, rule, and case pages stay publicly readable. An account is for the interactive layer — research chat, search, the citator, MCP, and the email assistant.",
+		a: `Yes — ${BRAND_NAME} is an account-based product: signing in is what gets you the browse, search, and research surfaces. The official text of Iowa law is always free from the State, and every citation we return links straight back to it.`,
 	},
 	{
 		q: "Is my research used to train models?",

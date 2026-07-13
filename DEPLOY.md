@@ -374,9 +374,26 @@ hard ceiling on OpenAI spend — tune them before launch.
 
 ## 16. Deferred (not blocking launch)
 
-- **Custom domain:** DO panel → app → **Settings → Domains** → add domain,
-  create the CNAME it shows. `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` use
+- **Custom domain:** put it in `domains:` in the spec, **not** the DO panel —
+  re-applying a spec wipes panel-attached domains, which is how `corpus.nick.law`
+  was lost once already. `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` use
   `${APP_DOMAIN}`, which follows the primary domain — no rebuild needed.
+
+  This line is correct, and `.do/app.yaml` used to contradict it (claiming
+  `${APP_DOMAIN}` was the bare `.ondigitalocean.app` host). Settled empirically
+  on 2026-07-13 — `${APP_DOMAIN}` is the **primary custom domain**:
+
+  ```bash
+  curl -o /dev/null -w '%{http_code}\n' https://statutes-ialpt.ondigitalocean.app/admin/login/  # 400 DisallowedHost
+  curl -o /dev/null -w '%{http_code}\n' https://corpus.nick.law/admin/login/                    # 200
+  ```
+
+  If the bare host were in `${APP_DOMAIN}` it would be in `ALLOWED_HOSTS` and
+  answer 200. It does not. **Corollary for any domain move:** `${APP_DOMAIN}`
+  moves the instant `PRIMARY` flips, so during an overlap where two domains must
+  both work, `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` have to become literal
+  comma-lists naming both. Leave the bindable in and the outgoing domain drops
+  out of the allowlist at the exact moment users are still on it.
 - **MCP server:** add as a second App Platform service on its own route
   once the API-key auth path is verified end to end (TASKS.md Phase 3).
 - **`backend/data/raw/` → Spaces (S3):** the container filesystem is
@@ -453,3 +470,92 @@ cd chat-frontend && npm run dev
 - **Old `/chat/*` URLs.** If anyone bookmarked the transitional `/chat`
   URLs from the side-by-side era, they now 404. Add a `redirects:` block
   to the spec mapping `/chat/(.*)` → `/$1` if that becomes an issue.
+
+---
+
+## 18. The marketing site — a **second** App Platform app
+
+`marketing-frontend` has never been deployed. It is not a component of the
+`statutes` app and must not become one: `statutes` routes by path with a `/`
+catch-all onto `chat-frontend`, so attaching the apex there would serve the chat
+app at `hudsonlegal.tech`. It gets its own app, at its own origin, so that a
+marketing vendor tag can never read a session cookie scoped to the app host.
+
+Spec: **`.do/marketing-app.yaml`** (app `hudson-marketing`; apex
+`hudsonlegal.tech` + a 301 from `www`).
+
+### First deploy
+
+```bash
+doctl apps spec validate .do/marketing-app.yaml    # must exit 0
+doctl apps create --spec .do/marketing-app.yaml
+```
+
+This file is safe to `create` from directly — unlike `.do/app.yaml`, it has no
+existing encrypted secret to clobber. **After the app exists, that stops being
+true**: `MARKETING_PROXY_TOKEN` is a value-less `type: SECRET`, and re-applying
+this file would re-encrypt it to the empty string. From then on, edit a live
+spec (`doctl apps spec get <app-id>`), same rule as the main app.
+
+Then, in the panel: set **`MARKETING_PROXY_TOKEN`** to the *same* string the
+`statutes` app uses. Two apps, two encrypted copies, one value.
+
+### The four ways this build ships broken and green
+
+Every one of these exits 0 and deploys a working-looking site.
+
+1. **A `NEXT_PUBLIC_*` env with no matching `ARG` in the Dockerfile.** App
+   Platform passes build-time envs as `--build-arg`; Docker silently discards
+   any that no `ARG` declares. `chat-frontend/Dockerfile` had zero `ARG`s for
+   its whole life, which is why `NEXT_PUBLIC_APP_URL` and
+   `NEXT_PUBLIC_MARKETING_URL` were the empty string in every bundle ever
+   shipped. Both Dockerfiles now declare them. Add an env, add the `ARG`.
+2. **A bindable in a `BUILD_TIME` env.** `${APP_URL}`, `${APP_DOMAIN}`,
+   `${db.*}` are **runtime-only** for a Dockerfile build. They validate fine and
+   arrive at the build as `""`. Build-time envs take **literals**.
+3. **`API_ORIGIN` scoped to only one phase.** It is read at build (`/articles`
+   `generateStaticParams`, `sitemap.xml`, the corpus counts) *and* at run (the
+   form proxies, ISR revalidation). `BUILD_TIME` alone → the forms 500.
+   `RUN_TIME` alone → an article-less sitemap. It needs `RUN_AND_BUILD_TIME`.
+4. **A root-owned `.next` under `USER node`.** Marketing has ISR; chat-frontend
+   does not. Next writes to `.next/cache/**` *and rewrites the prerendered
+   `.next/server/app/*.html` in place*. Those writes `EACCES` — and Next does
+   **not** crash. It logs a warning and serves the build-time HTML forever, so a
+   newly published article simply never appears. `marketing-frontend/Dockerfile`
+   chowns `.next` for exactly this reason.
+
+### Do NOT add the apex to `CORS_ALLOWED_ORIGINS`
+
+The contact and newsletter forms post to **same-origin** Next route handlers
+(`app/api/contact/route.ts`, `app/api/subscribe/route.ts`) which relay to
+`${API_ORIGIN}/api/marketing/*` **server-side**. The browser never talks to the
+backend cross-origin, so no CORS entry is needed — and adding one would be
+actively harmful: `settings.py` folds `CORS_ALLOWED_ORIGINS` into
+`CSRF_TRUSTED_ORIGINS` with `CORS_ALLOW_CREDENTIALS = True`, which would make the
+marketing site a credentialed, CSRF-trusted origin against the app. An XSS in a
+marketing tag would become authenticated read/write on customer sessions. The
+backend's list stays at exactly one entry: the app origin.
+
+If the forms break, the bug is `API_ORIGIN` or `MARKETING_PROXY_TOKEN` — never
+CORS.
+
+### `deploy_on_push` is coupled to the backend
+
+Same repo, same branch, no path filtering: **every push to `main` rebuilds and
+restarts marketing**, even a backend-only commit. Accepted — the alternative is a
+manual deploy step we would forget, and a marketing restart costs nothing (no
+sessions, no queue). Just know that one bad commit reddens both apps.
+
+### Smoke test
+
+- [ ] `https://hudsonlegal.tech/` loads; `https://www.hudsonlegal.tech/` **301s**
+      to the apex (and its TLS handshake succeeds — that is why `www` is in
+      `domains:` even though it only redirects).
+- [ ] `sitemap.xml`, `robots.txt` and the OG tags emit **`hudsonlegal.tech`** —
+      not `localhost:3001`. This is the loudest symptom of a discarded build-arg.
+- [ ] `/articles` lists real articles (proves `API_ORIGIN` reached the backend at
+      **build**), and publishing a new one makes it appear within the revalidate
+      window (proves the ISR write path is not `EACCES`).
+- [ ] A contact-form submission lands in Django with the **submitter's** IP, not
+      the proxy's (proves `MARKETING_PROXY_TOKEN` matches on both apps).
+- [ ] Every CTA points at `app.hudsonlegal.tech`, not localhost.

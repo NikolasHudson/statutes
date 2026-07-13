@@ -20,6 +20,7 @@ import {
 	PRODUCTS_INDEX_HREF,
 } from "@/components/marketing/chrome";
 import { ConsultForm } from "@/components/marketing/consult-form";
+import { CONTACT_EMAIL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -55,8 +56,8 @@ const REASONS: { title: string; body: React.ReactNode }[] = [
 				>
 					assistant that answers your email
 				</Link>{" "}
-				is piloting with Iowa practitioners. Tell us about your practice and
-				we'll set your addresses up.
+				is in limited pilot — access is granted per address. Tell us about your
+				practice and we'll set your addresses up.
 			</>
 		),
 	},
@@ -108,11 +109,11 @@ export default function ContactPage() {
 							<div className="mt-10 border-border border-t pt-6">
 								<Eyebrow>Prefer email?</Eyebrow>
 								<a
-									href="mailto:consulting@hudsonlegal.tech"
+									href={`mailto:${CONTACT_EMAIL}`}
 									className="mt-3 inline-flex items-center gap-2 font-medium text-[#0f62fe] text-sm hover:underline"
 								>
 									<MailIcon className="size-4" />
-									consulting@hudsonlegal.tech
+									{CONTACT_EMAIL}
 								</a>
 							</div>
 						</div>

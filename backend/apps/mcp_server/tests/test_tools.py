@@ -14,6 +14,7 @@ from apps.api.tests._factories import make_iowa_corpus_minimal
 from apps.corpus.services.lookups import reset_default_source_cache
 from apps.mcp_server import tools
 from apps.mcp_server.server import build_server
+from core.brand import MCP_SERVER_ID
 
 
 @tag("postgres")
@@ -295,6 +296,27 @@ class ToolFunctionTests(TestCase):
 
 @tag("postgres")
 class ToolRegistrationTests(TestCase):
+    def test_server_name_is_the_brand_constant(self):
+        # serverInfo.name on the wire is whatever build_server() was handed, so
+        # pin it to the constant — otherwise server.py can drift from brand.py
+        # and only a client would notice.
+        server = build_server()
+        self.assertEqual(server.name, MCP_SERVER_ID)
+
+    def test_wire_id_is_the_frozen_literal(self):
+        # Deliberately redundant with the assertion above, and deliberately a
+        # literal. MCP_SERVER_ID is an opaque KEY, not a name: a client stores it
+        # in a local config file (`claude mcp add`, claude_desktop_config.json)
+        # on a machine we cannot reach, so renaming it breaks their connector
+        # with no server-side fix. It is frozen permanently as of the 2026-07-13
+        # cutover — it must NOT follow a future BRAND_NAME change.
+        #
+        # Asserting only against the constant would let a rename sail through
+        # green, since both sides would move together. The literal is the point:
+        # if you are here because this failed, you are breaking real clients.
+        self.assertEqual(MCP_SERVER_ID, "hudson-corpus")
+        self.assertEqual(build_server().name, "hudson-corpus")
+
     def test_all_tools_registered(self):
         server = build_server()
         import asyncio

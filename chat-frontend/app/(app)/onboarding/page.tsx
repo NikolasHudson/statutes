@@ -36,6 +36,7 @@ import {
 	SEARCH_SCOPES,
 	TIMEZONES,
 } from "@/lib/settings-options";
+import { BRAND_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 const STEPS: { label: string; blurb: string }[] = [
@@ -383,7 +384,7 @@ function StepWelcome({ name }: { name: string }) {
 			<StepHead
 				eyebrow="Welcome"
 				title={`Welcome, ${name}.`}
-				lede="Let's get your account set up so the Iowa Legal Corpus works the way you do. Four quick steps — everything can be changed later."
+				lede={`Let's get your account set up so ${BRAND_NAME} works the way you do. Four quick steps — everything can be changed later.`}
 			/>
 			<ul className="mt-8 divide-y divide-[var(--cds-border)] border border-[var(--cds-border)]">
 				{[

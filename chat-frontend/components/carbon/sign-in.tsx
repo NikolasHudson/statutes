@@ -4,7 +4,10 @@
 // from the /app-carbon-mockup/signin exploration; behavior comes from the
 // shared useCredentialsForm hook (same brain as the legacy SignInScreen).
 // AuthGate renders this INSTEAD of the /v2 layout while signed out, so it
-// carries its own CarbonRoot for theme tokens.
+// carries its own CarbonRoot for theme tokens. It also only reaches this screen
+// after its session check has run, i.e. after mount — which is why appHost()
+// can be read straight out of `window` here without risking a hydration
+// mismatch, as it would on a server-rendered page.
 
 import type { AuthUser } from "@/components/auth-gate";
 import {
@@ -14,6 +17,7 @@ import {
 	TextField,
 } from "@/components/carbon/primitives";
 import { SignInResearchRun } from "@/components/carbon/sign-in-research-run";
+import { appHost, BRAND_NAME } from "@/lib/brand";
 import { useCredentialsForm } from "@/lib/use-credentials-form";
 
 export function CarbonSignIn({
@@ -63,7 +67,7 @@ export function CarbonSignIn({
 				<section className="flex min-w-0 flex-1 flex-col overflow-y-auto">
 					<div className="flex justify-end px-6 pt-5 sm:px-12">
 						<p className="font-mono text-[11px] text-[var(--cds-helper)]">
-							corpus.nick.law
+							{appHost()}
 						</p>
 					</div>
 
@@ -74,7 +78,7 @@ export function CarbonSignIn({
 						<p className="mt-3 text-[15px] text-[var(--cds-text-2)] leading-relaxed">
 							{login
 								? "Sign in to chat with the Iowa Code, Court Rules, and case law."
-								: "Get an API key to use the Iowa Legal Corpus from Claude Desktop or your own integration."}
+								: `Get an API key to use ${BRAND_NAME} from Claude Desktop or your own integration.`}
 						</p>
 
 						{form.error && (

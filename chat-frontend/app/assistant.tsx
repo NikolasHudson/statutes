@@ -25,6 +25,7 @@ import {
 	SidebarProvider,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { BRAND_NAME } from "@/lib/brand";
 import { runChatTurnParts } from "@/lib/chat-run";
 import { type BrowseSource, CHAT_MODELS, fetchSources } from "@/lib/iowa-chat";
 import {
@@ -337,7 +338,7 @@ export const Assistant = () => {
 							<Breadcrumb>
 								<BreadcrumbList>
 									<BreadcrumbItem className="hidden md:block">
-										Iowa Legal Corpus
+										{BRAND_NAME}
 									</BreadcrumbItem>
 									<BreadcrumbSeparator className="hidden md:block" />
 									<BreadcrumbItem>

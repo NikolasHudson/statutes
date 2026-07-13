@@ -10,6 +10,7 @@
 
 import { CheckIcon, Loader2Icon } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { PRIVACY_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 export function SubscribeForm({ tone = "light" }: { tone?: "light" | "dark" }) {
@@ -68,57 +69,81 @@ export function SubscribeForm({ tone = "light" }: { tone?: "light" | "dark" }) {
 	}
 
 	return (
-		<form
-			onSubmit={onSubmit}
-			className="relative flex w-full max-w-md flex-col gap-2 sm:flex-row"
-		>
-			<input
-				type="email"
-				name="email"
-				required
-				placeholder="you@firm.com"
-				aria-label="Email address"
-				className={cn(
-					"h-12 w-full rounded-none border-0 border-b px-4 text-sm focus:outline-2 focus:-outline-offset-2 focus:outline-[#0f62fe]",
-					dark
-						? "border-[#6f6f6f] bg-[#262626] text-white placeholder:text-[#6f6f6f]"
-						: "border-[#8d8d8d] bg-[#f4f4f4] text-foreground placeholder:text-[#a8a8a8]",
-				)}
-			/>
-			{/* Honeypot — hidden from real users, filled by bots. */}
-			<div
-				aria-hidden
-				className="absolute -left-[9999px] top-0 h-0 overflow-hidden"
+		<div className="w-full max-w-md">
+			<form
+				onSubmit={onSubmit}
+				className="relative flex w-full flex-col gap-2 sm:flex-row"
 			>
-				<label htmlFor="subscribe-website">
-					Website
-					<input
-						id="subscribe-website"
-						name="website"
-						tabIndex={-1}
-						autoComplete="off"
-					/>
-				</label>
-			</div>
-			<button
-				type="submit"
-				disabled={busy}
-				className="inline-flex h-12 shrink-0 items-center gap-2 bg-[#0f62fe] px-4 text-sm text-white transition-colors hover:bg-[#0353e9] active:bg-[#002d9c] disabled:opacity-70"
-			>
-				{busy && <Loader2Icon className="size-4 animate-spin" />}
-				Subscribe
-			</button>
+				<input
+					type="email"
+					name="email"
+					required
+					placeholder="you@firm.com"
+					aria-label="Email address"
+					className={cn(
+						"h-12 w-full rounded-none border-0 border-b px-4 text-sm focus:outline-2 focus:-outline-offset-2 focus:outline-[#0f62fe]",
+						dark
+							? "border-[#6f6f6f] bg-[#262626] text-white placeholder:text-[#6f6f6f]"
+							: "border-[#8d8d8d] bg-[#f4f4f4] text-foreground placeholder:text-[#a8a8a8]",
+					)}
+				/>
+				{/* Honeypot — hidden from real users, filled by bots. */}
+				<div
+					aria-hidden
+					className="absolute -left-[9999px] top-0 h-0 overflow-hidden"
+				>
+					<label htmlFor="subscribe-website">
+						Website
+						<input
+							id="subscribe-website"
+							name="website"
+							tabIndex={-1}
+							autoComplete="off"
+						/>
+					</label>
+				</div>
+				<button
+					type="submit"
+					disabled={busy}
+					className="inline-flex h-12 shrink-0 items-center gap-2 bg-[#0f62fe] px-4 text-sm text-white transition-colors hover:bg-[#0353e9] active:bg-[#002d9c] disabled:opacity-70"
+				>
+					{busy && <Loader2Icon className="size-4 animate-spin" />}
+					Subscribe
+				</button>
+			</form>
 			{error && (
 				<p
 					role="alert"
 					className={cn(
-						"text-[13px] sm:absolute sm:top-full sm:mt-2",
+						"mt-2 text-[13px]",
 						dark ? "text-[#ff8389]" : "text-[#da1e28]",
 					)}
 				>
 					Couldn't subscribe just now — please try again.
 				</p>
 			)}
-		</form>
+			{/* An email address is personal data even when it's the only field. Say
+			    what we do with it, and link the policy that governs it — absolute,
+			    because the policy lives on the app origin, not this one. */}
+			<p
+				className={cn(
+					"mt-3 text-[12px] leading-relaxed",
+					dark ? "text-[#a8a8a8]" : "text-muted-foreground",
+				)}
+			>
+				Your address is used to send the newsletter and nothing else — never
+				sold, never shared, unsubscribe in one click. See our{" "}
+				<a
+					href={PRIVACY_URL}
+					className={cn(
+						"underline underline-offset-2",
+						dark ? "text-[#78a9ff]" : "text-[#0f62fe]",
+					)}
+				>
+					privacy &amp; data practices
+				</a>
+				.
+			</p>
+		</div>
 	);
 }

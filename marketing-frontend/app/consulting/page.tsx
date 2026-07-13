@@ -20,6 +20,7 @@ import {
 	SolidLink,
 } from "@/components/marketing/carbon";
 import { ConsultForm } from "@/components/marketing/consult-form";
+import { CONTACT_EMAIL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -264,11 +265,11 @@ function Contact() {
 						<div className="mt-10 border-[#393939] border-t pt-6">
 							<Eyebrow tone="dark">Prefer email?</Eyebrow>
 							<a
-								href="mailto:consulting@hudsonlegal.tech"
+								href={`mailto:${CONTACT_EMAIL}`}
 								className="mt-3 inline-flex items-center gap-2 font-medium text-[#78a9ff] text-sm hover:underline"
 							>
 								<MailIcon className="size-4" />
-								consulting@hudsonlegal.tech
+								{CONTACT_EMAIL}
 							</a>
 						</div>
 					</div>

@@ -1,4 +1,4 @@
-"""MCP server for the Iowa Legal Corpus.
+"""MCP server for Hudson Corpus.
 
 Built on the official MCP Python SDK's FastMCP convenience wrapper. Runs as
 its own process (ASGI / stdio) but imports the Django ORM directly — no
@@ -29,6 +29,8 @@ import os
 import sys
 
 import django
+
+from core.brand import MCP_SERVER_ID
 
 
 def _bootstrap_django() -> None:
@@ -72,7 +74,7 @@ def build_server():
     # DNS-rebinding / Host / Origin validation for localhost binds; in prod we
     # bind 0.0.0.0, so we must supply it ourselves (an MCP-spec SHOULD).
     mcp = FastMCP(
-        "iowa-legal-corpus",
+        MCP_SERVER_ID,
         stateless_http=True,
         json_response=True,
         transport_security=_transport_security(),

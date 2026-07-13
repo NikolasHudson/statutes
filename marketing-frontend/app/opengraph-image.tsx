@@ -3,6 +3,7 @@
 // individual routes can override with their own opengraph-image later.
 
 import { ImageResponse } from "next/og";
+import { SITE_URL } from "@/lib/site";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -51,7 +52,12 @@ export default function OpenGraphImage() {
 					Every answer anchored to the source — and verified against it.
 				</div>
 			</div>
-			<div style={{ fontSize: 24, color: "#78a9ff" }}>hudsonlegal.tech</div>
+			{/* The card is the one place the domain is printed as an image — a
+			    literal here survives any rename, and would still read
+			    "hudsonlegal.tech" on a site served from somewhere else. */}
+			<div style={{ fontSize: 24, color: "#78a9ff" }}>
+				{new URL(SITE_URL).host}
+			</div>
 		</div>,
 		size,
 	);

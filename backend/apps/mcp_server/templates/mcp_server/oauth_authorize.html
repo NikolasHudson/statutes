@@ -6,7 +6,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Authorize {{ client.client_name|default:"connector" }} — Iowa Legal Corpus</title>
+  <title>Authorize {{ client.client_name|default:"connector" }} — {{ brand_name }}</title>
   <style>
     body { font-family: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
            background: #f4f4f4; color: #161616; margin: 0;
@@ -29,7 +29,7 @@
     <h1>Authorize connector</h1>
     <p>
       <strong>{{ client.client_name|default:"An MCP client" }}</strong> is requesting
-      access to the Iowa Legal Corpus MCP server on your behalf. It will be able to
+      access to the {{ brand_name }} MCP server on your behalf. It will be able to
       search and read Iowa statutes, court rules, and caselaw, and run citation and
       quote verification — with your account's plan limits.
     </p>

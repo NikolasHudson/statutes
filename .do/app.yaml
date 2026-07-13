@@ -32,6 +32,20 @@ databases:
 # i.e. always apply a spec whose SECRET envs include their EV[...] ciphertext
 # (passing the ciphertext back is what actually preserves them). This file is
 # the human-readable source of intent only.
+#
+# DRIFT — reconciled against `doctl apps spec get 61f2fbd2-...` on 2026-07-13.
+# The repo file had fallen behind live by three ingress rules (the /admin/usage,
+# /admin/users and /admin/articles staff SPA surfaces), so applying it verbatim
+# would have 404'd all three. They are restored below. Everything else matched
+# live exactly: same app-level env keys, scopes, types and values; all six
+# components identical; same domains, databases, region and features.
+#
+# Two blocks below are deliberately AHEAD of live, and neither is deployed yet:
+#   - the /oauth + /.well-known/oauth-* ingress rules (OAuth landed in 341a13c
+#     with no route; discovery 404s on prod today), and
+#   - the chat-frontend NEXT_PUBLIC_* build envs.
+# Both are annotated where they appear. Re-check this drift note whenever you
+# diff against live — a spec file that lies is worse than no spec file.
 envs:
 - key: SECRET_KEY
   scope: RUN_AND_BUILD_TIME
@@ -85,10 +99,31 @@ envs:
   scope: RUN_AND_BUILD_TIME
   value: "False"
 # Pin the Host allowlist instead of "*" (#19/#20/#29) to restore Django's
-# Host-header validation as defense-in-depth. corpus.nick.law is the PRIMARY
-# domain; ${APP_DOMAIN} resolves to the bare .ondigitalocean.app host App
-# Platform uses (e.g. for default routing / health probes) — no scheme, which
-# is what ALLOWED_HOSTS expects. settings.py parses this as a comma-list.
+# Host-header validation as defense-in-depth. settings.py parses it as a
+# comma-list.
+#
+# CORRECTION (verified 2026-07-13): ${APP_DOMAIN} is NOT the bare
+# .ondigitalocean.app host, as this comment claimed for months. It resolves to
+# the PRIMARY CUSTOM DOMAIN. Proof:
+#   curl -o /dev/null -w '%{http_code}' https://statutes-ialpt.ondigitalocean.app/admin/login/
+#     -> 400   (Django DisallowedHost — the bare host is NOT in ALLOWED_HOSTS)
+#   curl -o /dev/null -w '%{http_code}' https://corpus.nick.law/admin/login/
+#     -> 200
+# So the value below expands to "corpus.nick.law,corpus.nick.law" — the same
+# host twice. The bare .ondigitalocean.app host has never been allowed, and the
+# app is fine without it (App Platform's health probes reach the container
+# directly, not through the edge hostname).
+#
+# ⚠ CUTOVER: ${APP_DOMAIN} MOVES UNDER YOU the instant PRIMARY flips to
+# app.hudsonlegal.tech. During the overlap both hosts must be served, so both of
+# these must become LITERAL comma-lists covering BOTH domains — not a bindable:
+#   ALLOWED_HOSTS:        app.hudsonlegal.tech,corpus.nick.law
+#   CSRF_TRUSTED_ORIGINS: https://app.hudsonlegal.tech,https://corpus.nick.law
+# Leaving ${APP_DOMAIN} in place means the old domain drops out of the allowlist
+# at the exact moment it is still the one users are on: 400 on every request,
+# including for the `mcp` component, which derives its transport-security
+# allowlist from ALLOWED_HOSTS (421s otherwise). Drop the corpus.nick.law halves
+# only after the new domain verifies (runbook step 9).
 - key: ALLOWED_HOSTS
   scope: RUN_TIME
   value: "corpus.nick.law,${APP_DOMAIN}"
@@ -134,20 +169,87 @@ ingress:
   # and subdomain routing; path reuses this proven pattern with zero new DNS.
   # preserve_path_prefix is REQUIRED — FastMCP's streamable_http_path defaults to
   # /mcp, so the component must see /mcp (not a stripped /). Public endpoint:
-  # https://corpus.nick.law/mcp. NOTE: when OAuth lands, add a rule routing
-  # /.well-known/oauth-protected-resource* to this component too (it would
-  # otherwise fall into the / catch-all → chat-frontend).
+  # https://corpus.nick.law/mcp.
   - match:
       path:
         prefix: /mcp
     component:
       name: mcp
       preserve_path_prefix: true
+  # MCP OAuth 2.0 authorization server. These landed in 341a13c and the ingress
+  # rule was never added, so today they fall into the / catch-all and the chat
+  # frontend answers them with a 404 HTML page. Confirmed against live prod:
+  #   curl https://corpus.nick.law/.well-known/oauth-authorization-server
+  #     -> 404, body is Next.js HTML
+  # No client can discover the AS, so no client can connect over OAuth.
+  #
+  # They route to `statutes`, NOT to `mcp` — and the note this replaces (which
+  # said to point them at the mcp component) was wrong. The views are Django
+  # views: apps/mcp_server/urls.py is include()d at the ROOT of core/urls.py, and
+  # only `statutes` runs that URLConf (gunicorn core.wsgi:application). The `mcp`
+  # component overrides the CMD with gunicorn apps.mcp_server.asgi:app, which is
+  # build_http_app() — a /healthz short-circuit wrapping X-API-Key auth wrapping
+  # FastMCP. It mounts no Django URLConf at all. Exercised directly:
+  #   mcp asgi app  GET /healthz                                 -> 200
+  #   mcp asgi app  GET /oauth/authorize                         -> 401
+  #   mcp asgi app  GET /.well-known/oauth-authorization-server  -> 401
+  # i.e. routing discovery at `mcp` would 401 the very requests that must be
+  # public — an unauthenticated client fetches these documents precisely to learn
+  # how to authenticate. It would look like a working rule and break every connect.
+  #
+  # The /.well-known prefixes are pinned to the two OAuth documents rather than
+  # matching /.well-known wholesale, so nothing else that convention hosts there
+  # (ACME challenges at /.well-known/acme-challenge, above all) is diverted into
+  # Django. Prefix matching still covers the RFC 9728 §3.1 path-insertion variants
+  # (.../oauth-protected-resource/mcp) for free.
+  - match:
+      path:
+        prefix: /.well-known/oauth-authorization-server
+    component:
+      name: statutes
+      preserve_path_prefix: true
+  - match:
+      path:
+        prefix: /.well-known/oauth-protected-resource
+    component:
+      name: statutes
+      preserve_path_prefix: true
+  - match:
+      path:
+        prefix: /oauth
+    component:
+      name: statutes
+      preserve_path_prefix: true
   - match:
       path:
         prefix: /api
     component:
       name: statutes
+      preserve_path_prefix: true
+  # Staff SPA surfaces. These three live in the Next.js app, not Django admin,
+  # and they MUST stay above the /admin rule — rules are evaluated top-down and
+  # first prefix match wins, so /admin → statutes would otherwise swallow them and
+  # hand all three to Django, which has no such views: a 404 on every staff page.
+  #
+  # (These exist on the live app but were missing from this file. Applying this
+  # spec without them would have taken all three surfaces down.)
+  - match:
+      path:
+        prefix: /admin/usage
+    component:
+      name: chat-frontend
+      preserve_path_prefix: true
+  - match:
+      path:
+        prefix: /admin/users
+    component:
+      name: chat-frontend
+      preserve_path_prefix: true
+  - match:
+      path:
+        prefix: /admin/articles
+    component:
+      name: chat-frontend
       preserve_path_prefix: true
   - match:
       path:
@@ -200,6 +302,87 @@ services:
   - key: DOCLING_SERVICE_URL
     scope: RUN_TIME
     value: ${docling.PRIVATE_URL}
+  # -------------------------------------------------------------------------
+  # WHO THE CLIENT IS. These three decide the address that the login lockout,
+  # the registration throttle, the marketing lead throttle and every audit row
+  # key on (backend/apps/accounts/audit.client_ip). Get them wrong and the audit
+  # trail records a proxy, and axes' [[ip_address, username]] lockout degenerates
+  # to per-username: a handful of failures from anywhere locks any named account.
+  #
+  # THE TOPOLOGY, verified against live prod on 2026-07-13 (not assumed — the
+  # previous "App Platform is a single edge hop" model was assumed, and wrong):
+  #
+  #     client -> Cloudflare -> DO App Platform edge -> gunicorn
+  #
+  #   dig +short A corpus.nick.law   -> 104.21.54.137, 172.67.138.250  (CF anycast)
+  #   dig +short NS nick.law         -> rick/leanna.ns.cloudflare.com
+  #   curl -sI https://corpus.nick.law/api/health
+  #       -> server: cloudflare + cf-ray: ...   AND   x-do-app-origin: 7de0b917-...
+  #
+  # i.e. nick.law is ORANGE-CLOUDED (proxied). That is TWO appending proxies, so
+  # X-Forwarded-For arrives as "<client>, <CF egress>" on an honest request and
+  # the right-most entry is CLOUDFLARE, never the caller.
+  # -------------------------------------------------------------------------
+  #
+  # CF-Connecting-IP is the control. Cloudflare OVERWRITES it on ingress, so a
+  # browser cannot forge it, and — unlike a hop count — it does not depend on how
+  # many proxies append to the chain. Safe here only because ALLOWED_HOSTS already
+  # forecloses the Cloudflare bypass: the app's bare *.ondigitalocean.app hostname
+  # IS publicly reachable, but every path that calls client_ip answers 400
+  # DisallowedHost on it (verified 2026-07-13: /api/auth/login, /api/auth/register,
+  # /api/marketing/contact, /admin/login/ all 400; only /api/health answers 200,
+  # because HealthCheckMiddleware short-circuits it ahead of host validation for
+  # the container probe). So every request that reaches client_ip came via
+  # Cloudflare. Do NOT remove corpus.nick.law/${APP_DOMAIN} from ALLOWED_HOSTS
+  # believing it to be belt-and-braces — it is load-bearing for this control.
+  #
+  # ⚠ VERIFY ON FIRST DEPLOY, one command, before trusting this in anger. Our CF
+  # zone proxies to an origin (*.ondigitalocean.app) that is ITSELF Cloudflare-
+  # fronted, i.e. a Cloudflare-to-Cloudflare hop. Cloudflare's documented O2O
+  # behaviour preserves the visitor's address in CF-Connecting-IP, and that is what
+  # this setting bets on — but nothing echoes the origin-side header, so it has NOT
+  # been observed from outside. audit.record_event now logs the shape of every
+  # auth event, so one real login settles it:
+  #     doctl apps logs <app-id> statutes --type run | grep login_success
+  #     -> {"source_ip": "<your real IP>", "xff_len": N, "cf_ip": true}
+  # If source_ip comes back as a Cloudflare address (172.6x/104.2x) instead of the
+  # address you logged in from, CF-Connecting-IP is NOT surviving the O2O hop: set
+  # TRUST_CF_CONNECTING_IP=false and set TRUSTED_PROXY_COUNT from the xff_len that
+  # same log line reports. Failing that way is no worse than the state this
+  # replaces (a proxy address either way) — it is just not yet the fix.
+  - key: TRUST_CF_CONNECTING_IP
+    scope: RUN_TIME
+    value: "true"
+  # FALLBACK ONLY — unreachable in prod while TRUST_CF_CONNECTING_IP is true, which
+  # is exactly why it is left at the default of 1 rather than "corrected" to 2. A
+  # second unverified guess is not an improvement on the first: the honest chain
+  # length has never been measured (see the doctl command above). Left low it
+  # degrades to a proxy address; set too HIGH it reads an entry the CLIENT typed,
+  # and only that direction is a forgery. Do not raise it on a hunch.
+  - key: TRUSTED_PROXY_COUNT
+    scope: RUN_TIME
+    value: "1"
+  # Shared secret proving a POST to /api/marketing/* came from the marketing site's
+  # own server-side route handlers, which relay leads from a container and so must
+  # carry the visitor's address explicitly (X-Real-Client-IP) rather than as a
+  # property of the connection. Without it every lead on earth keys to the marketing
+  # container's egress IP and shares one throttle bucket.
+  #
+  # ⚠ THIS WAS MISSING. It was added to .do/marketing-app.yaml and never here — a
+  # dropped handoff that made the whole forwarding feature dead on arrival: the
+  # backend would read "" , ignore the header, and key every lead on the container.
+  #
+  # It MUST BE THE SAME STRING as MARKETING_PROXY_TOKEN on the `hudson-marketing`
+  # app. Two apps, two separately-encrypted values, one secret. Set it in the App
+  # Platform UI on BOTH; never plaintext here. Keep it ASCII (audit.client_ip
+  # compares bytes and will simply not match a non-ASCII token — it no longer
+  # crashes on one, but it will not authenticate it either).
+  #
+  # It is not an auth gate: /api/marketing/* is auth=None by design, and a missing
+  # or wrong token degrades IP attribution rather than breaking the forms.
+  - key: MARKETING_PROXY_TOKEN
+    scope: RUN_TIME
+    type: SECRET
 # Docling extraction microservice: turns uploaded PDF/DOCX into text for the
 # Verify Document feature. Internal-only (no ingress, internal_ports) so it's
 # never exposed publicly — only the Django service calls it. Carries the
@@ -238,6 +421,32 @@ services:
     http_path: /
     timeout_seconds: 5
     failure_threshold: 3
+  # NEXT_PUBLIC_* are inlined into the bundle at BUILD and cannot be corrected at
+  # runtime, so they must be BUILD_TIME and they must be LITERALS — an App
+  # Platform bindable (${APP_DOMAIN}, ${APP_URL}) is runtime-only for a Dockerfile
+  # build and arrives at the build as the empty string. chat-frontend/Dockerfile
+  # now declares a matching ARG for each; without one, App Platform passes the
+  # --build-arg and Docker discards it silently.
+  #
+  # Neither has ever been set. NEXT_PUBLIC_MARKETING_URL="" means every link from
+  # the app back to the marketing site is already dead (components/funnel-chrome.tsx,
+  # app/(app)/admin/articles/editor.tsx) — unnoticed only because marketing has
+  # never been deployed. NEXT_PUBLIC_APP_URL="" is masked in the browser by
+  # lib/brand.ts falling back to window.location, but there is no window during
+  # SSR, so server-rendered absolute self-URLs come out relative.
+  #
+  # ⚠ These two are BAKED AT BUILD, so they cannot be flipped independently of the
+  # domain: apply them in the SAME spec update as the `domains:` change above, not
+  # before. Set early, the app (still on corpus.nick.law) renders every self-link
+  # and marketing link at hosts that do not resolve yet; set late, the app links
+  # back to the retired domain. There is no runtime correction for either.
+  envs:
+  - key: NEXT_PUBLIC_APP_URL
+    scope: BUILD_TIME
+    value: https://app.hudsonlegal.tech
+  - key: NEXT_PUBLIC_MARKETING_URL
+    scope: BUILD_TIME
+    value: https://hudsonlegal.tech
 # Remote MCP server: the same Django image (mcp[cli] is in requirements.txt;
 # PyTorch is deliberately NOT — it lives only in docling — so this image is
 # small) served as a streamable-HTTP ASGI app instead of the WSGI API. We

@@ -55,6 +55,7 @@ import {
 	SEARCH_SCOPES,
 	TIMEZONES,
 } from "@/lib/settings-options";
+import { BRAND_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -710,9 +711,8 @@ function WelcomeStep({ firstName }: { firstName: string }) {
 				Welcome, {greeting}.
 			</h1>
 			<p className="mt-2 max-w-md text-muted-foreground text-sm">
-				Let&apos;s get your account set up so the Iowa Legal Corpus works the
-				way you do. Four quick steps — everything is adjustable later in
-				Settings.
+				Let&apos;s get your account set up so {BRAND_NAME} works the way you do.
+				Four quick steps — everything is adjustable later in Settings.
 			</p>
 			<ul className="mt-6 space-y-2.5">
 				{items.map((it) => {

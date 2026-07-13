@@ -298,22 +298,15 @@ def update_org(request, payload: OrgPatchIn):
 
 
 def _app_base_url() -> str:
-    """Where the ``/invite/<token>`` link points — the SPA's origin.
+    """Where the ``/invite/<token>`` link points — ``APP_URL``, and only ``APP_URL``.
 
-    Same precedence apps/billing uses for its Stripe return URL, so the two can't
-    send a user to two different front doors: an explicit APP_URL, else the first
-    configured CORS origin (which *is* the SPA in every deploy), else the base URL
-    the email assistant already links citations to.
+    ``/invite`` is a route on the app and nowhere else, so a base URL derived from
+    anything else (this used to walk ``CORS_ALLOWED_ORIGINS``, and to return ``""``
+    — a *relative* link in an email — when it ran out of candidates) is a dead link
+    for the invitee. Same resolution as ``apps/billing/api._return_base_url``, whose
+    Stripe override is the only sanctioned divergence.
     """
-    candidates = [
-        getattr(settings, "APP_URL", ""),
-        *(getattr(settings, "CORS_ALLOWED_ORIGINS", None) or []),
-        getattr(settings, "EMAIL_LINK_BASE_URL", ""),
-    ]
-    for candidate in candidates:
-        if candidate:
-            return str(candidate).rstrip("/")
-    return ""
+    return str(settings.APP_URL).rstrip("/")
 
 
 def _send_invitation_email(invitation: OrgInvitation, raw_token: str, inviter) -> None:

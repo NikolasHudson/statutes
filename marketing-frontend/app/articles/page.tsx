@@ -26,68 +26,21 @@ export const metadata: Metadata = {
 		"Practical writing on grounding, retrieval, verification, and what it takes to trust AI with the law — from the team building Hudson.",
 };
 
-// Fallback if the backend can't be reached when the page renders — mirrors
-// the first imported article so the index is never empty.
-const FALLBACK: ArticleCard[] = [
-	{
-		slug: "why-legal-ai-invents-citations",
-		category: "Grounding",
-		title:
-			"Why Legal AI Keeps Inventing Citations — and What Grounding Actually Fixes",
-		excerpt:
-			"Fluent text and trustworthy text are not the same thing. The difference between an AI that sounds right and one you can hand to a court — and why most legal AI tools make the same mistake look more convincing.",
-		published_at: "2026-06-24",
-		read_minutes: 8,
-	},
-];
-
-type Upcoming = {
-	category: string;
-	title: string;
-	excerpt: string;
-	read: string;
-};
-
-const UPCOMING: Upcoming[] = [
-	{
-		category: "Search",
-		title: "Reciprocal Rank Fusion, explained for lawyers",
-		excerpt:
-			"Why keyword search and semantic search each miss things — and how fusing them surfaces the on-point provision either way.",
-		read: "6 min read",
-	},
-	{
-		category: "Currency",
-		title: 'What "currently in force" really means in a statute',
-		excerpt:
-			"Effective dates, amendments, and supersession — the difference between the law today and the law that used to be.",
-		read: "5 min read",
-	},
-	{
-		category: "Engineering",
-		title: "Connecting Hudson to Claude Desktop over MCP",
-		excerpt:
-			"A walkthrough of wiring a grounded legal corpus into your own tools over a production MCP endpoint.",
-		read: "7 min read",
-	},
-	{
-		category: "Verification",
-		title: "Why we check citations with code, not another model",
-		excerpt:
-			"Asking a second LLM to grade the first inherits the same failure mode. What a deterministic check buys you.",
-		read: "5 min read",
-	},
-];
+// An "In the works" list of four unwritten articles — with invented read times —
+// used to sit here. It was fiction dressed as a publishing schedule. Articles
+// appear on this page when they are written and published, and not before.
+//
+// A hardcoded FALLBACK card used to sit here too, mirroring the first imported
+// article so the index was "never empty". It pointed at
+// /articles/why-legal-ai-invents-citations — which does not exist on prod
+// (`/api/marketing/articles` → 200 `[]`), so the featured slot on the live site
+// would have been a link straight to a 404. A dead featured article on launch
+// day is worse than no article, and an empty index is not a failure: it is a
+// site that has not published yet. Say so plainly instead.
 
 export default async function ArticlesIndexPage() {
-	const fetched = await fetchArticles();
-	const articles = fetched.length > 0 ? fetched : FALLBACK;
+	const articles = await fetchArticles();
 	const [featured, ...rest] = articles;
-	// A teaser graduates off the "in the works" list the day it's published.
-	const publishedTitles = new Set(articles.map((a) => a.title.toLowerCase()));
-	const upcoming = UPCOMING.filter(
-		(u) => !publishedTitles.has(u.title.toLowerCase()),
-	);
 
 	return (
 		<CarbonPage>
@@ -96,13 +49,36 @@ export default async function ArticlesIndexPage() {
 				title="Field notes on legal AI."
 				lede="Practical writing on grounding, retrieval, and verification — what it actually takes to trust AI with a citation, from the team building it."
 			/>
-			<FeaturedLead article={featured} />
+			{featured ? <FeaturedLead article={featured} /> : <NothingYet />}
 			{rest.length > 0 && <ArticleList articles={rest} />}
-			{upcoming.length > 0 && (
-				<UpcomingList articles={upcoming} n={rest.length > 0 ? "03" : "02"} />
-			)}
-			<Subscribe n={rest.length > 0 ? "04" : "03"} />
+			<Subscribe n={rest.length > 0 ? "03" : "02"} />
 		</CarbonPage>
+	);
+}
+
+// Empty state — shown when nothing is published yet (or the backend is
+// unreachable at render time). Carries no link: there is nowhere honest to send
+// anyone. The newsletter band below is the call to action.
+function NothingYet() {
+	return (
+		<section className="bg-background">
+			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
+				<header className="border-border border-t pt-6">
+					<Eyebrow>01 — Latest article</Eyebrow>
+				</header>
+
+				<div className="mt-12 border border-border bg-card p-8 sm:p-10">
+					<h2 className="max-w-3xl font-light text-3xl leading-[1.15] sm:text-4xl">
+						Nothing published yet.
+					</h2>
+					<p className="mt-5 max-w-2xl text-lg text-muted-foreground leading-relaxed">
+						We're writing. The first pieces — on grounding, retrieval, and what
+						citation verification actually buys you — are on the way. Subscribe
+						below and they'll land in your inbox as they go up.
+					</p>
+				</div>
+			</div>
+		</section>
 	);
 }
 
@@ -171,39 +147,6 @@ function ArticleList({ articles }: { articles: ArticleCard[] }) {
 								{formatArticleDate(a.published_at)} · {a.read_minutes} min read
 							</p>
 						</Link>
-					))}
-				</div>
-			</div>
-		</section>
-	);
-}
-
-// Upcoming — muted, non-interactive hairline tiles; mono "Coming soon" label.
-function UpcomingList({ articles, n }: { articles: Upcoming[]; n: string }) {
-	return (
-		<section className="bg-background">
-			<div className="mx-auto max-w-7xl px-5 pb-20 sm:px-8 lg:pb-28">
-				<SectionHead n={n} label="In the works" title="More on the way." />
-
-				<div className="mt-14 grid divide-y divide-border border border-border">
-					{articles.map((a) => (
-						<div
-							key={a.title}
-							className="grid gap-x-10 gap-y-3 bg-card p-8 sm:grid-cols-[9rem_1fr_auto]"
-						>
-							<Eyebrow>{a.category}</Eyebrow>
-							<div>
-								<h3 className="max-w-xl font-light text-foreground/80 text-xl leading-snug">
-									{a.title}
-								</h3>
-								<p className="mt-2 max-w-xl text-[14px] text-muted-foreground leading-relaxed">
-									{a.excerpt}
-								</p>
-							</div>
-							<p className="font-mono text-[11px] text-muted-foreground uppercase tracking-[0.18em] sm:text-right">
-								Coming soon · {a.read}
-							</p>
-						</div>
 					))}
 				</div>
 			</div>

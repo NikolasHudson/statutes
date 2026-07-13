@@ -15,8 +15,13 @@ Design:
   something the request path can do.
 * **Actor may be null.** A failed login has no authenticated user, so we record
   the *attempted* identifier (email) in ``actor_email`` and leave ``actor`` null.
-* **Source IP** respects ``X-Forwarded-For`` because the app runs behind the
-  DigitalOcean App Platform proxy (see :func:`client_ip`).
+* **Source IP** is whatever :func:`client_ip` resolves — which is also the key
+  every throttle and the login lockout in this app use, so a wrong answer here is
+  not a cosmetic logging bug: it is a forged audit trail and a throttle that
+  counts proxies instead of people. Production sits behind TWO appending proxies
+  (Cloudflare in front of DigitalOcean App Platform, verified 2026-07-13), so the
+  address is taken from a header Cloudflare overwrites rather than from a count of
+  hops nobody has measured. See :func:`client_ip` for the full order of trust.
 
 Retention: there is no automatic purge of this table — auth/security events are
 kept for the forensic/audit window. (Contrast the chat-trace table, which is
@@ -28,6 +33,8 @@ implement it as a dedicated, reviewed management command — never a cascade.
 
 from __future__ import annotations
 
+import hmac
+import ipaddress
 import logging
 from typing import Any, Optional
 
@@ -120,25 +127,187 @@ class AuditEvent(models.Model):
         super().save(*args, **kwargs)
 
 
-def client_ip(request) -> Optional[str]:
-    """Best-effort source IP, honouring the DO App Platform proxy.
+def _literal_ip(value: Optional[str]) -> Optional[str]:
+    """The value if it parses as an IP literal, else None.
 
-    App Platform terminates TLS and forwards the real client IP in
-    ``X-Forwarded-For`` (left-most entry is the original client). ``REMOTE_ADDR``
-    behind the proxy is the proxy itself, so prefer XFF when present. Returns
-    ``None`` rather than raising on a malformed header so audit emission can
-    never break the request path.
+    ``AuditEvent.source_ip`` and ``ContactSubmission.ip`` are ``inet`` columns:
+    handing them a header value that isn't an address is a 500 on INSERT, not a
+    row. Anything reaching here can be attacker-typed, so it is checked, never
+    assumed.
+    """
+    candidate = (value or "").strip()
+    if not candidate:
+        return None
+    try:
+        ipaddress.ip_address(candidate)
+    except ValueError:
+        return None
+    return candidate
+
+
+# The marketing lead endpoints, and ONLY these, may assert a client IP via
+# X-Real-Client-IP (see _resolve below). Scoped as a path prefix because the
+# token that authorises it is a shared secret on a second app: if it ever leaks,
+# the blast radius must stop at the lead funnel and must NOT extend to the login
+# lockout or the audit trail, where "assert an arbitrary source IP" is precisely
+# the forgery this module exists to prevent.
+_MARKETING_PATH_PREFIX = "/api/marketing/"
+
+
+def _request_path(request) -> str:
+    path = getattr(request, "path", None)
+    if not path:
+        path = (getattr(request, "META", {}) or {}).get("PATH_INFO", "") or ""
+    return path if isinstance(path, str) else ""
+
+
+def _marketing_token_ok(request) -> bool:
+    """Whether this request carries the marketing site's shared secret.
+
+    ``hmac.compare_digest`` on two ``str`` raises ``TypeError`` the moment either
+    side holds a character above U+007F — and Django decodes request headers as
+    ISO-8859-1, so a single high byte in ``X-Marketing-Proxy-Token`` produces
+    exactly that. Since ``client_ip`` runs on every login attempt (django-axes)
+    and inside ``record_event``, that TypeError was a 500 on login, registration
+    and the lead forms, reachable by any unauthenticated caller, latent only
+    while ``MARKETING_PROXY_TOKEN`` is unset. Compare BYTES, and never raise.
+
+    The token is expected to be ASCII (it is a secret we mint). A non-ASCII one
+    simply will not match — which is the safe outcome, not a crash.
+    """
+    expected = getattr(settings, "MARKETING_PROXY_TOKEN", "") or ""
+    presented = (getattr(request, "META", {}) or {}).get(
+        "HTTP_X_MARKETING_PROXY_TOKEN", ""
+    ) or ""
+    if not expected or not presented:
+        return False
+    try:
+        return hmac.compare_digest(
+            presented.encode("utf-8", "replace"), expected.encode("utf-8", "replace")
+        )
+    except (AttributeError, TypeError, ValueError, UnicodeError):
+        return False
+
+
+def _trusted_hops() -> int:
+    """How many trailing ``X-Forwarded-For`` entries our own infrastructure wrote."""
+    try:
+        return max(1, int(getattr(settings, "TRUSTED_PROXY_COUNT", 1)))
+    except (TypeError, ValueError):
+        return 1
+
+
+def _resolve(request) -> Optional[str]:
+    meta = getattr(request, "META", {}) or {}
+
+    # (a) The marketing site's server-side route handlers. They call this API
+    #     from a container, so the connection we see is THEIRS — the visitor's
+    #     address survives only because the handler copies it into a dedicated
+    #     header and proves the copy is ours with a shared secret. Both halves
+    #     are required, and so is the path: a leaked token must not buy anyone
+    #     the ability to assert a source IP against /api/auth/login.
+    #
+    #     This branch is deliberately ABOVE Cloudflare: on a proxied lead,
+    #     CF-Connecting-IP is the MARKETING CONTAINER's egress address (Cloudflare
+    #     sees the container as the client), so trusting CF first would key every
+    #     lead on earth to one address — the exact bug this replaces.
+    if _marketing_token_ok(request) and _request_path(request).startswith(
+        _MARKETING_PATH_PREFIX
+    ):
+        ip = _literal_ip(meta.get("HTTP_X_REAL_CLIENT_IP"))
+        if ip:
+            return ip
+
+    # (b) Cloudflare. Production is orange-clouded (verified 2026-07-13: A records
+    #     are Cloudflare anycast, NS is *.ns.cloudflare.com, and responses carry
+    #     server: cloudflare + cf-ray ALONGSIDE x-do-app-origin). Cloudflare
+    #     OVERWRITES CF-Connecting-IP on ingress, so unlike X-Forwarded-For a
+    #     client cannot forge it — and unlike a hop count it does not depend on
+    #     how many appending proxies are in the chain, which is the property that
+    #     makes it the right control here. Off by default: it is only unforgeable
+    #     where Cloudflare is genuinely in front (see TRUST_CF_CONNECTING_IP).
+    if getattr(settings, "TRUST_CF_CONNECTING_IP", False):
+        ip = _literal_ip(meta.get("HTTP_CF_CONNECTING_IP"))
+        if ip:
+            return ip
+
+    # (c) X-Forwarded-For, counted from the right. Each proxy APPENDS the address
+    #     it accepted the connection from, so a forged "X-Forwarded-For: 1.2.3.4"
+    #     arrives as "1.2.3.4, <real>": the left is what the caller typed and only
+    #     the last TRUSTED_PROXY_COUNT entries were written by infrastructure we
+    #     run. Reading the left-most (as this did until 2026-07) hands anyone a
+    #     fresh throttle bucket per request and lets them forge their address in
+    #     this very audit trail (SECURITY_AUDIT_2026-07 finding #5).
+    #
+    #     A header too short to have come through our full chain is not a header
+    #     we can reason about, so it is discarded in favour of REMOTE_ADDR —
+    #     degrading to a proxy's own address, never to a value the caller supplied.
+    hops = _trusted_hops()
+    forwarded = [
+        entry.strip()
+        for entry in (meta.get("HTTP_X_FORWARDED_FOR") or "").split(",")
+        if entry.strip()
+    ]
+    if len(forwarded) >= hops:
+        ip = _literal_ip(forwarded[-hops])
+        if ip:
+            return ip
+    return _literal_ip(meta.get("REMOTE_ADDR"))
+
+
+def client_ip(request) -> Optional[str]:
+    """Who the client is — the one answer every IP-keyed control here depends on.
+
+    Resolved in descending order of how hard the value is to forge:
+
+    (a) ``X-Real-Client-IP``, but ONLY with a valid ``X-Marketing-Proxy-Token``
+        AND only on ``/api/marketing/*``. The marketing site relays leads
+        server-side, so the visitor's address cannot survive as a connection
+        property; it is carried explicitly and authenticated instead. Hop
+        arithmetic does not enter into it.
+    (b) ``CF-Connecting-IP``, when ``TRUST_CF_CONNECTING_IP`` is on. Cloudflare
+        overwrites this header on ingress, so a browser cannot forge it, and it
+        is independent of how many proxies append to X-Forwarded-For.
+    (c) The ``X-Forwarded-For`` chain, counted from the right by
+        ``TRUSTED_PROXY_COUNT``, then ``REMOTE_ADDR``.
+
+    Returns ``None`` rather than raising, on any shape of input — including a
+    header crafted to blow up the comparison in (a). Audit emission and the login
+    path both call this, and neither may be breakable by a header a stranger sent.
     """
     if request is None:
         return None
-    meta = getattr(request, "META", {}) or {}
-    xff = meta.get("HTTP_X_FORWARDED_FOR")
-    if xff:
-        first = xff.split(",")[0].strip()
-        if first:
-            return first
-    addr = meta.get("REMOTE_ADDR")
-    return addr or None
+    try:
+        return _resolve(request)
+    except Exception:  # pragma: no cover - defensive; never break auth/audit
+        security_logger.exception("client_ip_failed")
+        return None
+
+
+def proxy_chain_shape(request) -> dict[str, Any]:
+    """What the proxy chain LOOKED like, for one request — a measurement, not a control.
+
+    ``TRUSTED_PROXY_COUNT`` is the one value here that cannot be verified from
+    outside the app: nothing echoes the origin-side headers, which is exactly how
+    a confidently-wrong hop count ("App Platform is a single edge hop") shipped in
+    the first place. These two fields ride along on the security log line, so the
+    true shape is readable off any real request in prod instead of guessed:
+
+        xff_len     — how many entries X-Forwarded-For actually arrived with
+        cf_ip       — whether Cloudflare stamped CF-Connecting-IP at all
+
+    Never raises, and never logs the addresses themselves (``source_ip`` is
+    already the attributed one); this is a count and a boolean.
+    """
+    try:
+        meta = (getattr(request, "META", {}) or {}) if request is not None else {}
+        raw = meta.get("HTTP_X_FORWARDED_FOR") or ""
+        return {
+            "xff_len": len([e for e in raw.split(",") if e.strip()]),
+            "cf_ip": bool(meta.get("HTTP_CF_CONNECTING_IP")),
+        }
+    except Exception:  # pragma: no cover - defensive
+        return {}
 
 
 def _user_agent(request) -> str:
@@ -189,6 +358,9 @@ def record_event(
             "actor_email": email or None,
             "actor_id": getattr(actor, "pk", None),
             "source_ip": ip,
+            # How the chain actually looked, so TRUSTED_PROXY_COUNT can be read
+            # off prod rather than guessed. See proxy_chain_shape.
+            **proxy_chain_shape(request),
             **({"detail": detail} if detail else {}),
         },
     )

@@ -29,6 +29,7 @@ import {
 	type ArticleDetail,
 	fetchArticle,
 	fetchArticles,
+	fetchArticlesStrict,
 	formatArticleDate,
 } from "@/lib/api";
 import { APP_URL } from "@/lib/site";
@@ -36,8 +37,12 @@ import { cn } from "@/lib/utils";
 
 type Params = { slug: string };
 
+// Strict: this decides which article pages exist in the build at all. A
+// backend blip during `next build` would otherwise prerender none of them —
+// green build, no articles, and every link from the index and the sitemap
+// resolving through a cold runtime fetch or not at all.
 export async function generateStaticParams(): Promise<Params[]> {
-	return (await fetchArticles()).map((a) => ({ slug: a.slug }));
+	return (await fetchArticlesStrict()).map((a) => ({ slug: a.slug }));
 }
 
 export async function generateMetadata({
