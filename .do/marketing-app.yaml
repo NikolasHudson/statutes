@@ -150,17 +150,15 @@ services:
   - key: NEXT_PUBLIC_SITE_URL
     scope: BUILD_TIME
     value: https://hudsonlegal.tech
-  # TRANSITIONAL (Tranche 2): the app has NOT moved yet — it is live at
-  # corpus.nick.law and does not answer on app.hudsonlegal.tech (no DNS). CTAs,
-  # the MCP install snippet and the API origin must point at the host that
-  # actually serves today, or (a) every CTA is a dead link and (b) the
-  # build-time fetches (corpus stats, articles, sitemap) fail on ENOTFOUND and
-  # the deploy goes RED. In Tranche 3, when the app moves, flip these three
-  # values (NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_ASSISTANT_ADDRESS, API_ORIGIN) to
-  # their app.hudsonlegal.tech / mail.hudsonlegal.tech forms and re-apply.
+  # Tranche 3 (2026-07-13): the app has moved to app.hudsonlegal.tech (live,
+  # added as an ALIAS during the corpus.nick.law overlap), so CTAs, the MCP
+  # install snippet and the API origin now point there. NEXT_PUBLIC_ASSISTANT_ADDRESS
+  # is the ONE value still on the old domain: mail.hudsonlegal.tech has no MX yet,
+  # so the site must keep advertising the working assistant@mail.nick.law until the
+  # mail migration — flip it then.
   - key: NEXT_PUBLIC_APP_URL
     scope: BUILD_TIME
-    value: https://corpus.nick.law
+    value: https://app.hudsonlegal.tech
   - key: NEXT_PUBLIC_ASSISTANT_ADDRESS
     scope: BUILD_TIME
     value: assistant@mail.nick.law
@@ -191,11 +189,12 @@ services:
   # (settings.py) with CORS_ALLOW_CREDENTIALS=True, making the marketing site a
   # credentialed, CSRF-trusted origin against the app. Do not "fix" the forms
   # that way.
-  # TRANSITIONAL (Tranche 2): corpus.nick.law until the app moves. See the note
-  # on NEXT_PUBLIC_APP_URL above — flip to https://app.hudsonlegal.tech in Tranche 3.
+  # Tranche 3 (2026-07-13): flipped to the app's new home. Both build-time
+  # (prerender) and run-time (form-proxy) fetches now hit app.hudsonlegal.tech,
+  # which serves in parallel with corpus.nick.law during the overlap.
   - key: API_ORIGIN
     scope: RUN_AND_BUILD_TIME
-    value: https://corpus.nick.law
+    value: https://app.hudsonlegal.tech
   # ---- RUN_TIME secret -------------------------------------------------------
   #
   # Shared secret proving to the backend that a /api/marketing/* POST really came

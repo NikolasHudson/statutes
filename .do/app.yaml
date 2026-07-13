@@ -9,6 +9,11 @@ features:
 domains:
 - domain: corpus.nick.law
   type: PRIMARY
+# Tranche 3 (2026-07-13): the app's new home, added as an ALIAS so both hosts
+# serve during the overlap. corpus.nick.law stays PRIMARY until it is retired
+# (runbook step 9); flip PRIMARY to app.hudsonlegal.tech at that point.
+- domain: app.hudsonlegal.tech
+  type: ALIAS
 databases:
 - name: iowa-db
   engine: PG
@@ -114,29 +119,41 @@ envs:
 # app is fine without it (App Platform's health probes reach the container
 # directly, not through the edge hostname).
 #
-# ⚠ CUTOVER: ${APP_DOMAIN} MOVES UNDER YOU the instant PRIMARY flips to
-# app.hudsonlegal.tech. During the overlap both hosts must be served, so both of
-# these must become LITERAL comma-lists covering BOTH domains — not a bindable:
-#   ALLOWED_HOSTS:        app.hudsonlegal.tech,corpus.nick.law
-#   CSRF_TRUSTED_ORIGINS: https://app.hudsonlegal.tech,https://corpus.nick.law
-# Leaving ${APP_DOMAIN} in place means the old domain drops out of the allowlist
-# at the exact moment it is still the one users are on: 400 on every request,
-# including for the `mcp` component, which derives its transport-security
-# allowlist from ALLOWED_HOSTS (421s otherwise). Drop the corpus.nick.law halves
-# only after the new domain verifies (runbook step 9).
+# ⚠ CUTOVER (DONE 2026-07-13, Tranche 3): ${APP_DOMAIN} moves under you the
+# instant PRIMARY flips, so during the corpus.nick.law <-> app.hudsonlegal.tech
+# overlap these are LITERAL comma-lists covering BOTH domains. ${APP_DOMAIN} is
+# kept as a harmless trailing entry (it still resolves to the PRIMARY,
+# corpus.nick.law). The `mcp` component derives its transport-security allowlist
+# from ALLOWED_HOSTS, so both hosts must stay listed until corpus.nick.law is
+# retired (runbook step 9) — at which point drop the corpus.nick.law halves and
+# make app.hudsonlegal.tech PRIMARY.
 - key: ALLOWED_HOSTS
   scope: RUN_TIME
-  value: "corpus.nick.law,${APP_DOMAIN}"
+  value: "corpus.nick.law,app.hudsonlegal.tech,${APP_DOMAIN}"
 - key: CSRF_TRUSTED_ORIGINS
   scope: RUN_TIME
-  value: https://${APP_DOMAIN}
+  value: https://corpus.nick.law,https://app.hudsonlegal.tech,https://${APP_DOMAIN}
 # Explicit credentialed-CORS allowlist (#21/#34). Without this, prod silently
 # falls back to the localhost dev origin in settings.py. Prod is same-origin
 # (frontend served at /), so this is hardening/clarity; never combine with a
-# wildcard while CORS_ALLOW_CREDENTIALS=True.
+# wildcard while CORS_ALLOW_CREDENTIALS=True. Both app hosts listed for the overlap.
 - key: CORS_ALLOWED_ORIGINS
   scope: RUN_TIME
-  value: https://corpus.nick.law
+  value: https://corpus.nick.law,https://app.hudsonlegal.tech
+# Tranche 3 (2026-07-13): the app's canonical origin, pinned to the new host so
+# Stripe return URLs + org-invite links (APP_URL), emailed citation links
+# (EMAIL_LINK_BASE_URL) and the MCP OAuth issuer (MCP_OAUTH_ISSUER) all reference
+# app.hudsonlegal.tech rather than floating on the request host or the code default
+# of corpus.nick.law. All three were previously UNSET in the live spec.
+- key: APP_URL
+  scope: RUN_TIME
+  value: https://app.hudsonlegal.tech
+- key: EMAIL_LINK_BASE_URL
+  scope: RUN_TIME
+  value: https://app.hudsonlegal.tech
+- key: MCP_OAUTH_ISSUER
+  scope: RUN_TIME
+  value: https://app.hudsonlegal.tech
 - key: CHAT_DAILY_USER_LIMIT
   scope: RUN_TIME
   value: "50"
