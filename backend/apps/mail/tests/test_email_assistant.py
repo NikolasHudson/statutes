@@ -523,12 +523,12 @@ class ProcessingTests(TestCase):
         sent = mail.outbox[0]
         # Plaintext part: untouched prose + a Sources list with raw URLs.
         self.assertIn("See Iowa Code § 714.16 for the rule.", sent.body)
-        self.assertIn(f"https://corpus.nick.law/section/{section.id}", sent.body)
+        self.assertIn(f"https://app.hudsonlegal.tech/section/{section.id}", sent.body)
         self.assertIn("official PDF: https://www.legis.iowa.gov", sent.body)
         # HTML part: inline anchor on the citation.
         ((html_body, mimetype),) = sent.alternatives
         self.assertEqual(mimetype, "text/html")
-        self.assertIn(f'href="https://corpus.nick.law/section/{section.id}"', html_body)
+        self.assertIn(f'href="https://app.hudsonlegal.tech/section/{section.id}"', html_body)
 
     @mock.patch("apps.mail.services.render.requests.get")
     @mock.patch("apps.mail.services.run_chat_turn", return_value=ANSWER)

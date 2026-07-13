@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-// The Next.js app serves the whole frontend at the root of corpus.nick.law
+// The Next.js app serves the whole frontend at the root of app.hudsonlegal.tech
 // in production (App Platform routes / → chat-frontend; /api and /admin
 // go to Django). No basePath: same URL in dev and prod.
 const isProd = process.env.NODE_ENV === "production";

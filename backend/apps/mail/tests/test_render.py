@@ -11,7 +11,7 @@ from apps.api.tests._factories import make_caselaw_case, make_iowa_corpus_minima
 from apps.corpus.models import ReporterCitation
 from apps.mail import render
 
-BASE = "https://corpus.nick.law"
+BASE = "https://app.hudsonlegal.tech"
 
 
 class LinkifyTests(TestCase):

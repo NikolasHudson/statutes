@@ -18,7 +18,7 @@ env = environ.Env(
     # that doesn't exist. The default is today's production origin so no box
     # needs a new .env entry to boot; set it in the App Platform spec when the
     # app changes host.
-    APP_URL=(str, "https://corpus.nick.law"),
+    APP_URL=(str, "https://app.hudsonlegal.tech"),
     # MCP OAuth 2.0 issuer (apps/mcp_server/{oauth,auth}.py, which read it from
     # os.environ directly — this entry exists so the var is discoverable and
     # settable from .env). Empty means the issuer FLOATS WITH THE REQUEST HOST:
@@ -40,7 +40,7 @@ env = environ.Env(
     # APPENDS the address it accepted the connection from to X-Forwarded-For, so
     # only the last N entries are ours to trust. An earlier version of this comment
     # asserted "on App Platform that is the single edge hop"; that was never
-    # measured and prod contradicts it — corpus.nick.law is orange-clouded, so a
+    # measured and prod contradicts it — app.hudsonlegal.tech is orange-clouded, so a
     # request crosses Cloudflare AND the App Platform edge (verified 2026-07-13:
     # Cloudflare anycast A records + cf-ray + x-do-app-origin on one response).
     #
@@ -182,7 +182,7 @@ env = environ.Env(
     # LOAD-BEARING DEFAULT: the live App Platform spec does not set this, so
     # prod runs on the value below. Moving the app without also setting this
     # explicitly in the spec silently keeps mailing links to the old host.
-    EMAIL_LINK_BASE_URL=(str, "https://corpus.nick.law"),
+    EMAIL_LINK_BASE_URL=(str, "https://app.hudsonlegal.tech"),
     # PR7: the *currency* axis, orthogonal to fidelity — is the case the user's
     # premise rests on still GOOD LAW? Deterministic (reads the PR3 treatment flag
     # already on the retrieved passage; no LLM), so it ships ON by default: a
@@ -372,7 +372,7 @@ APP_URL = env("APP_URL")
 # config. That default is wrong for dev, though: before APP_URL existed, dev
 # resolved these links through CORS_ALLOWED_ORIGINS[0] (the local SPA), so
 # inheriting the prod default would point a dev Stripe checkout and a dev invite
-# email at corpus.nick.law. Absent an explicit APP_URL, dev keeps its own origin.
+# email at app.hudsonlegal.tech. Absent an explicit APP_URL, dev keeps its own origin.
 # Checked against os.environ, not env(), because env() cannot distinguish "unset"
 # from "set to the default"; read_env() has already folded .env into os.environ.
 if DEBUG and "APP_URL" not in os.environ:
@@ -598,7 +598,7 @@ CORS_ALLOW_CREDENTIALS = True
 # The session routes are CSRF-protected (apps/api/session_auth.py). For an
 # HTTPS request with an Origin header, Django verifies that origin against the
 # request host + CSRF_TRUSTED_ORIGINS. In prod the SPA is same-origin
-# (corpus.nick.law → set via APP_DOMAIN). In dev the Next server proxies /api
+# (app.hudsonlegal.tech → set via APP_DOMAIN). In dev the Next server proxies /api
 # to Django, so the browser's Origin is the frontend dev origin checked against
 # Django's own host — trusting the same origins we already allow to make
 # credentialed CORS requests keeps those POSTs from failing the Origin check

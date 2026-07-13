@@ -122,8 +122,8 @@ class HealthzTests(SimpleTestCase):
 
 class TransportSecurityTests(SimpleTestCase):
     @override_settings(
-        ALLOWED_HOSTS=["corpus.nick.law", "x.ondigitalocean.app"],
-        CORS_ALLOWED_ORIGINS=["https://corpus.nick.law"],
+        ALLOWED_HOSTS=["app.hudsonlegal.tech", "x.ondigitalocean.app"],
+        CORS_ALLOWED_ORIGINS=["https://app.hudsonlegal.tech"],
     )
     def test_defaults_derive_from_django_with_port_wildcards(self):
         with patch.dict(os.environ, {}, clear=False):
@@ -137,11 +137,11 @@ class TransportSecurityTests(SimpleTestCase):
         self.assertTrue(ts.enable_dns_rebinding_protection)
         # Both bare host and :* port-wildcard forms, so a Host with or without an
         # explicit port validates.
-        self.assertIn("corpus.nick.law", ts.allowed_hosts)
-        self.assertIn("corpus.nick.law:*", ts.allowed_hosts)
+        self.assertIn("app.hudsonlegal.tech", ts.allowed_hosts)
+        self.assertIn("app.hudsonlegal.tech:*", ts.allowed_hosts)
         self.assertIn("x.ondigitalocean.app", ts.allowed_hosts)
         self.assertIn("x.ondigitalocean.app:*", ts.allowed_hosts)
-        self.assertEqual(ts.allowed_origins, ["https://corpus.nick.law"])
+        self.assertEqual(ts.allowed_origins, ["https://app.hudsonlegal.tech"])
 
     @override_settings(ALLOWED_HOSTS=["*"])
     def test_wildcard_host_disables_protection(self):

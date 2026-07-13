@@ -257,14 +257,14 @@ class MetadataTests(TestCase):
         from unittest.mock import patch as env_patch
 
         with env_patch.dict(
-            os.environ, {"MCP_OAUTH_ISSUER": "https://corpus.nick.law/"}
+            os.environ, {"MCP_OAUTH_ISSUER": "https://app.hudsonlegal.tech/"}
         ):
             meta = self.client.get(
                 "/.well-known/oauth-authorization-server"
             ).json()
-        self.assertEqual(meta["issuer"], "https://corpus.nick.law")
+        self.assertEqual(meta["issuer"], "https://app.hudsonlegal.tech")
         self.assertEqual(
-            meta["token_endpoint"], "https://corpus.nick.law/oauth/token"
+            meta["token_endpoint"], "https://app.hudsonlegal.tech/oauth/token"
         )
 
 
@@ -780,13 +780,13 @@ class BearerTransportTests(OAuthFlowMixin, TestCase):
         recorder = _RecorderApp()
         app = api_key_middleware(recorder)
         status, _, headers = _drive(
-            app, headers=[(b"host", b"corpus.nick.law")]
+            app, headers=[(b"host", b"app.hudsonlegal.tech")]
         )
         self.assertEqual(status, 401)
         self.assertEqual(
             headers["www-authenticate"],
             'Bearer resource_metadata='
-            '"https://corpus.nick.law/.well-known/oauth-protected-resource/mcp"',
+            '"https://app.hudsonlegal.tech/.well-known/oauth-protected-resource/mcp"',
         )
 
     def test_garbage_bearer_does_not_fall_through_to_api_key(self):

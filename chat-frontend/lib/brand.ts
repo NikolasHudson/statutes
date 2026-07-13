@@ -27,7 +27,7 @@ export const MCP_SERVER_ID = "hudson-corpus";
 // is imported by server-rendered metadata, and a const would freeze in the
 // window-less value.
 
-/** Absolute origin the app is served from ("https://corpus.nick.law"), or "". */
+/** Absolute origin the app is served from ("https://app.hudsonlegal.tech"), or "". */
 export function appOrigin(): string {
   const configured = process.env.NEXT_PUBLIC_APP_URL;
   if (configured) return configured.replace(/\/+$/, "");
@@ -35,7 +35,7 @@ export function appOrigin(): string {
   return "";
 }
 
-/** Host portion of the app origin ("corpus.nick.law"), for display. */
+/** Host portion of the app origin ("app.hudsonlegal.tech"), for display. */
 export function appHost(): string {
   const origin = appOrigin();
   if (!origin) return "";

@@ -545,3 +545,24 @@ workers:
   instance_count: 1
   instance_size_slug: apps-s-1vcpu-1gb
   run_command: python manage.py process_assistant_email --forever
+# ---------------------------------------------------------------------------
+# Deploy-phase jobs.
+# ---------------------------------------------------------------------------
+# import-articles syncs backend/content/articles/*.md -> the marketing.Article
+# table (idempotent upsert by slug). It is a POST_DEPLOY job so a new article is
+# published simply by committing its .md and deploying — the mechanism the
+# import_articles command was written for ("safe to run on every deploy") but
+# which was never wired up, leaving prod /articles empty. Runs on EVERY deploy;
+# because it upserts, re-runs are no-ops ("0 created, 0 updated"). Inherits the
+# app-level DATABASE_URL like the workers above.
+jobs:
+- name: import-articles
+  kind: POST_DEPLOY
+  dockerfile_path: /Dockerfile
+  source_dir: /
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    deploy_on_push: true
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  run_command: python manage.py import_articles

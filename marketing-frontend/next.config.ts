@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-// Public marketing site (separate deployment from the app at corpus.nick.law).
+// Public marketing site (separate deployment from the app at app.hudsonlegal.tech).
 // Mostly static/SSG; the browser never talks to the backend directly. The two
 // same-origin route handlers (app/api/contact, app/api/subscribe) and the
 // articles pages call the backend SERVER-side via API_ORIGIN (lib/api.ts), so
