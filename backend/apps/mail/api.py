@@ -84,16 +84,41 @@ def _is_auto_generated(payload: dict) -> bool:
     return False
 
 
-def _base_address(payload: dict) -> str:
-    """The assistant inbox this message was addressed to, plus-tag stripped
-    (``assistant+t_ab12@x`` → ``assistant@x``). OriginalRecipient is the
-    envelope recipient, which is authoritative over To (Bcc/alias delivery)."""
-    raw = (payload.get("OriginalRecipient") or "").strip().lower()
-    if not raw:
-        to_full = payload.get("ToFull") or []
-        raw = (to_full[0].get("Email", "") if to_full else "").strip().lower()
-    local, _, domain = raw.partition("@")
-    return f"{local.split('+')[0]}@{domain}" if domain else raw
+def _resolve_inbox(payload: dict) -> tuple["AssistantAddress | None", str, str]:
+    """Which assistant inbox this message is for: ``(address, base, tag)``.
+
+    OriginalRecipient — the envelope recipient — is authoritative for DIRECT
+    delivery (Postmark inbound domain, Bcc/alias). But a forwarding hop rewrites
+    it: Cloudflare Email Routing relaying to a Postmark inbound *hash* address
+    puts ``…@inbound.postmarkapp.com`` in OriginalRecipient, leaving the real
+    inbox — and its ``+token`` — only in the To header. So we consider the
+    envelope first, then To, and return the first recipient whose plus-stripped
+    base matches an ACTIVE inbox (with the ``+token``, so reply threading still
+    works when Postmark's MailboxHash is absent under forwarding). When nothing
+    matches we fall back to the first recipient, so the miss is still audited.
+    """
+    raws: list[str] = []
+    orig = (payload.get("OriginalRecipient") or "").strip().lower()
+    if orig:
+        raws.append(orig)
+    for entry in payload.get("ToFull") or []:
+        email = (entry.get("Email") or "").strip().lower()
+        if email:
+            raws.append(email)
+
+    first_base = first_tag = ""
+    for raw in raws:
+        local, _, domain = raw.partition("@")
+        if not domain:
+            continue
+        base_local, _, tag = local.partition("+")
+        base = f"{base_local}@{domain}"
+        if not first_base:
+            first_base, first_tag = base, tag
+        address = AssistantAddress.objects.filter(address=base, active=True).first()
+        if address is not None:
+            return address, base, tag
+    return None, first_base, first_tag
 
 
 def _strip_attachment_content(payload: dict) -> dict:
@@ -130,8 +155,7 @@ def inbound_webhook(request, token: str = ""):
     if not from_email:
         raise HttpError(400, "missing From")
 
-    to_email = _base_address(payload)
-    address = AssistantAddress.objects.filter(address=to_email, active=True).first()
+    address, to_email, derived_hash = _resolve_inbox(payload)
 
     body = payload.get("StrippedTextReply") or payload.get("TextBody") or ""
 
@@ -144,7 +168,7 @@ def inbound_webhook(request, token: str = ""):
             "address": address,
             "from_email": from_email,
             "to_email": to_email,
-            "mailbox_hash": str(payload.get("MailboxHash") or ""),
+            "mailbox_hash": str(payload.get("MailboxHash") or "") or derived_hash,
             "subject": str(payload.get("Subject") or "")[:500],
             "body_text": body,
             "spf_pass": _spf_pass(payload),

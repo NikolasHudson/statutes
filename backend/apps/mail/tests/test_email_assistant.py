@@ -119,11 +119,41 @@ class InboundWebhookTests(TestCase):
         self.assertEqual(row.mailbox_hash, "t12ab34cd9")
 
     def test_unknown_recipient_dead_letters(self):
-        payload = postmark_payload(OriginalRecipient="nobody@mail.nick.law")
+        payload = postmark_payload(
+            OriginalRecipient="nobody@mail.nick.law",
+            ToFull=[{"Email": "nobody@mail.nick.law", "Name": ""}],
+        )
         self.post(payload)
         row = InboundEmail.objects.get()
         self.assertEqual(row.status, InboundEmail.Status.IGNORED)
         self.assertIsNone(row.address)
+
+    def test_forwarded_to_postmark_hash_matches_via_to_header(self):
+        # Cloudflare Email Routing relays to a Postmark inbound hash, so the
+        # envelope recipient is the hash, not the real inbox — which survives
+        # only in To. The inbox must still be resolved (was dead-lettered before).
+        payload = postmark_payload(
+            OriginalRecipient="a1b2c3d4@inbound.postmarkapp.com",
+            ToFull=[{"Email": "assistant@mail.nick.law", "Name": ""}],
+        )
+        self.post(payload)
+        row = InboundEmail.objects.get()
+        self.assertEqual(row.status, InboundEmail.Status.PENDING)
+        self.assertEqual(row.address, self.address)
+
+    def test_forwarded_plus_tag_derives_hash_from_to_header(self):
+        # Under forwarding, Postmark's MailboxHash is empty (the +token is on the
+        # To address, not the hash), so the reply-threading token is recovered
+        # from To instead.
+        payload = postmark_payload(
+            OriginalRecipient="a1b2c3d4@inbound.postmarkapp.com",
+            ToFull=[{"Email": "assistant+t99zz@mail.nick.law", "Name": ""}],
+            MailboxHash="",
+        )
+        self.post(payload)
+        row = InboundEmail.objects.get()
+        self.assertEqual(row.address, self.address)
+        self.assertEqual(row.mailbox_hash, "t99zz")
 
     def test_attachment_content_never_stored(self):
         payload = postmark_payload(
