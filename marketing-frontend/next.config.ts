@@ -32,8 +32,13 @@ const securityHeaders = [
 	{ key: "X-Content-Type-Options", value: "nosniff" },
 	{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
 	{
+		// No `preload` token: the decision (DOMAIN_AND_BRAND_PLAN, open decision #2)
+		// is to keep strong HSTS but NOT submit to hstspreload.org, so that an
+		// HTTP staging/partner subdomain stays possible later. Advertising `preload`
+		// invites list operators to enrol the apex + all subdomains irreversibly,
+		// which is exactly what that decision declined. includeSubDomains stays.
 		key: "Strict-Transport-Security",
-		value: "max-age=63072000; includeSubDomains; preload",
+		value: "max-age=63072000; includeSubDomains",
 	},
 ];
 

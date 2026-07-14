@@ -22,7 +22,13 @@ everything it needs from us lives here and is exposed through the public
 
 from __future__ import annotations
 
+from django.core import signing
 from django.db import models
+
+# Namespaced salt for one-click unsubscribe tokens. A signed token means the
+# link carries no guessable id and cannot be forged into unsubscribing someone
+# else's address — and it needs no extra DB column.
+_UNSUBSCRIBE_SALT = "marketing.newsletter.unsubscribe"
 
 
 class Article(models.Model):
@@ -121,3 +127,15 @@ class NewsletterSubscriber(models.Model):
 
     def __str__(self) -> str:
         return self.email
+
+    def unsubscribe_token(self) -> str:
+        """A signed, tamper-proof token for a one-click unsubscribe link."""
+        return signing.dumps(self.email, salt=_UNSUBSCRIBE_SALT)
+
+    @staticmethod
+    def email_from_unsubscribe_token(token: str, max_age=None) -> str | None:
+        """The address a token unsubscribes, or None if it is invalid/expired."""
+        try:
+            return signing.loads(token, salt=_UNSUBSCRIBE_SALT, max_age=max_age)
+        except signing.BadSignature:
+            return None

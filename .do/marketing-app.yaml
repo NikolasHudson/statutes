@@ -74,6 +74,11 @@ domains:
   type: PRIMARY
 - domain: www.hudsonlegal.tech
   type: ALIAS
+# Deploy/domain failure notifications (2026-07-14 doctl security review: no
+# alert rules existed on either app). App-level; emails the account owner.
+alerts:
+- rule: DEPLOYMENT_FAILED
+- rule: DOMAIN_FAILED
 ingress:
   rules:
   # There is NO automatic ALIAS -> PRIMARY redirect on App Platform. Without this

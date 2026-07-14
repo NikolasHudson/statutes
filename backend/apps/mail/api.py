@@ -43,7 +43,55 @@ def _header(payload: dict, name: str) -> str:
     return ""
 
 
+def _iter_headers(payload: dict, name: str):
+    """Every value of a header (a message can carry several
+    ``Authentication-Results``: one per hop, plus any the sender embedded)."""
+    want = name.lower()
+    for h in payload.get("Headers") or []:
+        if str(h.get("Name", "")).lower() == want:
+            yield str(h.get("Value", ""))
+
+
+def _authserv_id(auth_results: str) -> str:
+    """RFC 8601 §2.2: the authserv-id is the first token, before the first ';'."""
+    head = auth_results.split(";", 1)[0].strip()
+    return head.split()[0].lower() if head else ""
+
+
+def _trusted_authserv_ids() -> set[str]:
+    return {
+        a.strip().lower()
+        for a in getattr(settings, "EMAIL_TRUSTED_AUTHSERV_IDS", None) or []
+        if a and a.strip()
+    }
+
+
+def _auth_results_verdict(payload: dict, mechanism: str) -> bool | None:
+    """``spf``/``dkim`` verdict read ONLY from Authentication-Results headers
+    stamped by a trusted verifier (RFC 8601 authserv-id pinning).
+
+    Returns True on a trusted pass, False if a trusted verifier weighed in
+    without a pass, None if no trusted header is present. A sender-embedded
+    ``Authentication-Results: …; dkim=pass`` carries an authserv-id that is not
+    ours, so it is ignored — closing the forged-verdict path."""
+    trusted = _trusted_authserv_ids()
+    needle = f"{mechanism}=pass"
+    seen = False
+    for ar in _iter_headers(payload, "Authentication-Results"):
+        if not ar.strip() or _authserv_id(ar) not in trusted:
+            continue
+        seen = True
+        if needle in ar.lower():
+            return True
+    return False if seen else None
+
+
 def _spf_pass(payload: dict) -> bool | None:
+    if _trusted_authserv_ids():
+        return _auth_results_verdict(payload, "spf")
+    # Legacy (authserv-id pinning unconfigured): the standalone Received-SPF
+    # header. Spoofable by a sender who embeds their own; set
+    # EMAIL_TRUSTED_AUTHSERV_IDS in prod to switch to the pinned path above.
     received_spf = _header(payload, "Received-SPF")
     if not received_spf:
         return None
@@ -51,6 +99,9 @@ def _spf_pass(payload: dict) -> bool | None:
 
 
 def _dkim_pass(payload: dict) -> bool | None:
+    if _trusted_authserv_ids():
+        return _auth_results_verdict(payload, "dkim")
+    # Legacy (unpinned): substring on the first Authentication-Results header.
     auth_results = _header(payload, "Authentication-Results")
     if not auth_results:
         return None
@@ -133,12 +184,32 @@ def _strip_attachment_content(payload: dict) -> dict:
     return snapshot
 
 
+def _token_ok(presented: str, expected: str) -> bool:
+    """Constant-time, byte-safe token compare. ``hmac.compare_digest`` on two
+    ``str`` raises TypeError the moment either holds a character above U+007F —
+    and a ``?token=%C3%A9`` decodes to exactly that — which would surface as an
+    unauthenticated 500 instead of a clean 403. Compare BYTES, never raise (the
+    audit.client_ip pattern)."""
+    if not presented or not expected:
+        return False
+    try:
+        return hmac.compare_digest(
+            presented.encode("utf-8", "replace"), expected.encode("utf-8", "replace")
+        )
+    except (AttributeError, TypeError, ValueError, UnicodeError):
+        return False
+
+
 @mail_router.post("/inbound", auth=None)
 def inbound_webhook(request, token: str = ""):
     expected = settings.EMAIL_INBOUND_WEBHOOK_TOKEN
     if not expected:
         raise HttpError(503, "inbound email is not configured")
-    if not hmac.compare_digest(token, expected):
+    # Prefer a header (keeps the secret out of access/proxy logs and Postmark's
+    # stored URL); fall back to the legacy ?token= query param so the webhook
+    # keeps working while Postmark is reconfigured to send the header.
+    presented = request.headers.get("X-Inbound-Webhook-Token") or token
+    if not _token_ok(presented, expected):
         raise HttpError(403, "bad token")
 
     try:

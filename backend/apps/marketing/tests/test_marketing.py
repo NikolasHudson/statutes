@@ -205,6 +205,90 @@ class SubscribeApiTests(TestCase):
         sub = NewsletterSubscriber.objects.get()
         self.assertEqual(sub.email, "reader@example.com")
 
+    def _unsubscribe(self, token):
+        return self.client.post(
+            "/api/marketing/unsubscribe",
+            {"token": token},
+            content_type="application/json",
+        )
+
+    def test_signed_token_unsubscribes_and_is_idempotent(self):
+        sub = NewsletterSubscriber.objects.create(email="reader@example.com")
+        resp = self._unsubscribe(sub.unsubscribe_token())
+        self.assertEqual(resp.status_code, 200)
+        sub.refresh_from_db()
+        self.assertIsNotNone(sub.unsubscribed_at)
+        first = sub.unsubscribed_at
+        # A second click does not move the timestamp (idempotent).
+        self._unsubscribe(sub.unsubscribe_token())
+        sub.refresh_from_db()
+        self.assertEqual(sub.unsubscribed_at, first)
+
+    def test_forged_token_changes_nothing_but_still_200s(self):
+        sub = NewsletterSubscriber.objects.create(email="reader@example.com")
+        resp = self._unsubscribe("not-a-valid-signed-token")
+        self.assertEqual(resp.status_code, 200)  # no oracle
+        sub.refresh_from_db()
+        self.assertIsNone(sub.unsubscribed_at)
+
+
+@override_settings(MARKETING_LEAD_RETENTION_DAYS=30)
+class LeadRetentionTests(TestCase):
+    def test_purge_deletes_old_contacts_and_unsubscribed_only(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        old = timezone.now() - timedelta(days=60)
+        recent = timezone.now() - timedelta(days=5)
+
+        stale = ContactSubmission.objects.create(
+            name="Old", email="old@example.com", message="m"
+        )
+        ContactSubmission.objects.filter(pk=stale.pk).update(created_at=old)
+        fresh = ContactSubmission.objects.create(
+            name="New", email="new@example.com", message="m"
+        )
+
+        active = NewsletterSubscriber.objects.create(email="active@example.com")
+        long_unsub = NewsletterSubscriber.objects.create(email="gone@example.com")
+        NewsletterSubscriber.objects.filter(pk=long_unsub.pk).update(
+            unsubscribed_at=old
+        )
+        recent_unsub = NewsletterSubscriber.objects.create(email="recent@example.com")
+        NewsletterSubscriber.objects.filter(pk=recent_unsub.pk).update(
+            unsubscribed_at=recent
+        )
+
+        call_command("purge_marketing_leads")
+
+        # Old contact gone; recent contact kept.
+        self.assertFalse(ContactSubmission.objects.filter(pk=stale.pk).exists())
+        self.assertTrue(ContactSubmission.objects.filter(pk=fresh.pk).exists())
+        # Long-unsubscribed erased; active subscriber and recently-unsubscribed kept.
+        self.assertFalse(
+            NewsletterSubscriber.objects.filter(pk=long_unsub.pk).exists()
+        )
+        self.assertTrue(NewsletterSubscriber.objects.filter(pk=active.pk).exists())
+        self.assertTrue(
+            NewsletterSubscriber.objects.filter(pk=recent_unsub.pk).exists()
+        )
+
+    @override_settings(MARKETING_LEAD_RETENTION_DAYS=0)
+    def test_retention_disabled_deletes_nothing(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        s = ContactSubmission.objects.create(
+            name="Old", email="old@example.com", message="m"
+        )
+        ContactSubmission.objects.filter(pk=s.pk).update(
+            created_at=timezone.now() - timedelta(days=9999)
+        )
+        call_command("purge_marketing_leads")
+        self.assertTrue(ContactSubmission.objects.filter(pk=s.pk).exists())
+
 
 class ArticleApiTests(TestCase):
     def setUp(self):

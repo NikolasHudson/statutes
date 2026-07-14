@@ -179,6 +179,65 @@ class InboundWebhookTests(TestCase):
         self.post(payload)
         self.assertTrue(InboundEmail.objects.get().is_auto_generated)
 
+    def test_non_ascii_token_is_403_not_500(self):
+        # A ?token= with a byte above U+007F once crashed the constant-time
+        # compare (TypeError → unauthenticated 500). It must be a clean 403.
+        response = self.client.post(
+            f"{WEBHOOK}?token=%C3%A9",
+            data=json.dumps(postmark_payload()),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(InboundEmail.objects.count(), 0)
+
+    def test_token_accepted_via_header(self):
+        # The secret can ride a header (kept out of URLs/logs) instead of ?token=.
+        response = self.client.post(
+            f"{WEBHOOK}?token=wrong",
+            data=json.dumps(postmark_payload()),
+            content_type="application/json",
+            headers={"X-Inbound-Webhook-Token": TOKEN},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(InboundEmail.objects.get().status, InboundEmail.Status.PENDING)
+
+    @override_settings(EMAIL_TRUSTED_AUTHSERV_IDS=["mx.trusted.example"])
+    def test_authserv_id_pinning_ignores_untrusted_verdict(self):
+        # A sender-embedded Authentication-Results with an untrusted authserv-id
+        # must NOT be honored — its dkim=pass/spf=pass are ignored (None).
+        payload = postmark_payload(
+            Headers=[
+                {
+                    "Name": "Authentication-Results",
+                    "Value": "attacker.example; spf=pass; dkim=pass header.d=victim.com",
+                },
+                {"Name": "Received-SPF", "Value": "pass (forged by sender)"},
+            ]
+        )
+        self.post(payload)
+        row = InboundEmail.objects.get()
+        self.assertIsNone(row.dkim_pass)
+        self.assertIsNone(row.spf_pass)
+
+    @override_settings(EMAIL_TRUSTED_AUTHSERV_IDS=["mx.trusted.example"])
+    def test_authserv_id_pinning_honors_trusted_verdict(self):
+        payload = postmark_payload(
+            Headers=[
+                {
+                    "Name": "Authentication-Results",
+                    "Value": "attacker.example; dkim=pass",  # forged, ignored
+                },
+                {
+                    "Name": "Authentication-Results",
+                    "Value": "mx.trusted.example; spf=pass; dkim=pass header.d=example.com",
+                },
+            ]
+        )
+        self.post(payload)
+        row = InboundEmail.objects.get()
+        self.assertTrue(row.dkim_pass)
+        self.assertTrue(row.spf_pass)
+
 
 ANSWER = ("Iowa Code § 572.18 governs priority. [advisory omitted]", "gpt-5-mini")
 

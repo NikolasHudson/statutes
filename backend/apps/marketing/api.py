@@ -23,6 +23,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.core.validators import validate_email
+from django.utils import timezone
 from ninja import Router, Schema
 from ninja.errors import HttpError
 
@@ -214,6 +215,23 @@ def subscribe(request, payload: SubscribeIn):
     if _hits(request, "subscribe", _SUBSCRIBE_WINDOW_S) > _SUBSCRIBE_LIMIT:
         raise HttpError(429, "Too many attempts.")
     NewsletterSubscriber.objects.get_or_create(email=_clean_email(payload.email))
+    return OkOut()
+
+
+class UnsubscribeIn(Schema):
+    token: str
+
+
+@marketing_router.post("/unsubscribe", response=OkOut, auth=None)
+def unsubscribe(request, payload: UnsubscribeIn):
+    """One-click opt-out from a signed token in the unsubscribe link. Always
+    answers 200 (idempotent, and never an oracle for whether an address is on
+    the list); a bad/forged token simply changes nothing."""
+    email = NewsletterSubscriber.email_from_unsubscribe_token(payload.token)
+    if email:
+        NewsletterSubscriber.objects.filter(
+            email=email, unsubscribed_at__isnull=True
+        ).update(unsubscribed_at=timezone.now())
     return OkOut()
 
 

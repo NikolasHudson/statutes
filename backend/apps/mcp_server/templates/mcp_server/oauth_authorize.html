@@ -22,6 +22,10 @@
     .approve { background: #0f62fe; color: #fff; }
     .deny { background: #fff; color: #161616; border: 1px solid #8d8d8d; }
     .who { font-size: .75rem; color: #8d8d8d; margin-top: 1.25rem; }
+    .warn { background: #fff8e1; border-left: 3px solid #f1c21b; padding: .625rem .75rem;
+            font-size: .78125rem; line-height: 1.4; color: #525252; margin: 1rem 0; }
+    .warn strong { color: #161616; }
+    .host { font-family: 'IBM Plex Mono', monospace; word-break: break-all; }
   </style>
 </head>
 <body>
@@ -33,6 +37,11 @@
       search and read Iowa statutes, court rules, and caselaw, and run citation and
       quote verification — with your account's plan limits.
     </p>
+    <div class="warn">
+      This connector's name is <strong>self-reported and unverified</strong>. If you
+      approve, your authorization is sent to <span class="host">{{ redirect_host|default:"an unknown host" }}</span>.
+      Only continue if you recognize that address and started this connection yourself.
+    </div>
     <div class="scope">scope: {{ scope_display }}</div>
     <form method="post">
       {% csrf_token %}

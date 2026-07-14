@@ -2,6 +2,12 @@ name: statutes
 region: nyc
 features:
 - buildpack-stack=ubuntu-22
+# Deploy/domain failure notifications (2026-07-14 doctl security review: both
+# apps had ZERO alert rules, so a failed deploy or a cert/domain problem was
+# silent). App-level alerts email the account owner.
+alerts:
+- rule: DEPLOYMENT_FAILED
+- rule: DOMAIN_FAILED
 # Custom domain. Without this, re-applying the spec wipes whatever domain
 # was attached via the DO panel — that's how we lost corpus.nick.law on
 # the first spec re-paste. Keep this in source so the domain is tied to
@@ -51,6 +57,14 @@ databases:
 #   - the chat-frontend NEXT_PUBLIC_* build envs.
 # Both are annotated where they appear. Re-check this drift note whenever you
 # diff against live — a spec file that lies is worse than no spec file.
+#
+# DRIFT 2026-07-14 (doctl security review): a reconciled apply-ready copy of the
+# LIVE spec (EV ciphertexts preserved) + this file's additions (PRE_DEPLOY
+# migrate job, alerts, MARKETING_LEAD_RETENTION_DAYS, TRUSTED_PROXY_COUNT,
+# chat-frontend NEXT_PUBLIC_* build envs) was prepared and structure-validated;
+# applying it is gated on Nick (production deploy). EMAIL_TRUSTED_AUTHSERV_IDS
+# deliberately NOT included — its value must be read off a real post-cutover
+# message first (see the commented env below).
 envs:
 - key: SECRET_KEY
   scope: RUN_AND_BUILD_TIME
@@ -162,6 +176,31 @@ envs:
 - key: CHAT_TRACE_RETENTION_DAYS
   scope: RUN_TIME
   value: "7"
+# Marketing lead PII retention (SOC2 data-retention gap): contact submissions
+# older than the window are deleted; unsubscribed newsletter emails are erased
+# once the unsubscribe is that old (active subscribers are never touched). 365
+# set 2026-07-14 as the initial policy — adjust freely; 0 disables (retain
+# forever). ENFORCEMENT IS NOT SCHEDULED YET: purge_marketing_leads ships in
+# the uncommitted security-fix code; after that code is pushed, add a worker
+# mirroring trace-purge (`python manage.py purge_marketing_leads --forever`).
+# Adding the worker BEFORE the push would crash the deploy — the command does
+# not exist on origin/main yet.
+- key: MARKETING_LEAD_RETENTION_DAYS
+  scope: RUN_TIME
+  value: "365"
+# RFC 8601 authserv-id pinning for the inbound-mail SPF/DKIM verdicts (see
+# core/settings.py). DO NOT GUESS the value — read it off a real POST-CUTOVER
+# message's Authentication-Results header (the token before the first ';'):
+#   URI=$(doctl databases connection a567f0d2-4a91-4f35-8f60-23f582a30f20 --format URI --no-header)
+#   psql "$URI" -t -c "SELECT DISTINCT split_part(h->>'Value',';',1) FROM mail_inboundemail e, jsonb_array_elements(e.raw_payload->'Headers') h WHERE lower(h->>'Name')='authentication-results' AND e.received_at > '2026-07-13';"
+# Pre-cutover rows are NOT representative: they carry an authserv-id-less
+# header ("spf=pass; dkim=pass …") that cannot be pinned. A WRONG value is
+# worse than none — with EMAIL_REQUIRE_SENDER_AUTH on, both verdicts read None
+# and every reply is silently refused. Until set, the legacy (spoofable) path
+# is used, same as before the fix.
+# - key: EMAIL_TRUSTED_AUTHSERV_IDS
+#   scope: RUN_TIME
+#   value: "<read-off-a-real-message-first>"
 # HTTPS enforcement (#39) is layered, no spec directive required: (1) DO App
 # Platform terminates TLS and redirects HTTP->HTTPS at the edge for every
 # component (including the Next.js frontend at "/"), and (2) Django additionally
@@ -338,16 +377,21 @@ services:
   # -------------------------------------------------------------------------
   #
   # CF-Connecting-IP is the control. Cloudflare OVERWRITES it on ingress, so a
-  # browser cannot forge it, and — unlike a hop count — it does not depend on how
-  # many proxies append to the chain. Safe here only because ALLOWED_HOSTS already
-  # forecloses the Cloudflare bypass: the app's bare *.ondigitalocean.app hostname
-  # IS publicly reachable, but every path that calls client_ip answers 400
-  # DisallowedHost on it (verified 2026-07-13: /api/auth/login, /api/auth/register,
-  # /api/marketing/contact, /admin/login/ all 400; only /api/health answers 200,
-  # because HealthCheckMiddleware short-circuits it ahead of host validation for
-  # the container probe). So every request that reaches client_ip came via
-  # Cloudflare. Do NOT remove corpus.nick.law/${APP_DOMAIN} from ALLOWED_HOSTS
-  # believing it to be belt-and-braces — it is load-bearing for this control.
+  # browser cannot forge it THROUGH CLOUDFLARE, and — unlike a hop count — it does
+  # not depend on how many proxies append to the chain. It is trustworthy only
+  # while every request reaching client_ip has transited a Cloudflare that
+  # overwrote the header. ALLOWED_HOSTS does NOT establish that: the attack is not
+  # sending Host: <bare>.ondigitalocean.app (that 400s and no attacker would), it
+  # is sending Host: app.hudsonlegal.tech (which IS allowed) straight to the DO
+  # origin to skip our CF and forge the header. What forecloses THAT (verified
+  # 2026-07-14): a request to statutes-*.ondigitalocean.app carrying
+  # Host: app.hudsonlegal.tech is refused 403 at DO's edge (/api/health and
+  # /admin/login/ both 403), so it never reaches Django — and the DO edge is
+  # itself CF-fronted, so anything that does reach Django was CF-overwritten.
+  # This rests on DO edge behavior we neither control nor monitor: add Cloudflare
+  # Authenticated Origin Pulls (mTLS) or a CF-injected secret header the origin
+  # verifies for a control that does not depend on it, and re-run the 403 probe
+  # after any DO/CF topology change.
   #
   # ⚠ VERIFY ON FIRST DEPLOY, one command, before trusting this in anger. Our CF
   # zone proxies to an origin (*.ondigitalocean.app) that is ITSELF Cloudflare-
@@ -556,6 +600,28 @@ workers:
 # because it upserts, re-runs are no-ops ("0 created, 0 updated"). Inherits the
 # app-level DATABASE_URL like the workers above.
 jobs:
+# migrate applies DB schema changes as a PRE_DEPLOY step — BEFORE the new image
+# serves traffic — so the schema the new code expects exists when it starts.
+# This closes the standing change-management gap: prod migrations were hand-run
+# against the live DB (unlogged, easy to forget mid-deploy — the billing paywall
+# and several other rollouts each needed a manual `manage.py migrate`). With this
+# job, `git push` is the whole deploy again.
+#
+# CONSTRAINT: keep migrations ADDITIVE / backward-compatible. A PRE_DEPLOY job
+# runs while the OLD version is still live, so a destructive migration (dropping
+# a column the running code still reads) would break prod for the deploy window.
+# Split such changes across two deploys (add-and-backfill, then remove) — the
+# standard expand/contract pattern. Inherits the app-level DATABASE_URL.
+- name: migrate
+  kind: PRE_DEPLOY
+  dockerfile_path: /Dockerfile
+  source_dir: /
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    deploy_on_push: true
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  run_command: python manage.py migrate --noinput
 - name: import-articles
   kind: POST_DEPLOY
   dockerfile_path: /Dockerfile
@@ -566,3 +632,17 @@ jobs:
     deploy_on_push: true
   instance_size_slug: apps-s-1vcpu-0.5gb
   run_command: python manage.py import_articles
+# seed-assistant-address exists on the LIVE app (added during the 2026-07-13
+# mail cutover) but was never recorded here — restored 2026-07-14 so applying
+# this file's intent doesn't silently drop it. Idempotent upsert of the
+# flagship assistant address + its sender allowlist; re-runs are no-ops.
+- name: seed-assistant-address
+  kind: POST_DEPLOY
+  dockerfile_path: /Dockerfile
+  source_dir: /
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    deploy_on_push: true
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  run_command: python manage.py seed_assistant_address --address assistant@hudsonlegal.tech --allow nick@nickhudson.me --allow nick@nick.law

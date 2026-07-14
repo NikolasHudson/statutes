@@ -18,7 +18,11 @@ probe never trips host validation. Keep the payload in sync with that view
 from __future__ import annotations
 
 from django.conf import settings
-from django.http import HttpResponseNotFound, JsonResponse
+from django.http import (
+    HttpResponseForbidden,
+    HttpResponseNotFound,
+    JsonResponse,
+)
 
 # Container probe path (statutes service health_check.http_path in .do/app.yaml).
 _HEALTH_PATHS = frozenset({"/api/health", "/api/health/"})
@@ -27,6 +31,26 @@ _HEALTH_PATHS = frozenset({"/api/health", "/api/health/"})
 # distinct sentinel: None already MEANS the flagship, which is exactly the
 # outcome strict mode exists to withhold.
 _UNKNOWN_HOST = object()
+
+# Corpus-data API prefixes that read source content but do NOT yet clamp their
+# scope to request.product. Chat and the email assistant clamp centrally
+# (chat._enforce_product_scope / mail.services); search, browse, verify and
+# research never read request.product, so on a white-label front door they would
+# serve the ENTIRE flagship corpus with the scope lock silently gone — the
+# fail-OPEN break (DOMAIN_AND_BRAND_PLAN landmine #9). Until each grows its own
+# clamp (the clerk/white-label launch gate), this list is refused outright when a
+# product is resolved, turning fail-open into fail-closed. It is INERT on the
+# flagship (product is None) and everywhere no product hostname resolves — i.e.
+# all of prod today. Remove a prefix here the same change that teaches its
+# endpoints to clamp. Non-corpus paths (/api/auth, /api/account, /api/branding,
+# /api/billing, /api/org, /api/admin, static, the SPA) are untouched so a
+# white-label host still logs in, themes, and bills normally.
+_SCOPE_UNSAFE_PREFIXES = (
+    "/api/search",
+    "/api/browse",
+    "/api/research",
+    "/api/verify",
+)
 
 
 class HealthCheckMiddleware:
@@ -78,6 +102,13 @@ class ProductResolutionMiddleware:
         if product is _UNKNOWN_HOST:
             return HttpResponseNotFound("Unknown host.")
         request.product = product
+        # Fail-closed backstop for the scope lock: a scoped (white-label) host
+        # must not reach a corpus reader that doesn't clamp itself yet. No-op on
+        # the flagship (product is None).
+        if product is not None and _is_scope_unsafe_path(request.path):
+            return HttpResponseForbidden(
+                "This endpoint is not available on this app."
+            )
         return self.get_response(request)
 
     @staticmethod
@@ -100,6 +131,17 @@ class ProductResolutionMiddleware:
         if _flagship_host_is_open(host):
             return None
         return _UNKNOWN_HOST
+
+
+def _is_scope_unsafe_path(path: str) -> bool:
+    """Does this request path hit a corpus reader that doesn't clamp to
+    request.product yet? Matched at a segment boundary so ``/api/searchlog``
+    (were it to exist) can't be blocked by the ``/api/search`` prefix."""
+    path = path or ""
+    for prefix in _SCOPE_UNSAFE_PREFIXES:
+        if path == prefix or path.startswith(prefix + "/"):
+            return True
+    return False
 
 
 def _flagship_host_is_open(host: str) -> bool:

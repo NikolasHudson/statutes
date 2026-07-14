@@ -39,8 +39,11 @@ const securityHeaders = [
 	{ key: "X-Content-Type-Options", value: "nosniff" },
 	{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
 	{
+		// No `preload` token — see the note in marketing-frontend/next.config.ts:
+		// the decision is strong HSTS without hstspreload.org submission, so an
+		// HTTP staging/partner subdomain remains possible later.
 		key: "Strict-Transport-Security",
-		value: "max-age=63072000; includeSubDomains; preload",
+		value: "max-age=63072000; includeSubDomains",
 	},
 ];
 

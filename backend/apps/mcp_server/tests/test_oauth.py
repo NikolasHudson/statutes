@@ -630,7 +630,43 @@ class TokenFlowTests(OAuthFlowMixin, TestCase):
         self.assertNotEqual(new["refresh_token"], tokens["refresh_token"])
         self.assertEqual(new["scope"], "mcp")
 
-        # Rotation: the OLD refresh token is now invalid.
+        # Immediately after a clean rotation (no reuse yet): the NEW access token
+        # works and the OLD one — whose row the rotation revoked — does not.
+        self.assertEqual(self._bearer_status(new["access_token"]), 204)
+        self.assertEqual(self._bearer_status(tokens["access_token"]), 401)
+
+    def _bearer_status(self, access_token):
+        status, _, _ = _drive(
+            api_key_middleware(_RecorderApp()),
+            headers=[
+                (b"authorization", f"Bearer {access_token}".encode()),
+                (b"host", b"testserver"),
+            ],
+        )
+        return status
+
+    def test_refresh_reuse_revokes_the_whole_token_family(self):
+        # OAuth 2.1 §6.1 reuse detection: presenting an already-rotated refresh
+        # token is the stolen-token signal, so it must fail AND revoke every token
+        # descended from the same authorization — including the live tokens the
+        # legitimate client just received — forcing re-consent. (The auth-code
+        # replay path already did this; the refresh path now matches it.)
+        tokens = self.issue_tokens()
+        refreshed = self.client.post(
+            "/oauth/token",
+            data={
+                "grant_type": "refresh_token",
+                "client_id": tokens["client_id"],
+                "refresh_token": tokens["refresh_token"],
+            },
+        )
+        self.assertEqual(refreshed.status_code, 200, refreshed.content)
+        new = refreshed.json()
+
+        # The freshly-minted access token is live until the reuse is detected.
+        self.assertEqual(self._bearer_status(new["access_token"]), 204)
+
+        # Replay the OLD (already-rotated) refresh token — the reuse signal.
         again = self.client.post(
             "/oauth/token",
             data={
@@ -642,26 +678,19 @@ class TokenFlowTests(OAuthFlowMixin, TestCase):
         self.assertEqual(again.status_code, 400)
         self.assertEqual(again.json()["error"], "invalid_grant")
 
-        # ... and so is the OLD access token (the rotated row was revoked).
-        recorder = _RecorderApp()
-        app = api_key_middleware(recorder)
-        status, _, headers = _drive(
-            app,
-            headers=[
-                (b"authorization", f"Bearer {tokens['access_token']}".encode()),
-                (b"host", b"testserver"),
-            ],
+        # Reuse detection has now revoked the whole family: the NEW access token
+        # AND the NEW refresh token are both dead.
+        self.assertEqual(self._bearer_status(new["access_token"]), 401)
+        replay_new = self.client.post(
+            "/oauth/token",
+            data={
+                "grant_type": "refresh_token",
+                "client_id": tokens["client_id"],
+                "refresh_token": new["refresh_token"],
+            },
         )
-        self.assertEqual(status, 401)
-        # The NEW access token works.
-        status, _, _ = _drive(
-            app,
-            headers=[
-                (b"authorization", f"Bearer {new['access_token']}".encode()),
-                (b"host", b"testserver"),
-            ],
-        )
-        self.assertEqual(status, 204)
+        self.assertEqual(replay_new.status_code, 400)
+        self.assertEqual(replay_new.json()["error"], "invalid_grant")
 
     def test_unsupported_grant_type(self):
         reg = self.register_client()

@@ -59,15 +59,29 @@ env = environ.Env(
     # Trust Cloudflare's CF-Connecting-IP as the client address.
     #
     # This is THE client-IP control in production, and it is the one header in the
-    # chain a browser cannot lie about: Cloudflare OVERWRITES CF-Connecting-IP on
-    # ingress, and unlike X-Forwarded-For it does not depend on counting hops. It
-    # is sound here only because ALLOWED_HOSTS already forecloses the bypass:
-    # the app's bare *.ondigitalocean.app hostname is publicly reachable, but every
-    # security-relevant path on it answers 400 DisallowedHost (verified 2026-07-13
-    # against prod: /api/auth/login, /api/auth/register, /api/marketing/contact and
-    # /admin/login/ all 400; only /api/health answers, because HealthCheckMiddleware
-    # short-circuits it ahead of host validation for the container probe). So the
-    # only route to a path that calls client_ip runs through Cloudflare.
+    # chain a browser cannot lie about THROUGH CLOUDFLARE: Cloudflare OVERWRITES
+    # CF-Connecting-IP on ingress, and unlike X-Forwarded-For it does not depend on
+    # counting hops. Trusting it is sound ONLY while every request that reaches a
+    # path calling client_ip has transited a Cloudflare that overwrote the header.
+    #
+    # The bypass this must foreclose is NOT the one an earlier version of this
+    # comment tested. That test hit the bare *.ondigitalocean.app host with its OWN
+    # hostname and got 400 DisallowedHost — but an attacker would not do that; they
+    # would send Host: app.hudsonlegal.tech (which IS in ALLOWED_HOSTS) straight to
+    # the DO origin, skipping OUR Cloudflare, and forge CF-Connecting-IP. So
+    # ALLOWED_HOSTS does NOT foreclose it. What actually does (verified 2026-07-14
+    # against prod): a request to statutes-*.ondigitalocean.app bearing
+    # Host: app.hudsonlegal.tech is refused 403 at DO's edge — /api/health and
+    # /admin/login/ both 403, so the spoofed-host request never reaches Django, and
+    # any request that DOES reach it has passed through a Cloudflare (DO's edge is
+    # itself CF-fronted) that overwrote CF-Connecting-IP.
+    #
+    # That safety therefore rests on DO edge behavior we do not control and do not
+    # monitor. DEFENSE-IN-DEPTH TO ADD (Cloudflare-side, not code): enable
+    # Authenticated Origin Pulls (mTLS) or a CF Transform Rule that injects a secret
+    # header the origin verifies, so a direct-to-origin request is rejected
+    # regardless of DO's edge. Until then, re-run the 403 probe after any DO/CF
+    # topology change.
     #
     # Default OFF, and it MUST stay off anywhere Cloudflare is not genuinely in
     # front — with no CF in the path this header is just another string a client
@@ -177,6 +191,16 @@ env = environ.Env(
     # a spoofed From both leaks answers and creates backscatter, so this stays
     # on everywhere real mail arrives; tests toggle it off explicitly.
     EMAIL_REQUIRE_SENDER_AUTH=(bool, True),
+    # RFC 8601 authserv-id pinning for the SPF/DKIM verdicts on inbound mail.
+    # The verdict lives in an Authentication-Results header, and a SENDER can
+    # embed a forged "Authentication-Results: …; dkim=pass" in their own message
+    # — so a consumer MUST only honor headers stamped by a verifier it trusts,
+    # identified by the authserv-id (the token before the first ';'). Set this to
+    # the authserv-id(s) our own inbound path stamps (read it off one real
+    # message's top Authentication-Results header — the Cloudflare Email Routing
+    # / Postmark verifier). When EMPTY (default), pinning is OFF and the legacy
+    # first-header substring is used, which is spoofable — so set it in prod.
+    EMAIL_TRUSTED_AUTHSERV_IDS=(list, []),
     # Where emailed citation links point for the flagship assistant address
     # (a scoped product's address uses its own Product.hostname instead).
     # LOAD-BEARING DEFAULT: the live App Platform spec does not set this, so
@@ -208,6 +232,13 @@ env = environ.Env(
     # mail domain, so the domain move must set this in the same breath.
     CONTACT_NOTIFY_EMAIL=(str, ""),
     CONTACT_FROM_EMAIL=(str, "assistant@mail.nick.law"),
+    # Data-retention window for marketing lead PII (ContactSubmission rows and
+    # unsubscribed NewsletterSubscriber rows), enforced by the
+    # `purge_marketing_leads` management command. Lead rows hold name/email/IP
+    # and had no lifecycle at all — indefinite retention is the SOC 2 gap this
+    # closes. 0 = disabled (retain forever): a real value is a policy decision,
+    # so the mechanism ships off and Nick sets the number + schedules the command.
+    MARKETING_LEAD_RETENTION_DAYS=(int, 0),
     # Whole-platform monthly LLM spend ceiling in USD (apps.api.usage). The
     # dollar sibling of CHAT_MONTHLY_GLOBAL_LIMIT (message count): when
     # month-to-date recorded cost crosses this, chat/verify return 503 for
@@ -323,9 +354,11 @@ DOCLING_TIMEOUT = env("DOCLING_TIMEOUT")
 POSTMARK_SERVER_TOKEN = env("POSTMARK_SERVER_TOKEN")
 EMAIL_INBOUND_WEBHOOK_TOKEN = env("EMAIL_INBOUND_WEBHOOK_TOKEN")
 EMAIL_REQUIRE_SENDER_AUTH = env("EMAIL_REQUIRE_SENDER_AUTH")
+EMAIL_TRUSTED_AUTHSERV_IDS = env("EMAIL_TRUSTED_AUTHSERV_IDS")
 EMAIL_LINK_BASE_URL = env("EMAIL_LINK_BASE_URL")
 CONTACT_NOTIFY_EMAIL = env("CONTACT_NOTIFY_EMAIL")
 CONTACT_FROM_EMAIL = env("CONTACT_FROM_EMAIL")
+MARKETING_LEAD_RETENTION_DAYS = env("MARKETING_LEAD_RETENTION_DAYS")
 # Contact notifications OFF is a silent failure mode by construction: the visitor
 # still gets a 200 and the row is still written, so nothing anywhere goes red — we
 # just never look. Say so at boot, once, where the App Platform runtime log will

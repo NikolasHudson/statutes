@@ -32,6 +32,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import os
 import re
 import secrets
@@ -55,7 +56,6 @@ from .models import (
     OAuthToken,
     generate_token,
     hash_token,
-    verify_refresh_token,
 )
 
 SUPPORTED_AUTH_METHODS = {m.value for m in OAuthClient.AuthMethod}
@@ -65,6 +65,15 @@ SUPPORTED_RESPONSE_TYPES = {"code"}
 # stays where it already lives — the user's tier (apps/mcp_server/gating.py) —
 # so the OAuth layer never becomes a second, conflicting permission system.
 SUPPORTED_SCOPES = ["mcp"]
+
+# RFC 7591 registration is unauthenticated by design (a client row is only a
+# name + redirect-URI allowlist and grants nothing until a user consents). But
+# unauthenticated + unbounded is a DB-fill DoS, so cap the total number of
+# registered clients. Set far above any legitimate need — a real deployment has
+# a handful of connector types, not thousands — and easy to raise if ever hit.
+MAX_REGISTERED_CLIENTS = 10_000
+
+logger = logging.getLogger(__name__)
 
 # RFC 7636 §4.1: code_verifier is 43–128 chars of [A-Za-z0-9-._~].
 _VERIFIER_RE = re.compile(r"^[A-Za-z0-9\-._~]{43,128}$")
@@ -242,6 +251,14 @@ def register(request: HttpRequest) -> JsonResponse:
 
     scope = meta.get("scope") or ""
 
+    if OAuthClient.objects.count() >= MAX_REGISTERED_CLIENTS:
+        logger.warning(
+            "oauth_registration_cap_reached count=%s", MAX_REGISTERED_CLIENTS
+        )
+        return _registration_error(
+            "registration temporarily unavailable", code="temporarily_unavailable"
+        )
+
     raw_secret = ""
     secret_hash = ""
     if auth_method != OAuthClient.AuthMethod.NONE:
@@ -404,6 +421,16 @@ def authorize(request: HttpRequest) -> HttpResponse:
                 "client": client,
                 "params": params,
                 "scope_display": params["scope"] or "mcp",
+                # The consent screen is the ONLY human check in the flow, and the
+                # client's name is self-asserted at (unauthenticated) registration
+                # — an attacker can register "Hudson Corpus Official" pointed at
+                # their own redirect_uri and phish a victim here. Exact-match
+                # redirect_uri validation stops the token from actually landing
+                # anywhere unregistered, but the user still deserves to see (a)
+                # that the name is unverified and (b) exactly which host will
+                # receive the authorization, so a redirect to attacker.example is
+                # visible rather than hidden behind a trusted-looking name.
+                "redirect_host": urlsplit(params["redirect_uri"]).netloc,
                 "user": request.user,
                 "brand_name": BRAND_NAME,
             },
@@ -542,18 +569,23 @@ def _token_authorization_code(request, client) -> JsonResponse:
     if code is None or code.client_id != client.pk:
         return _token_error("invalid_grant", "unknown authorization code")
 
-    if code.used_at is not None:
-        # Replay of a consumed code — the OAuth 2.1 stolen-code signal. Revoke
-        # every token descended from it so the attacker AND the legitimate
-        # holder both lose access (the user just re-consents).
-        now = timezone.now()
-        code.tokens.filter(revoked_at__isnull=True).update(revoked_at=now)
+    # Single-use, enforced ATOMICALLY and BEFORE the PKCE check so a stolen code
+    # cannot be retried against a dictionary of verifiers. The read-then-write
+    # this replaces had a TOCTOU: two concurrent redemptions could both observe
+    # used_at IS NULL and both mint a token family, defeating single-use and the
+    # replay mitigation below. A conditional UPDATE lets exactly one request win
+    # the burn; every other (a genuine replay, or the loser of a race) changes
+    # zero rows and is treated as the OAuth 2.1 stolen-code signal — revoke every
+    # token descended from the code so attacker AND holder lose access (the user
+    # just re-consents).
+    burned = OAuthAuthorizationCode.objects.filter(
+        pk=code.pk, used_at__isnull=True
+    ).update(used_at=timezone.now())
+    if burned == 0:
+        code.tokens.filter(revoked_at__isnull=True).update(
+            revoked_at=timezone.now()
+        )
         return _token_error("invalid_grant", "authorization code already used")
-
-    # Single attempt: burn the code BEFORE the PKCE check so a stolen code
-    # cannot be retried against a dictionary of verifiers.
-    code.used_at = timezone.now()
-    code.save(update_fields=["used_at"])
 
     if code.is_expired:
         return _token_error("invalid_grant", "authorization code expired")
@@ -581,17 +613,69 @@ def _token_authorization_code(request, client) -> JsonResponse:
     return _token_success(row, raw_access, raw_refresh)
 
 
-def _token_refresh(request, client) -> JsonResponse:
-    old = verify_refresh_token(request.POST.get("refresh_token", ""))
-    if old is None or old.client_id != client.pk:
-        return _token_error(
-            "invalid_grant", "invalid, expired, or rotated refresh token"
+def _revoke_token_family(token: OAuthToken, now) -> None:
+    """Revoke every still-active token descended from the same authorization
+    code — the OAuth 2.1 §6.1 reuse-detection response, matching what the
+    authorization-code replay path does. If the originating code was since
+    deleted (``authorization_code`` is NULL under SET_NULL), fall back to
+    revoking just this orphan so a reused token still dies."""
+    code = token.authorization_code
+    if code is not None:
+        OAuthToken.objects.filter(
+            authorization_code=code, revoked_at__isnull=True
+        ).update(revoked_at=now)
+    else:
+        OAuthToken.objects.filter(pk=token.pk, revoked_at__isnull=True).update(
+            revoked_at=now
         )
 
-    # Rotation (OAuth 2.1 MUST for public clients): the presented refresh token
-    # dies now; a fresh pair replaces it. New row rather than in-place update
+
+def _token_refresh(request, client) -> JsonResponse:
+    # Look the token up WITHOUT the active/expiry filter (unlike
+    # verify_refresh_token) so a presented-but-already-rotated token is
+    # distinguishable from an unknown one: the former is the reuse signal.
+    raw = request.POST.get("refresh_token", "")
+    old = (
+        OAuthToken.objects.filter(refresh_hashed=hash_token(raw))
+        .select_related("user")
+        .first()
+        if raw
+        else None
+    )
+    # One generic message for every failure — never an oracle for which check failed.
+    invalid = lambda: _token_error(  # noqa: E731
+        "invalid_grant", "invalid, expired, or rotated refresh token"
+    )
+    if old is None or old.client_id != client.pk:
+        return invalid()
+
+    now = timezone.now()
+
+    # Reuse detection: a refresh token already rotated away (revoked) is being
+    # presented again — the stolen-token signal. Revoke the whole grant family so
+    # neither the attacker nor the legitimate holder keeps access; the user
+    # re-consents. The auth-code path already does this on code replay; the
+    # refresh path previously did not, so a stolen refresh token stayed live for
+    # up to its full TTL after the thief redeemed it.
+    if old.revoked_at is not None:
+        _revoke_token_family(old, now)
+        return invalid()
+
+    if not old.user.is_active or now >= old.refresh_expires_at:
+        return invalid()
+
+    # Rotation (OAuth 2.1 MUST for public clients), done ATOMICALLY: revoke the
+    # presented token only if it is still active. A concurrent refresh with the
+    # same token loses this race (rowcount 0) and is treated as reuse — so a race
+    # can no longer mint two live families. New row rather than in-place update
     # keeps the grant chain auditable.
-    old.revoke()
+    rotated = OAuthToken.objects.filter(
+        pk=old.pk, revoked_at__isnull=True
+    ).update(revoked_at=now)
+    if rotated == 0:
+        _revoke_token_family(old, now)
+        return invalid()
+
     row, raw_access, raw_refresh = OAuthToken.issue(
         client=client,
         user=old.user,
