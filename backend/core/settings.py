@@ -688,7 +688,15 @@ if not DEBUG:
     CSRF_COOKIE_NAME = "__Host-csrftoken"
     SECURE_HSTS_SECONDS = 31_536_000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    # No `preload` token, deliberately (2026-07-14, matching both next.config.ts):
+    # serving it is the machine-readable opt-in that hstspreload.org accepts —
+    # from anyone, not just us — and a preloaded entry locks every future
+    # subdomain (staging, partner, white-label) to HTTPS near-permanently.
+    # The HSTS header itself stays: protection for every prior visitor,
+    # reversible by letting max-age lapse. Decision trail: DOMAIN_AND_BRAND_PLAN
+    # resolution #2 (2026-07-13, "keep headers, do not submit") tightened by the
+    # 2026-07-14 SOC2 review to "do not advertise eligibility either".
+    SECURE_HSTS_PRELOAD = False
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "same-origin"
     X_FRAME_OPTIONS = "DENY"

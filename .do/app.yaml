@@ -180,11 +180,9 @@ envs:
 # older than the window are deleted; unsubscribed newsletter emails are erased
 # once the unsubscribe is that old (active subscribers are never touched). 365
 # set 2026-07-14 as the initial policy — adjust freely; 0 disables (retain
-# forever). ENFORCEMENT IS NOT SCHEDULED YET: purge_marketing_leads ships in
-# the uncommitted security-fix code; after that code is pushed, add a worker
-# mirroring trace-purge (`python manage.py purge_marketing_leads --forever`).
-# Adding the worker BEFORE the push would crash the deploy — the command does
-# not exist on origin/main yet.
+# forever). Enforced by the lead-purge worker below (mirrors trace-purge);
+# the command shipped in ca6a14c, so the worker requires that commit (or
+# later) to be the deployed ref.
 - key: MARKETING_LEAD_RETENTION_DAYS
   scope: RUN_TIME
   value: "365"
@@ -574,6 +572,20 @@ workers:
   # note above), so there's no reason to pay for a larger slug here.
   instance_size_slug: apps-s-1vcpu-0.5gb
   run_command: python manage.py purge_chat_traces --forever
+# Marketing-lead retention enforcement (same daily wake-purge-sleep loop and
+# shell-free-argv rules as trace-purge; see MARKETING_LEAD_RETENTION_DAYS at
+# app level for the policy). Command shipped in ca6a14c — do not deploy this
+# worker against an older ref.
+- name: lead-purge
+  dockerfile_path: /Dockerfile
+  source_dir: /
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    deploy_on_push: true
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  run_command: python manage.py purge_marketing_leads --forever
 # Email assistant: drains the inbound-email queue (rows written by the
 # /api/email/inbound webhook), runs the chat pipeline headlessly, replies via
 # Postmark. Same shell-free-argv rule as trace-purge. 1GB (not 0.5) because a
