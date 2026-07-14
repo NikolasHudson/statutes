@@ -150,18 +150,17 @@ services:
   - key: NEXT_PUBLIC_SITE_URL
     scope: BUILD_TIME
     value: https://hudsonlegal.tech
-  # Tranche 3 (2026-07-13): the app has moved to app.hudsonlegal.tech (live,
-  # added as an ALIAS during the corpus.nick.law overlap), so CTAs, the MCP
-  # install snippet and the API origin now point there. NEXT_PUBLIC_ASSISTANT_ADDRESS
-  # is the ONE value still on the old domain: mail.hudsonlegal.tech has no MX yet,
-  # so the site must keep advertising the working assistant@mail.nick.law until the
-  # mail migration — flip it then.
+  # Tranche 3 (2026-07-13): the app has moved to app.hudsonlegal.tech, so CTAs,
+  # the MCP install snippet and the API origin point there. The email assistant
+  # went live on the APEX address assistant@hudsonlegal.tech (2026-07-14, via
+  # Postmark + Cloudflare Email Routing — NOT the plan's mail. subdomain), so
+  # NEXT_PUBLIC_ASSISTANT_ADDRESS was flipped off the old mail.nick.law to match.
   - key: NEXT_PUBLIC_APP_URL
     scope: BUILD_TIME
     value: https://app.hudsonlegal.tech
   - key: NEXT_PUBLIC_ASSISTANT_ADDRESS
     scope: BUILD_TIME
-    value: assistant@mail.nick.law
+    value: assistant@hudsonlegal.tech
   # Empty until Stripe is live. Set to "1" in the same change that flips billing
   # on — it swaps /pricing from pre-launch framing to CTAs that link straight
   # into self-serve checkout, so setting it early points buyers at a checkout
