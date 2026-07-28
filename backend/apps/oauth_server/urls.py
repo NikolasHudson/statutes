@@ -1,4 +1,8 @@
-"""URL routes for the MCP OAuth authorization server (served by Django).
+"""URL routes for the OAuth 2.0 authorization server (served by Django).
+
+Serves every product surface that authenticates with our tokens — the MCP
+transport and ``/api/edms`` today — which is why this lives in its own app
+rather than inside apps.mcp_server, its first consumer.
 
 Mounted at the ROOT of core/urls.py — the ``/.well-known/*`` documents must
 live at the domain root per RFC 8414 / RFC 9728. The ``/mcp``-suffixed
@@ -15,7 +19,9 @@ from django.urls import path
 
 from . import oauth
 
-app_name = "mcp_oauth"
+# Never referenced by reverse() anywhere in the project; kept as a namespace
+# for the include() and renamed with the app.
+app_name = "oauth_server"
 
 urlpatterns = [
     path(

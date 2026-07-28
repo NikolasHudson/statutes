@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "Hudson EDMSpro",
+  "version": "0.2.0",
+  "description": "Save Iowa court filings straight from the docket into your own cloud storage, named and filed the way you want them.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArGz01hAjKgs5zGsJxl9PW7Eh5Gddls2sWqWc/4Nj6KDwDG0PTPa7YA0BrTEBXxZQsyR+87RZb8aujorpYoxoqCXhPnp3+GudcG+88wPf67DDOXf5zMZkpbyqEWYHABIaTj+lSWsetvQbHfl8djWpqAvoCp4ho46e/M8aXtXKPGgxLHz2PCr2YroeE6ppI7fJemQ8L04XbWTwyb1L+yQkdKyOnYTPQPrrqzmh0Cc6qoAzmIYtVL+DzS/KzerrZ5Qda3l4Ir6LeKH4lEkmrC9c6zxRstdVIEfY+e5k9Qm9nGJzMarzVhvZrUmPJaAIUIKTbhvOq5gPE1A/yPL7PeYUcwIDAQAB",
+  "permissions": [
+    "storage",
+    "downloads",
+    "identity",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://*.iowacourts.state.ia.us/*",
+    "https://*.iowacourts.gov/*",
+    "https://app.hudsonlegal.tech/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Hudson EDMSpro",
+    "default_popup": "popup.html"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.iowacourts.state.ia.us/*",
+        "https://*.iowacourts.gov/*"
+      ],
+      "js": [
+        "zip.js",
+        "content.js"
+      ],
+      "css": [
+        "tokens.css",
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "fonts/*"
+      ],
+      "matches": [
+        "https://*.iowacourts.state.ia.us/*",
+        "https://*.iowacourts.gov/*"
+      ]
+    }
+  ]
+}

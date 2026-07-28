@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hudson EDMSpro</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="shell">
+      <div class="shell__brand">
+        <span class="shell__name">HUDSON</span><span class="shell__suffix">EDMSpro</span>
+      </div>
+      <button id="openSettings" class="shell__btn" title="Open EDMSpro settings in Hudson">
+        Settings
+      </button>
+    </header>
+
+    <!-- Signed out ------------------------------------------------------->
+    <section class="pane" id="signedOut" hidden>
+      <p class="pane__lede">
+        Sign in to save filings from the Iowa Courts docket into your own cloud
+        storage.
+      </p>
+      <button id="signIn" class="btn btn--primary">Sign in to Hudson</button>
+      <p class="pane__note" id="signInError" hidden></p>
+      <p class="pane__fine">
+        Sign-in opens a Hudson window. This extension never sees your password.
+      </p>
+    </section>
+
+    <!-- PDF preview ------------------------------------------------------>
+    <section class="preview" id="preview" hidden>
+      <div class="preview__head">
+        <span class="preview__title" id="previewTitle">Filing</span>
+        <button id="previewClose" class="iconbtn" title="Close preview" aria-label="Close preview">
+          ✕
+        </button>
+      </div>
+      <div class="preview__frame">
+        <embed id="previewEmbed" type="application/pdf" />
+      </div>
+      <div class="preview__actions">
+        <button id="previewDownload" class="btn btn--primary btn--sm">Download</button>
+      </div>
+      <p class="pane__note" id="previewNote" hidden></p>
+    </section>
+
+    <!-- Idle ------------------------------------------------------------->
+    <!-- Was "Recent saves", which listed cloud saves. v1 does not save
+         anywhere, so there is no history to show — just say what to do. -->
+    <section class="pane pane--grow" id="idlePane">
+      <p class="pane__fine">
+        Open a filing from the docket with the preview button to read it here,
+        then download it with the name your template produces.
+      </p>
+    </section>
+
+    <!-- Account + connection ---------------------------------------------->
+    <!-- A footer, not a pane: this used to sit above the preview and cost the
+         PDF ~80px of height for information you glance at, not read. One row,
+         pinned to the bottom. Keeps the id `signedIn` because that is the
+         signed-in/out toggle the panel drives. -->
+    <footer class="statusbar" id="signedIn" hidden>
+      <span class="status__dot" id="accountDot"></span>
+      <span class="statusbar__text" id="accountLine">Signed in</span>
+      <button id="signOut" class="linkbtn" title="Sign out of this device">Sign out</button>
+    </footer>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

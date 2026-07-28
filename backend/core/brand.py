@@ -18,6 +18,22 @@ BRAND_NAME = "Hudson Corpus"
 # contracts, the "operated by" line).
 COMPANY_NAME = "Hudson Legal Technologies"
 
+# The court-filing product (apps/edms + the browser extension). Settled
+# 2026-07-28: "Casevault" was the prototype codename and is retired. Long form
+# for page titles, consent copy, the Chrome Web Store listing and the extension
+# manifest; short form for nav entries and anywhere the "Hudson" is already
+# implied by context.
+EDMS_PRODUCT_NAME = "Hudson EDMSpro"
+EDMS_PRODUCT_SHORT_NAME = "EDMSpro"
+
+# The OAuth client_id the EDMSpro browser extension authenticates with.
+#
+# FROZEN once a build ships: the value is compiled into the extension and, like
+# MCP_SERVER_ID above, changing it server-side silently breaks every installed
+# copy with no client-side fix. It is an opaque key, not a name — it must NOT
+# follow a future EDMS_PRODUCT_NAME change.
+EDMS_OAUTH_CLIENT_ID = "hudson-edmspro-extension"
+
 # The MCP server's wire identifier, advertised as serverInfo.name and used as the
 # connector key in the install snippet.
 #

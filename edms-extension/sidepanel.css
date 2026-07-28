@@ -1,0 +1,282 @@
+/*
+ * Side panel — Carbon vocabulary, tokens from tokens.css.
+ *
+ * Layout constraint worth stating: Chrome's side panel opens around 360–400px
+ * and the user can drag it wider. A letter-size PDF wants ~700px to read
+ * comfortably, so the preview is sized in viewport units and gets as much
+ * height as the panel has — the docket stays visible and clickable beside it,
+ * which is the whole point of previewing here instead of in a modal.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+/* A DEFINITE height, not just min-height: the preview fills the panel by
+ * flexing, and a flex chain rooted in an auto-height document gives its
+ * children nothing to resolve against. */
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--cds-text);
+  background: var(--cds-bg);
+}
+
+/* --- shell header --- */
+
+.shell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 48px;
+  padding: 0 8px 0 16px;
+  background: var(--cds-shell-bg);
+  border-bottom: 1px solid var(--cds-shell-border);
+  flex: 0 0 auto;
+}
+
+.shell__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  letter-spacing: 0.02em;
+}
+
+.shell__name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #fff;
+}
+
+.shell__suffix {
+  font-size: 13px;
+  color: var(--cds-shell-muted);
+}
+
+.shell__btn {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--cds-shell-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.shell__btn:hover {
+  background: var(--cds-shell-hover);
+  color: #fff;
+}
+
+/* --- panes --- */
+
+.pane {
+  padding: 16px;
+  border-bottom: 1px solid var(--cds-border);
+  flex: 0 0 auto;
+}
+
+.pane--grow {
+  flex: 1 1 auto;
+  border-bottom: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.pane__lede {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cds-text-2);
+}
+
+.pane__fine {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--cds-helper);
+}
+
+.pane__note {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--cds-danger);
+  background: var(--cds-layer);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--cds-text-2);
+}
+
+/* --- buttons --- */
+
+.btn {
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--cds-border-strong);
+  background: transparent;
+  color: var(--cds-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 70ms;
+}
+
+.btn:hover {
+  background: var(--cds-layer-hover);
+}
+
+.btn--primary {
+  border-color: var(--cds-blue);
+  background: var(--cds-blue);
+  color: #fff;
+}
+
+.btn--primary:hover {
+  background: var(--cds-blue-hover);
+}
+
+.btn--primary:active {
+  background: var(--cds-blue-active);
+}
+
+.btn--sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.linkbtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--cds-link);
+  cursor: pointer;
+}
+
+.linkbtn:hover {
+  text-decoration: underline;
+}
+
+.iconbtn {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: none;
+  color: var(--cds-text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.iconbtn:hover {
+  background: var(--cds-layer-hover);
+  color: var(--cds-text);
+}
+
+/* --- status --- */
+
+.status__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  background: var(--cds-success);
+}
+
+/* --- status footer --- */
+
+/* One row pinned under everything else: a dot plus the signed-in account.
+ * It used to be a block above the preview, taxing the PDF for space to show a
+ * OneDrive connection state that v1 no longer has. */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  border-top: 1px solid var(--cds-border);
+  background: var(--cds-layer);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--cds-text-2);
+}
+
+.statusbar__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- preview --- */
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-bottom: 1px solid var(--cds-border);
+}
+
+.preview__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 8px 8px 16px;
+  border-bottom: 1px solid var(--cds-border);
+}
+
+.preview__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* The frame is itself a flex container so the embed can GROW into it. The
+ * previous `height: 100%` on the embed silently resolved to auto — the frame's
+ * height came from min-height + flex, which leaves the computed `height` auto,
+ * so a percentage has no base and <embed> fell back to a replaced element's
+ * ~150px default. Flexing has no such dependency. */
+.preview__frame {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--cds-layer);
+}
+
+.preview__frame embed {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+}
+
+.preview__actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+[hidden] {
+  display: none !important;
+}

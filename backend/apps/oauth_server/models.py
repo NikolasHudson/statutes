@@ -85,6 +85,11 @@ class OAuthClient(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        # Table name predates the split of the OAuth authorization
+        # server out of apps.mcp_server. Pinned so the move is a
+        # state-only migration: no ALTER TABLE, no deploy window
+        # where the old image queries a renamed table.
+        db_table = "mcp_server_oauthclient"
         ordering = ("-created_at",)
 
     def __str__(self):
@@ -134,6 +139,11 @@ class OAuthAuthorizationCode(models.Model):
     used_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        # Table name predates the split of the OAuth authorization
+        # server out of apps.mcp_server. Pinned so the move is a
+        # state-only migration: no ALTER TABLE, no deploy window
+        # where the old image queries a renamed table.
+        db_table = "mcp_server_oauthauthorizationcode"
         ordering = ("-created_at",)
 
     def __str__(self):
@@ -180,6 +190,11 @@ class OAuthToken(models.Model):
     revoked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        # Table name predates the split of the OAuth authorization
+        # server out of apps.mcp_server. Pinned so the move is a
+        # state-only migration: no ALTER TABLE, no deploy window
+        # where the old image queries a renamed table.
+        db_table = "mcp_server_oauthtoken"
         ordering = ("-created_at",)
 
     def __str__(self):

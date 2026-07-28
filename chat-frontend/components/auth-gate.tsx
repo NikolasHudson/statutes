@@ -42,6 +42,11 @@ export type AuthUser = {
 	// Gates the staff-flag controls on /admin/users. Display-only — the
 	// server re-checks superuser on every admin write.
 	is_superuser?: boolean;
+	// Feature strings the plan includes (apps/api/auth.FEATURES_BY_TIER) — the
+	// same source the 402/403 gate reads. Lets the nav hide product entries the
+	// account has no plan for without a probe request per product. Display-only,
+	// and optional so a cached pre-field response simply shows nothing extra.
+	features?: string[];
 };
 
 // Session-scoped flag so the first-login redirect into the wizard fires once

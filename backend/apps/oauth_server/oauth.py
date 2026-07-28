@@ -1,13 +1,22 @@
-"""OAuth 2.0 authorization server endpoints for the MCP server.
+"""OAuth 2.0 authorization server — the app's single token issuer.
 
-The MCP spec (2025-06-18 authorization) models a remote MCP server as an
-OAuth 2.1 resource server discovered via RFC 9728 Protected Resource Metadata,
-with an authorization server discovered via RFC 8414. We co-host both roles:
-these Django views ARE the authorization server (they own users, sessions, and
-the login page), and the MCP ASGI app (apps/mcp_server/auth.py) is the
-resource server that validates the issued Bearer tokens.
+These Django views ARE the authorization server (they own users, sessions, and
+the login page). They serve every surface that authenticates with our tokens,
+each of which is a resource server validating what this module issues:
 
-Endpoints (all rooted at the public domain — see apps/mcp_server/urls.py):
+* the MCP transport (apps/mcp_server/auth.py), scope ``mcp``
+* ``/api/edms`` for the EDMSpro extension (apps/api/bearer_auth.py), scope
+  ``edms``
+
+It lived in ``apps.mcp_server`` until 2026-07-28, because MCP was its first
+consumer — the shape the MCP spec (2025-06-18 authorization) asks for, where a
+remote MCP server is an OAuth 2.1 resource server discovered via RFC 9728
+Protected Resource Metadata with an authorization server discovered via
+RFC 8414. Two consumers made that ownership wrong, so the server moved out and
+MCP became one caller among several. The tables kept their ``mcp_server_*``
+names to make the move zero-downtime (see migrations/0001_initial.py).
+
+Endpoints (all rooted at the public domain — see apps/oauth_server/urls.py):
 
 * ``GET /.well-known/oauth-authorization-server``  — RFC 8414 AS metadata
 * ``GET /.well-known/oauth-protected-resource``    — RFC 9728 PRM (+ the
@@ -61,10 +70,65 @@ from .models import (
 SUPPORTED_AUTH_METHODS = {m.value for m in OAuthClient.AuthMethod}
 SUPPORTED_GRANT_TYPES = {"authorization_code", "refresh_token"}
 SUPPORTED_RESPONSE_TYPES = {"code"}
-# One coarse scope: access to the MCP tool surface. Fine-grained entitlement
-# stays where it already lives — the user's tier (apps/mcp_server/gating.py) —
-# so the OAuth layer never becomes a second, conflicting permission system.
-SUPPORTED_SCOPES = ["mcp"]
+# One coarse scope PER PRODUCT SURFACE, not per operation. Fine-grained
+# entitlement stays where it already lives — the user's tier
+# (apps/mcp_server/gating.py, apps/api/auth.require_feature_for_user) — so the
+# OAuth layer never becomes a second, conflicting permission system.
+#
+# ``edms`` was added 2026-07-28 for the Hudson EDMSpro browser extension, which
+# authenticates with ``chrome.identity.launchWebAuthFlow`` against this same
+# authorization server. It is a real boundary, not a label, and both halves are
+# enforced: an ``mcp`` token cannot call ``/api/edms``
+# (apps/api/bearer_auth.py), and an ``edms`` token cannot drive the MCP tool
+# surface (apps/mcp_server/auth.py). Which scopes a given client may request at
+# all is a separate question, answered by :func:`allowed_scopes`.
+SUPPORTED_SCOPES = ["mcp", "edms"]
+
+# What a client may obtain by *self-registering* (RFC 7591 DCR is open — see
+# ``register`` below). ``edms`` is deliberately absent: it reaches a user's
+# filing history and their connected cloud drive, so it is attached only to
+# first-party client rows seeded by ``manage.py seed_edms_oauth_client``, which
+# writes the row directly and never goes through this endpoint. Without this
+# clamp, anyone could register a client named "Hudson EDMSpro", request
+# ``scope=edms``, and phish a signed-in attorney into consenting.
+OPEN_REGISTRATION_SCOPES = {"mcp"}
+
+# What each scope actually lets a client do, in the user's words. This is the
+# consent screen's whole job — a screen that says "scope: edms" and nothing else
+# is a click-through, not a decision.
+SCOPE_GRANTS: dict[str, list[str]] = {
+    "mcp": [
+        "Search and read Iowa statutes, court rules, and caselaw",
+        "Run citation and quote verification",
+    ],
+    "edms": [
+        "Save court filings to the cloud storage you have connected",
+        "Read and update your filing folder and file-naming settings",
+        "See your filing history",
+    ],
+}
+
+
+def allowed_scopes(client: OAuthClient) -> set[str]:
+    """The scopes ``client`` is registered to request.
+
+    An empty registered scope means the client never declared one — every MCP
+    connector registered before scopes existed is in that state, and most DCR
+    clients omit the field — so it defaults to ``mcp`` rather than to nothing,
+    which would lock out every already-registered connector.
+    """
+    registered = set((client.scope or "").split()) & set(SUPPORTED_SCOPES)
+    return registered or {"mcp"}
+
+
+def scope_grants(scope: str) -> list[str]:
+    """Consent-screen bullets for the requested scopes, de-duplicated in order."""
+    seen: list[str] = []
+    for name in (scope or "mcp").split():
+        for grant in SCOPE_GRANTS.get(name, []):
+            if grant not in seen:
+                seen.append(grant)
+    return seen
 
 # RFC 7591 registration is unauthenticated by design (a client row is only a
 # name + redirect-URI allowlist and grants nothing until a user consents). But
@@ -250,6 +314,12 @@ def register(request: HttpRequest) -> JsonResponse:
         return _registration_error("client_name must be a string")
 
     scope = meta.get("scope") or ""
+    if not isinstance(scope, str):
+        scope = ""
+    # Clamp rather than reject: RFC 7591 §3.2.1 lets the server issue a
+    # narrower scope than asked, and the response echoes what was actually
+    # granted (``client.scope``, below), so a client can see what it got.
+    scope = " ".join(s for s in scope.split() if s in OPEN_REGISTRATION_SCOPES)
 
     if OAuthClient.objects.count() >= MAX_REGISTERED_CLIENTS:
         logger.warning(
@@ -271,7 +341,7 @@ def register(request: HttpRequest) -> JsonResponse:
         redirect_uris=redirect_uris,
         token_endpoint_auth_method=auth_method,
         grant_types=sorted(set(grant_types) | {"refresh_token"}),
-        scope=scope[:200] if isinstance(scope, str) else "",
+        scope=scope[:200],
     )
 
     body = {
@@ -311,7 +381,7 @@ def _error_page(request, description: str, status: int = 400) -> HttpResponse:
     redirecting to an unvalidated URI would be an open redirect."""
     return render(
         request,
-        "mcp_server/oauth_error.html",
+        "oauth_server/oauth_error.html",
         {"description": description, "brand_name": BRAND_NAME},
         status=status,
     )
@@ -386,6 +456,17 @@ def _validate_authorize_params(request, params: dict):
         return None, _redirect_error(
             redirect_uri, "invalid_scope", "unsupported scope requested", state
         )
+    # A client may only ask for what it is registered for. Validating against
+    # SUPPORTED_SCOPES alone would let any self-registered client request
+    # ``edms``; ``client.scope`` was being stored and echoed but never read.
+    grantable = allowed_scopes(client)
+    if any(s not in grantable for s in requested):
+        return None, _redirect_error(
+            redirect_uri,
+            "invalid_scope",
+            "client is not registered for the requested scope",
+            state,
+        )
     return client, None
 
 
@@ -416,11 +497,12 @@ def authorize(request: HttpRequest) -> HttpResponse:
     if request.method == "GET":
         return render(
             request,
-            "mcp_server/oauth_authorize.html",
+            "oauth_server/oauth_authorize.html",
             {
                 "client": client,
                 "params": params,
                 "scope_display": params["scope"] or "mcp",
+                "scope_grants": scope_grants(params["scope"]),
                 # The consent screen is the ONLY human check in the flow, and the
                 # client's name is self-asserted at (unauthenticated) registration
                 # — an attacker can register "Hudson Corpus Official" pointed at

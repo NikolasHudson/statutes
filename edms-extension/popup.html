@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hudson EDMSpro</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="shell">
+      <div class="shell__brand">
+        <span class="shell__name">HUDSON</span><span class="shell__suffix">EDMSpro</span>
+      </div>
+      <button id="openDemo" class="shell__btn" title="Open demo docket">Demo</button>
+    </header>
+
+    <div class="conn" id="connStatus">Checking…</div>
+
+    <section class="card">
+      <button id="openPanel" class="btn btn--primary">Open side panel</button>
+      <p class="card__hint">
+        Sign in, preview filings, and download them without leaving the docket.
+      </p>
+    </section>
+
+    <footer class="ftr">
+      <button id="openSettings" class="ftr__btn">EDMSpro settings</button>
+      <button id="openOptions" class="ftr__btn">This device</button>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

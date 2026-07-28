@@ -39,21 +39,38 @@ TIER_DAILY_QUOTA: dict[str, int | None] = {
 
 # Features locked behind paid tiers. Free callers can do citation lookups and
 # a small amount of search; everything else is gated.
+#
+# ``edms`` (Hudson EDMSpro — court-filing routing, apps/edms) is included in
+# every paid tier rather than sold as an add-on: it is the differentiator
+# against LexIowa, and a feature you have to notice and buy separately is a
+# feature most subscribers never discover. One row here is all that has to
+# change if that decision is ever revisited.
 FEATURES_BY_TIER: dict[str, set[str]] = {
     Tier.FREE: {"lookup", "search"},
     Tier.SOLO: {
         "lookup", "search", "history", "at_date", "cross_refs",
-        "definitions", "amendments", "validate",
+        "definitions", "amendments", "validate", "edms",
     },
     Tier.FIRM: {
         "lookup", "search", "history", "at_date", "cross_refs",
-        "definitions", "amendments", "validate",
+        "definitions", "amendments", "validate", "edms",
     },
     Tier.CUSTOM: {
         "lookup", "search", "history", "at_date", "cross_refs",
-        "definitions", "amendments", "validate",
+        "definitions", "amendments", "validate", "edms",
     },
 }
+
+
+def features_for(user) -> list[str]:
+    """The feature strings this user's plan includes, sorted.
+
+    Display-only — served by ``/api/auth/me`` so the SPA can hide nav entries
+    for products the user has no plan for. Every endpoint still enforces its own
+    gate server-side; a stale or forged list buys nothing."""
+    if user is None or not getattr(user, "is_authenticated", False):
+        return []
+    return sorted(FEATURES_BY_TIER.get(user.tier, set()))
 
 
 @dataclass
@@ -93,6 +110,32 @@ class ApiKeyAuth(APIKeyHeader):
 api_key_auth = ApiKeyAuth()
 
 
+def require_feature_for_user(user, feature: str) -> None:
+    """Raise 402/403 if ``user``'s plan doesn't include ``feature``.
+
+    The gate itself, expressed in terms of the user — because the caller is not
+    always an API key any more. ``/api/edms`` accepts three credential shapes
+    (OAuth Bearer from the extension, ``X-API-Key``, session cookie from the
+    SPA) and all three must land on exactly this policy; a gate that only knew
+    how to read an ``APIKey`` row would have meant a second, drifting copy for
+    the other two.
+    """
+    from apps.tenancy.services import has_paid_access
+
+    if not has_paid_access(user):
+        raise HttpError(
+            402,
+            "An active plan is required to use the API. Start your free trial "
+            "at Account → Billing in the app.",
+        )
+    allowed = FEATURES_BY_TIER.get(user.tier, set())
+    if feature not in allowed:
+        raise HttpError(
+            403,
+            f"Feature '{feature}' is not available on the {user.tier} tier.",
+        )
+
+
 def require_feature(api_key: APIKey, feature: str) -> None:
     """Raise 403 if ``api_key``'s tier doesn't include ``feature``.
 
@@ -101,20 +144,7 @@ def require_feature(api_key: APIKey, feature: str) -> None:
     for the beta era). One chokepoint covers both headless surfaces — the REST
     ``X-API-Key`` routes and MCP (apps/mcp_server/gating.py calls this).
     """
-    from apps.tenancy.services import has_paid_access
-
-    if not has_paid_access(api_key.user):
-        raise HttpError(
-            402,
-            "An active plan is required to use the API. Start your free trial "
-            "at Account → Billing in the app.",
-        )
-    allowed = FEATURES_BY_TIER.get(api_key.user.tier, set())
-    if feature not in allowed:
-        raise HttpError(
-            403,
-            f"Feature '{feature}' is not available on the {api_key.user.tier} tier.",
-        )
+    require_feature_for_user(api_key.user, feature)
 
 
 def check_rate_limit(api_key: APIKey) -> RateLimitDecision:

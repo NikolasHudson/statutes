@@ -26,17 +26,22 @@
             font-size: .78125rem; line-height: 1.4; color: #525252; margin: 1rem 0; }
     .warn strong { color: #161616; }
     .host { font-family: 'IBM Plex Mono', monospace; word-break: break-all; }
+    .grants { font-size: .875rem; line-height: 1.5; color: #525252;
+              margin: .75rem 0 0; padding-left: 1.25rem; }
+    .grants li { margin-bottom: .25rem; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>Authorize connector</h1>
     <p>
-      <strong>{{ client.client_name|default:"An MCP client" }}</strong> is requesting
-      access to the {{ brand_name }} MCP server on your behalf. It will be able to
-      search and read Iowa statutes, court rules, and caselaw, and run citation and
-      quote verification — with your account's plan limits.
+      <strong>{{ client.client_name|default:"An application" }}</strong> is requesting
+      access to your {{ brand_name }} account. If you approve, it will be able to —
+      within your account's plan limits:
     </p>
+    <ul class="grants">
+      {% for grant in scope_grants %}<li>{{ grant }}</li>{% endfor %}
+    </ul>
     <div class="warn">
       This connector's name is <strong>self-reported and unverified</strong>. If you
       approve, your authorization is sent to <span class="host">{{ redirect_host|default:"an unknown host" }}</span>.

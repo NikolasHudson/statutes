@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Demo Docket — Hudson EDMSpro</title>
+    <link rel="stylesheet" href="docket.css" />
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../content.css" />
+  </head>
+  <body>
+    <div class="mock-frame">
+      <div class="mock-frame__bar">
+        <span class="mock-frame__dot"></span>
+        <span class="mock-frame__dot"></span>
+        <span class="mock-frame__dot"></span>
+        <span class="mock-frame__url">iowacourts.state.ia.us / efile / docket</span>
+      </div>
+
+      <header class="mock-hdr">
+        <div class="mock-hdr__title">Iowa Judicial Branch — eFile</div>
+        <nav class="mock-hdr__nav">
+          <a>Cases</a><a>Filings</a><a>Calendar</a><a>Account</a>
+        </nav>
+      </header>
+
+      <div class="mock-toolbar">
+        <strong>Switch demo case:</strong>
+        <button class="mock-toolbar__btn is-active" data-case="civil">Civil (CVCV)</button>
+        <button class="mock-toolbar__btn" data-case="juvenile">Juvenile (JDJV)</button>
+        <button class="mock-toolbar__btn" data-case="dissolution">Dissolution (DMDM)</button>
+      </div>
+
+      <main class="docket" data-cv-docket>
+        <!-- EDMSpro banner injects here -->
+
+        <section class="case-header">
+          <div class="case-header__left">
+            <h1 class="case-header__caption" data-cv-field="caption">State of Iowa v. Acme Holdings LLC</h1>
+            <div class="case-header__meta">
+              <span><label>Case Number</label><strong data-cv-field="case-number">CVCV012345</strong></span>
+              <span><label>Type</label><strong data-cv-field="case-type">Civil — Contract</strong></span>
+              <span><label>County</label><strong data-cv-field="county">Polk</strong></span>
+              <span><label>Judge</label><strong data-cv-field="judge">Hon. Margaret Smith</strong></span>
+              <span><label>Filed</label><strong data-cv-field="filed-date">2024-03-15</strong></span>
+              <span class="status status--open">Open</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="filings">
+          <h2>Docket entries</h2>
+          <ol class="filings__list" id="filingsList">
+            <!-- populated by docket.js -->
+          </ol>
+        </section>
+      </main>
+
+      <footer class="mock-ftr">
+        This is a simulated docket page for previewing the Hudson EDMSpro extension. No data is real.
+      </footer>
+    </div>
+
+    <script src="docket.js"></script>
+    <script src="../content.js"></script>
+  </body>
+</html>

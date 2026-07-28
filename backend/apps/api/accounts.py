@@ -42,6 +42,7 @@ from ninja.errors import HttpError
 from apps.accounts.audit import AuditEvent, client_ip, record_event
 from apps.accounts.models import APIKey, User, UserProfile, generate_key
 from apps.accounts.profile import CitationStyle, Role, SearchScope, Theme
+from apps.api.auth import features_for
 from apps.api.session_auth import csrf_protect, session_auth
 from apps.tenancy import services as tenancy
 
@@ -126,6 +127,11 @@ class UserOut(Schema):
     # The SPA renders its paywall off this; the server re-enforces with 402 on
     # every interactive endpoint regardless.
     paid_access: bool = True
+    # The plan's feature strings (apps/api/auth.FEATURES_BY_TIER) — the same
+    # source the 402/403 gate reads. Lets the SPA hide nav entries for products
+    # the account has no plan for (e.g. "EDMSpro") without a probe request per
+    # product. Display-only: a stale or edited list opens nothing.
+    features: list[str] = []
 
 
 class CreateKeyRequest(Schema):
@@ -268,6 +274,7 @@ def _user_out(user: User) -> UserOut:
         is_superuser=user.is_superuser,
         org=_org_out(user),
         paid_access=tenancy.has_paid_access(user),
+        features=features_for(user),
     )
 
 

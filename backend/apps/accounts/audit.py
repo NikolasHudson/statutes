@@ -77,6 +77,16 @@ class AuditEvent(models.Model):
         ORG_INVITE_REVOKE = "org_invite_revoke", "Org invitation revoked"
         ORG_INVITE_ACCEPT = "org_invite_accept", "Org invitation accepted"
         ORG_UPDATE = "org_update", "Organization updated"
+        # Hudson EDMSpro (apps.edms). The cloud connection is standing, offline
+        # access to an attorney's document store, and a contribution is a client
+        # document leaving their control — both are exactly the kind of consent
+        # decision this trail exists to be able to reconstruct later.
+        EDMS_CONNECT = "edms_connect", "EDMSpro cloud account connected"
+        EDMS_DISCONNECT = "edms_disconnect", "EDMSpro cloud account disconnected"
+        EDMS_OPT_IN = "edms_opt_in", "EDMSpro contribution opt-in enabled"
+        EDMS_OPT_OUT = "edms_opt_out", "EDMSpro contribution opt-in disabled"
+        EDMS_CONTRIBUTE = "edms_contribute", "EDMSpro filing contributed"
+        EDMS_PURGE = "edms_purge", "EDMSpro contributions purged"
 
     class Outcome(models.TextChoices):
         SUCCESS = "success", "Success"

@@ -32,6 +32,7 @@ from apps.corpus.services.lookups import (
 from apps.corpus.services.search import hybrid_search
 
 from apps.billing.api import billing_router
+from apps.edms.api import edms_router
 from apps.mail.api import mail_router
 from apps.marketing.api import marketing_router
 
@@ -103,6 +104,11 @@ api.add_router("/org", orgs_router)
 # is the source of truth for Subscription state. The webhook is auth=None and
 # CSRF-exempt — it is signature-verified instead.
 api.add_router("/billing", billing_router)
+# Hudson EDMSpro (apps/edms): court-filing routing for the browser extension and
+# its SPA settings page. Auth is Bearer (OAuth, scope-locked to `edms`) OR
+# X-API-Key OR session — three clients, one policy (apps/edms/auth.py) — and
+# every route is gated on the `edms` plan feature.
+api.add_router("/edms", edms_router)
 
 
 # ---------------------------------------------------------------------------

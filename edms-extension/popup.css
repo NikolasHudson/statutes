@@ -1,0 +1,173 @@
+/* Hudson EDMSpro popup — Carbon v11. Tokens + Plex come from tokens.css. */
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--cds-text);
+  background: var(--cds-bg);
+  width: 320px;
+}
+
+/* UI-shell header — g100-dark in both themes, per Carbon convention */
+.shell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  background: var(--cds-shell-bg);
+  border-bottom: 1px solid var(--cds-shell-border);
+  color: #fff;
+}
+.shell__name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.shell__suffix {
+  margin-left: 6px;
+  font-size: 14px;
+  color: var(--cds-shell-muted);
+}
+.shell__btn {
+  all: unset;
+  cursor: pointer;
+  height: 48px;
+  margin-right: -16px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cds-shell-muted);
+  transition: background 0.11s ease, color 0.11s ease;
+}
+.shell__btn:hover {
+  background: var(--cds-shell-hover);
+  color: #fff;
+}
+.shell__btn:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: -2px;
+}
+
+.conn {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--cds-border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cds-helper);
+  border-left: 3px solid transparent;
+}
+
+.conn--ok { border-left-color: var(--cds-success); color: var(--cds-text-2); }
+.conn--warn { border-left-color: var(--cds-warning); color: var(--cds-text-2); }
+
+.card {
+  padding: 16px;
+  border-bottom: 1px solid var(--cds-border);
+}
+.card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.card__head { margin-bottom: 12px; }
+.card__label {
+  font-size: 14px;
+}
+.card__hint {
+  font-size: 12px;
+  color: var(--cds-helper);
+  margin-top: 2px;
+}
+
+/* Primary action — square, Carbon blue */
+.btn {
+  width: 100%;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--cds-border-strong);
+  background: transparent;
+  color: var(--cds-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 70ms;
+}
+.btn:hover { background: var(--cds-layer-hover); }
+.btn:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: -2px;
+}
+.btn--primary {
+  border-color: var(--cds-blue);
+  background: var(--cds-blue);
+  color: #fff;
+}
+.btn--primary:hover { background: var(--cds-blue-hover); }
+.btn--primary:active { background: var(--cds-blue-active); }
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.list:empty { display: none; }
+.list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--cds-layer);
+  font-size: 12px;
+}
+.list li + li {
+  border-top: 1px solid var(--cds-border);
+}
+.list li .name {
+  color: var(--cds-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.list li .when {
+  color: var(--cds-helper);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.ftr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px 8px 8px;
+}
+.ftr__btn {
+  all: unset;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--cds-link);
+  padding: 6px 8px;
+  transition: background 0.11s ease;
+}
+.ftr__btn:hover { background: var(--cds-layer-hover); }
+.ftr__btn:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: -2px;
+}
+.ftr__ver {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cds-helper);
+}

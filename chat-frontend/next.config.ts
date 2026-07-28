@@ -53,17 +53,34 @@ const nextConfig: NextConfig = {
 	// size of a full node_modules copy.
 	output: "standalone",
 
-	// Dev only: forward /api/* server-side to Django on :8000 so the browser
-	// stays same-origin (works in Codespaces port-forwarding and keeps
-	// session cookies happy). In production /api/* is routed to the Django
-	// component by App Platform's ingress rules — the Next.js app never
-	// proxies anything itself.
+	// Dev only: forward server-side to Django on :8000 so the browser stays
+	// same-origin (works in Codespaces port-forwarding and keeps session
+	// cookies happy). In production these are routed to the Django component
+	// by App Platform's ingress rules — the Next.js app never proxies anything
+	// itself.
+	//
+	// /oauth and /.well-known/oauth-* are here for the same reason /api is, and
+	// the EDMSpro extension makes it load-bearing: without them the OAuth flow
+	// is reachable only on :8000, so dev needs a SECOND forwarded port, and the
+	// logged-out /oauth/authorize redirect to LOGIN_URL="/" lands on Django
+	// (404) instead of the SPA. Proxying them puts the whole flow on one origin
+	// exactly as production serves it.
 	async rewrites() {
 		if (isProd) return [];
 		return [
 			{
 				source: "/api/:path*",
 				destination: "http://localhost:8000/api/:path*",
+			},
+			{
+				source: "/oauth/:path*",
+				destination: "http://localhost:8000/oauth/:path*",
+			},
+			{
+				// Whole namespace, not `oauth-:path*` — path-to-regexp rejects a
+				// repeated param with no separator before it.
+				source: "/.well-known/:path*",
+				destination: "http://localhost:8000/.well-known/:path*",
 			},
 		];
 	},

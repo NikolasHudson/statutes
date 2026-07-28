@@ -7,7 +7,7 @@ will dial into, so it has to be authenticated.
 Two credentials are accepted, checked in this order:
 
 1. ``Authorization: Bearer <token>`` — an OAuth 2.0 access token issued by
-   our co-hosted authorization server (apps/mcp_server/oauth.py). This is the
+   our co-hosted authorization server (apps/oauth_server/oauth.py). This is the
    MCP-spec path and what claude.ai's connector UI uses. Tokens are opaque
    bearers verified by hashed lookup (:func:`models.verify_access_token`);
    the resolved token is wrapped in :class:`BearerPrincipal` so the existing
@@ -186,7 +186,9 @@ def api_key_middleware(app: ASGIApp) -> ASGIApp:
             # Bearer token 401s immediately — it must NOT fall through to the
             # X-API-Key check, so a spec-following client sees the
             # WWW-Authenticate challenge and re-runs the OAuth flow.
-            from .models import verify_access_token as _verify_token
+            from apps.oauth_server.models import (
+                verify_access_token as _verify_token,
+            )
 
             token = await sync_to_async(_verify_token, thread_sensitive=True)(
                 bearer
@@ -203,6 +205,31 @@ def api_key_middleware(app: ASGIApp) -> ASGIApp:
                         (
                             b"www-authenticate",
                             _www_authenticate(scope, error="invalid_token"),
+                        )
+                    ],
+                )
+                return
+            # Scope is a boundary, not a label. /api/edms refuses an ``mcp``
+            # token (apps/api/bearer_auth.py); this is the other half. An
+            # ``edms`` token must not drive the MCP tool surface — the EDMSpro
+            # consent screen lists only the three filing grants, so the
+            # research surface is something the user was never asked about.
+            # Tokens minted before SUPPORTED_SCOPES grew past ``mcp`` carry an
+            # empty scope, hence the default: empty means ``mcp``, not nothing.
+            if "mcp" not in (token.scope or "mcp").split():
+                body, status = _unauthorized(
+                    "access token is not scoped for the MCP surface"
+                )
+                await _send_json(
+                    send,
+                    body,
+                    status,
+                    extra_headers=[
+                        (
+                            b"www-authenticate",
+                            _www_authenticate(
+                                scope, error="insufficient_scope"
+                            ),
                         )
                     ],
                 )

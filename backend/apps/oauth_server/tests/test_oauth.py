@@ -34,7 +34,7 @@ from django.utils import timezone
 
 from apps.accounts.models import APIKey, generate_key
 from apps.mcp_server.auth import BearerPrincipal, api_key_middleware
-from apps.mcp_server.models import (
+from apps.oauth_server.models import (
     OAuthAuthorizationCode,
     OAuthClient,
     OAuthToken,
@@ -849,3 +849,151 @@ class BearerTransportTests(OAuthFlowMixin, TestCase):
         )
         self.assertEqual(status, 204)
         self.assertEqual(recorder.calls[0]["mcp_api_key"].user_id, self.user.pk)
+
+
+# ---------------------------------------------------------------------------
+# Scope boundaries (both halves + backward compatibility)
+# ---------------------------------------------------------------------------
+
+class ScopeBoundaryTests(OAuthFlowMixin, TestCase):
+    """``edms`` is a privilege boundary, so it has to hold in three places.
+
+    Who may *ask* for it (only first-party client rows, not open DCR), what an
+    ``edms`` token may *reach* (not the MCP tool surface), and — the part that
+    breaks live users if it is wrong — that clients and tokens predating scopes
+    keep working.
+    """
+
+    def _seed_first_party_client(self, scope="edms"):
+        """The row ``manage.py seed_edms_oauth_client`` writes: created
+        directly, deliberately never through the open /oauth/register."""
+        return OAuthClient.objects.create(
+            client_id="hudson-edmspro-extension",
+            client_secret_hash="",
+            client_name="Hudson EDMSpro",
+            redirect_uris=[REDIRECT_URI],
+            token_endpoint_auth_method=OAuthClient.AuthMethod.NONE,
+            grant_types=["authorization_code", "refresh_token"],
+            scope=scope,
+        )
+
+    def test_open_registration_clamps_away_edms(self):
+        """A self-registered client asking for edms is granted mcp instead.
+        RFC 7591 lets us narrow, and the response says what was granted."""
+        reg = self.register_client(scope="edms")
+        self.assertEqual(reg["scope"], "")
+        client = OAuthClient.objects.get(client_id=reg["client_id"])
+        self.assertNotIn("edms", (client.scope or "").split())
+
+    def test_self_registered_client_cannot_authorize_edms(self):
+        """The phishing path: register a lookalike client, then walk a
+        signed-in attorney through a consent screen for their filings."""
+        _verifier, challenge = _pkce_pair()
+        reg = self.register_client(client_name="Hudson EDMSpro", scope="edms")
+        self.client.force_login(self.user)
+        resp = self.client.get(
+            "/oauth/authorize",
+            data=self.authorize_params(
+                reg["client_id"], challenge, scope="edms"
+            ),
+        )
+        self.assertEqual(resp.status_code, 302)
+        query = parse_qs(urlsplit(resp["Location"]).query)
+        self.assertEqual(query["error"], ["invalid_scope"])
+        self.assertEqual(query["state"], ["xyz123"])
+        self.assertNotIn("code", query)
+        self.assertFalse(OAuthAuthorizationCode.objects.exists())
+
+    def test_consent_post_cannot_smuggle_edms_past_the_get_check(self):
+        """The POST re-validates, so a tampered hidden field buys nothing."""
+        _verifier, challenge = _pkce_pair()
+        reg = self.register_client()
+        self.client.force_login(self.user)
+        params = self.authorize_params(
+            reg["client_id"], challenge, scope="edms"
+        )
+        resp = self.client.post(
+            "/oauth/authorize", data={**params, "action": "approve"}
+        )
+        self.assertEqual(resp.status_code, 302)
+        query = parse_qs(urlsplit(resp["Location"]).query)
+        self.assertEqual(query["error"], ["invalid_scope"])
+        self.assertFalse(OAuthToken.objects.exists())
+
+    def test_first_party_client_may_obtain_edms(self):
+        """The clamp must not break the product it was added for."""
+        verifier, challenge = _pkce_pair()
+        client = self._seed_first_party_client()
+        code = self.obtain_code(client.client_id, challenge, scope="edms")
+        resp = self.exchange_code(client.client_id, code, verifier)
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.json()["scope"], "edms")
+
+    def test_first_party_edms_client_cannot_cross_into_mcp(self):
+        """Registered for edms means edms — not a superset."""
+        _verifier, challenge = _pkce_pair()
+        client = self._seed_first_party_client()
+        self.client.force_login(self.user)
+        resp = self.client.get(
+            "/oauth/authorize",
+            data=self.authorize_params(
+                client.client_id, challenge, scope="mcp"
+            ),
+        )
+        query = parse_qs(urlsplit(resp["Location"]).query)
+        self.assertEqual(query["error"], ["invalid_scope"])
+
+    def test_client_registered_without_a_scope_still_gets_mcp(self):
+        """Every connector registered before scopes existed stored scope="".
+        Treating that as "no scopes" would lock all of them out."""
+        client = self._seed_first_party_client(scope="")
+        client.client_id = "legacy-connector"
+        client.save()
+        verifier, challenge = _pkce_pair()
+        code = self.obtain_code(client.client_id, challenge, scope="mcp")
+        resp = self.exchange_code(client.client_id, code, verifier)
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.json()["scope"], "mcp")
+
+    def test_edms_token_is_refused_on_the_mcp_transport(self):
+        """The other half of apps/api/bearer_auth.py's mcp→edms refusal.
+
+        Without this, an extension token — whose consent screen listed only
+        the three filing grants — drives the entire paid research surface.
+        """
+        verifier, challenge = _pkce_pair()
+        client = self._seed_first_party_client()
+        code = self.obtain_code(client.client_id, challenge, scope="edms")
+        tokens = self.exchange_code(client.client_id, code, verifier).json()
+
+        recorder = _RecorderApp()
+        app = api_key_middleware(recorder)
+        status, _, headers = _drive(
+            app,
+            headers=[
+                (b"authorization", f"Bearer {tokens['access_token']}".encode()),
+                (b"host", b"testserver"),
+            ],
+        )
+        self.assertEqual(status, 401)
+        self.assertIn('error="insufficient_scope"', headers["www-authenticate"])
+        self.assertEqual(recorder.calls, [])
+
+    def test_legacy_empty_scope_token_still_reaches_mcp(self):
+        """Access tokens minted before SUPPORTED_SCOPES grew past ``mcp``
+        carry scope="". They must keep working, or the fix logs out every
+        live connector on deploy."""
+        tokens = self.issue_tokens()
+        OAuthToken.objects.update(scope="")
+
+        recorder = _RecorderApp()
+        app = api_key_middleware(recorder)
+        status, _, _ = _drive(
+            app,
+            headers=[
+                (b"authorization", f"Bearer {tokens['access_token']}".encode()),
+                (b"host", b"testserver"),
+            ],
+        )
+        self.assertEqual(status, 204)
+        self.assertEqual(recorder.calls[0]["mcp_api_key"].user, self.user)

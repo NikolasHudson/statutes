@@ -19,7 +19,8 @@ env = environ.Env(
     # needs a new .env entry to boot; set it in the App Platform spec when the
     # app changes host.
     APP_URL=(str, "https://app.hudsonlegal.tech"),
-    # MCP OAuth 2.0 issuer (apps/mcp_server/{oauth,auth}.py, which read it from
+    # MCP OAuth 2.0 issuer (apps/oauth_server/oauth.py + apps/mcp_server/auth.py,
+    # which read it from
     # os.environ directly — this entry exists so the var is discoverable and
     # settable from .env). Empty means the issuer FLOATS WITH THE REQUEST HOST:
     # tokens minted under one hostname stop validating under another, so on a
@@ -280,6 +281,57 @@ env = environ.Env(
     # URLs. Empty (the normal case) = APP_URL, full stop; there is no guessing
     # tail. The "/account/billing" path is appended.
     STRIPE_RETURN_BASE_URL=(str, ""),
+    # --- Hudson EDMSpro (apps.edms) ----------------------------------------
+    # The v1/v2 switch for cloud saving. EDMSpro v1 ships WITHOUT it: the
+    # extension downloads the filing to the user's own machine, naming it from
+    # the template it reads off GET /api/edms/settings. The OneDrive/Graph
+    # round trip is a v2 feature, and its code is deliberately kept — models,
+    # migrations, ms_oauth/onedrive/storage modules and their tests all stay —
+    # so this flag, not a deletion, is what keeps it out of production. While
+    # it is False every cloud route on /api/edms is unreachable (404 before
+    # authentication, so a probe cannot even tell the route exists); flipping
+    # it to True restores the entire surface with no code change. Defaults off
+    # because an unshipped endpoint being live is a bigger risk than a shipped
+    # one being dark. GET/PATCH /settings and GET /safety are NOT gated — v1
+    # needs the naming template, and the contribution opt-in stays a live user
+    # preference.
+    EDMS_CLOUD_ENABLED=(bool, False),
+    # Microsoft identity platform app registration, for connecting a user's
+    # OneDrive. Both empty = the integration is dark: the connect endpoints
+    # answer 503 and the settings page says "not configured" instead of
+    # bouncing the user to a Microsoft error page. TENANT stays "common" so
+    # personal and work/school accounts both work; pin it to a directory id
+    # only if EDMSpro is ever sold to a single tenant.
+    MS_OAUTH_CLIENT_ID=(str, ""),
+    MS_OAUTH_CLIENT_SECRET=(str, ""),
+    MS_OAUTH_TENANT=(str, "common"),
+    # Empty = derive from APP_URL (the normal case). It must match the Azure
+    # registration byte-for-byte, so the override exists for tunnels/dev boxes
+    # whose public origin is not APP_URL.
+    MS_OAUTH_REDIRECT_URI=(str, ""),
+    # offline_access is LOAD-BEARING: without it Microsoft returns no refresh
+    # token, the connection dies in an hour, and it looks healthy until the
+    # first save after lunch. Files.ReadWrite is scoped to the user's own
+    # drive (not .All — we never touch anyone else's files).
+    MS_OAUTH_SCOPES=(list, ["offline_access", "Files.ReadWrite", "User.Read"]),
+    # Fernet key for the stored OneDrive tokens (apps/edms/crypto.py). Empty
+    # derives one from SECRET_KEY, which works everywhere but ties the two
+    # rotations together — set it explicitly in production.
+    EDMS_CRYPTO_KEY=(str, ""),
+    # Per-user daily cap on destination requests. Bounds an extension retry
+    # loop against both our Graph quota and the user's. 0 disables.
+    EDMS_DAILY_UPLOAD_LIMIT=(int, 500),
+    # DigitalOcean Spaces bucket for opted-in contributions. PRIVATE bucket,
+    # and the key below should be scoped to it alone: nothing in the app reads
+    # this bucket, so a key that can only write and delete is sufficient.
+    # Unset = the contribute endpoint answers 503 and nothing is collected.
+    SPACES_KEY=(str, ""),
+    SPACES_SECRET=(str, ""),
+    SPACES_BUCKET=(str, ""),
+    SPACES_REGION=(str, "nyc3"),
+    # Empty = https://<region>.digitaloceanspaces.com. Override only for a
+    # non-DO S3 endpoint or a local MinIO in dev.
+    SPACES_ENDPOINT=(str, ""),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
@@ -398,6 +450,21 @@ STRIPE_PRICE_FIRM_SEAT = env("STRIPE_PRICE_FIRM_SEAT")
 STRIPE_TRIAL_DAYS = env("STRIPE_TRIAL_DAYS")
 STRIPE_RETURN_BASE_URL = env("STRIPE_RETURN_BASE_URL")
 
+# Hudson EDMSpro — see the schema block above for what each of these gates.
+EDMS_CLOUD_ENABLED = env("EDMS_CLOUD_ENABLED")
+MS_OAUTH_CLIENT_ID = env("MS_OAUTH_CLIENT_ID")
+MS_OAUTH_CLIENT_SECRET = env("MS_OAUTH_CLIENT_SECRET")
+MS_OAUTH_TENANT = env("MS_OAUTH_TENANT")
+MS_OAUTH_REDIRECT_URI = env("MS_OAUTH_REDIRECT_URI")
+MS_OAUTH_SCOPES = env("MS_OAUTH_SCOPES")
+EDMS_CRYPTO_KEY = env("EDMS_CRYPTO_KEY")
+EDMS_DAILY_UPLOAD_LIMIT = env("EDMS_DAILY_UPLOAD_LIMIT")
+SPACES_KEY = env("SPACES_KEY")
+SPACES_SECRET = env("SPACES_SECRET")
+SPACES_BUCKET = env("SPACES_BUCKET")
+SPACES_REGION = env("SPACES_REGION")
+SPACES_ENDPOINT = env("SPACES_ENDPOINT")
+
 # The app's public origin. Every user-facing link we generate server-side hangs
 # off this one value — see the schema note above.
 APP_URL = env("APP_URL")
@@ -410,7 +477,7 @@ APP_URL = env("APP_URL")
 # from "set to the default"; read_env() has already folded .env into os.environ.
 if DEBUG and "APP_URL" not in os.environ:
     APP_URL = "http://localhost:3000"
-# Registered, not consumed here: apps/mcp_server reads it from os.environ (which
+# Registered, not consumed here: apps/oauth_server reads it from os.environ (which
 # read_env() has already populated from .env). Pin it in prod — see the schema.
 MCP_OAUTH_ISSUER = env("MCP_OAUTH_ISSUER")
 # The MCP door is a path on the app host (App Platform routes /mcp to Django), so
@@ -454,12 +521,17 @@ INSTALLED_APPS = [
     "apps.mail",
     "apps.marketing",
     "apps.citations",
+    "apps.edms",
     "apps.ingestion_iowa_code",
     "apps.ingestion_iowa_rules",
     "apps.ingestion_iowa_admin_code",
     "apps.ingestion_iowa_acts",
     "apps.ingestion_caselaw",
     "apps.mcp_server",
+    # The OAuth 2.0 authorization server. Split out of apps.mcp_server on
+    # 2026-07-28: MCP was its first consumer, not its owner, and /api/edms now
+    # authenticates with the same tokens.
+    "apps.oauth_server",
 ]
 
 MIDDLEWARE = [
@@ -522,7 +594,7 @@ if not DEBUG:
 AUTH_USER_MODEL = "accounts.User"
 
 # Where redirect_to_login() sends an unauthenticated browser. The only Django
-# view that uses it today is the MCP OAuth consent page (apps/mcp_server/
+# view that uses it today is the OAuth consent page (apps/oauth_server/
 # oauth.authorize): the SPA's sign-in gate lives on the root route and gets
 # ?next=<full authorize URL> so it can land the user back on the consent page
 # after signing in.

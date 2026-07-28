@@ -1,0 +1,563 @@
+/*
+ * Hudson EDMSpro injected UI — scoped under .cv-* to avoid clashing with host
+ * CSS. Carbon v11 vocabulary: flat --cds-layer surfaces, square corners,
+ * hairline borders, blue-60 interactive. Tokens are scoped onto the injected
+ * roots in tokens.css (injected alongside this file); the system font stack is
+ * kept on purpose — no webfonts in the court's page.
+ */
+
+.cv-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  margin: 0 0 16px 0;
+  background: var(--cds-layer);
+  border: 1px solid var(--cds-border);
+  border-left: 3px solid var(--cds-blue);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--cds-text);
+}
+.cv-banner--blocked {
+  border-left-color: var(--cds-warning);
+}
+.cv-banner__left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.cv-banner__dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  flex-shrink: 0;
+  background: var(--cds-blue);
+}
+.cv-banner--blocked .cv-banner__dot {
+  background: var(--cds-warning);
+}
+.cv-banner__title {
+  font-weight: 600;
+  font-size: 14px;
+}
+.cv-banner__sub {
+  font-size: 12px;
+  color: var(--cds-text-2);
+  margin-top: 2px;
+}
+.cv-banner__right {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.cv-gear {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  background: var(--cds-bg);
+  border: 1px solid var(--cds-border);
+  color: var(--cds-text-2);
+  cursor: pointer;
+  transition: background 0.11s ease, color 0.11s ease;
+  white-space: nowrap;
+}
+.cv-gear:hover {
+  background: var(--cds-layer-hover);
+  color: var(--cds-text);
+}
+.cv-gear:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: 1px;
+}
+.cv-gear--active {
+  background: var(--cds-blue) !important;
+  border-color: var(--cds-blue) !important;
+  color: #fff !important;
+}
+.cv-gear svg {
+  flex-shrink: 0;
+}
+.cv-signin {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 14px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  background: var(--cds-blue);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.11s ease;
+  white-space: nowrap;
+}
+.cv-signin:hover {
+  background: var(--cds-blue-hover);
+}
+.cv-signin:active {
+  background: var(--cds-blue-active);
+}
+.cv-signin:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: 1px;
+}
+.cv-signin svg {
+  flex-shrink: 0;
+}
+
+/* Per-case settings popover */
+.cv-casepop {
+  background: var(--cds-bg);
+  border: 1px solid var(--cds-border);
+  padding: 16px;
+  margin: 8px 0 16px 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  font-family: var(--font-sans);
+  color: var(--cds-text);
+}
+.cv-casepop[hidden] { display: none; }
+.cv-casepop__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.cv-casepop__hint {
+  font-size: 12px;
+  color: var(--cds-text-2);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+.cv-casepop__field {
+  margin-bottom: 12px;
+}
+.cv-casepop__label {
+  display: block;
+  font-size: 12px;
+  color: var(--cds-text-2);
+  margin-bottom: 6px;
+}
+.cv-casepop__input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-bottom: 1px solid var(--cds-border-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--cds-text);
+  background: var(--cds-field);
+  outline: none;
+  box-sizing: border-box;
+}
+.cv-casepop__input::placeholder {
+  color: var(--cds-placeholder);
+}
+.cv-casepop__input:focus {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: -2px;
+}
+.cv-casepop__inputrow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.cv-casepop__inputrow .cv-casepop__input { flex: 1; }
+.cv-casepop__inputrow .cv-casepop__btn { white-space: nowrap; }
+.cv-casepop__tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.cv-casepop__tokens code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--cds-layer);
+  color: var(--cds-text);
+  padding: 2px 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.11s ease, color 0.11s ease;
+}
+.cv-casepop__tokens code:hover {
+  background: var(--cds-blue);
+  color: #fff;
+}
+.cv-casepop__preview {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cds-text-2);
+  background: var(--cds-layer);
+  padding: 6px 10px;
+  margin: 4px 0 12px;
+  word-break: break-all;
+}
+.cv-casepop__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.cv-casepop__btn {
+  all: unset;
+  height: 32px;
+  padding: 0 14px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.11s ease, color 0.11s ease, border-color 0.11s ease;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+}
+.cv-casepop__btn:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: 1px;
+}
+.cv-casepop__btn--primary {
+  background: var(--cds-blue);
+  color: #fff;
+}
+.cv-casepop__btn--primary:hover { background: var(--cds-blue-hover); }
+.cv-casepop__btn--primary:active { background: var(--cds-blue-active); }
+.cv-casepop__btn--secondary {
+  background: transparent;
+  color: var(--cds-link);
+  border: 1px solid var(--cds-link);
+}
+.cv-casepop__btn--secondary:hover {
+  background: var(--cds-blue);
+  border-color: var(--cds-blue);
+  color: #fff;
+}
+.cv-casepop__btn--link {
+  background: transparent;
+  color: var(--cds-danger-text);
+  padding: 0 8px;
+}
+.cv-casepop__btn--link:hover { background: var(--cds-layer-hover); }
+.cv-casepop__btn:disabled {
+  background: var(--cds-layer-selected);
+  color: var(--cds-helper);
+  cursor: not-allowed;
+}
+.cv-casepop__status {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 8px 12px;
+  background: var(--cds-layer);
+  color: var(--cds-text);
+  border-left: 3px solid var(--cds-border-strong);
+}
+.cv-casepop__status--error {
+  border-left-color: var(--cds-danger);
+}
+.cv-casepop__status--success {
+  border-left-color: var(--cds-success);
+}
+
+/* Per-filing action */
+.cv-action {
+  position: relative;
+  display: inline-block;
+}
+.cv-action__btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--cds-blue);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.11s ease;
+}
+.cv-action__btn:hover {
+  background: var(--cds-blue-hover);
+}
+.cv-action__btn:active {
+  background: var(--cds-blue-active);
+}
+.cv-action__btn:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: 1px;
+}
+.cv-action__btn:disabled {
+  cursor: default;
+}
+.cv-action__btn--working {
+  background: var(--cds-blue-hover);
+}
+.cv-action__btn--done {
+  background: var(--cds-success);
+}
+.cv-action__btn svg {
+  flex-shrink: 0;
+}
+
+/* Tooltip — Carbon tooltips are g100-dark in both themes */
+.cv-action__tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 260px;
+  background: #161616;
+  color: #c6c6c6;
+  padding: 10px 12px;
+  border: 1px solid #393939;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 0.11s ease, transform 0.11s ease;
+  z-index: 9999;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+.cv-action:hover .cv-action__tip,
+.cv-action:focus-within .cv-action__tip {
+  opacity: 1;
+  transform: translateY(0);
+}
+.cv-tip__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+}
+.cv-tip__row span {
+  color: #8d8d8d;
+}
+.cv-tip__row strong {
+  color: #f4f4f4;
+  font-weight: 400;
+  text-align: right;
+  word-break: break-all;
+}
+
+/* Spinner */
+.cv-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  animation: cv-spin 0.8s linear infinite;
+  display: inline-block;
+}
+@keyframes cv-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Real-EDMS docket — dedicated "Download" column */
+.cv-dl-coltitle {
+  /* picks up the host page's .coltitle styling; we just keep it compact */
+  white-space: nowrap;
+  padding: 0 10px;
+}
+.cv-dl-cell {
+  white-space: nowrap;
+  padding: 6px 10px;
+  vertical-align: middle;
+  text-align: center;
+}
+
+/* Icon button group for per-row actions: preview, download, save */
+.cv-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cv-iconbtn {
+  all: unset;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cds-layer);
+  color: var(--cds-text-2);
+  cursor: pointer;
+  transition: background 0.11s ease, color 0.11s ease;
+}
+.cv-iconbtn:hover {
+  background: var(--cds-blue);
+  color: #fff;
+}
+/* Preview is a read-only action — it never leaves the court's page — so it
+   stays neutral on hover rather than taking the blue action color. */
+.cv-iconbtn--preview:hover {
+  background: var(--cds-layer-selected);
+  color: var(--cds-text);
+}
+.cv-iconbtn:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: 1px;
+}
+.cv-iconbtn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.cv-iconbtn--working {
+  background: var(--cds-blue-hover) !important;
+  color: #fff !important;
+}
+.cv-iconbtn--done {
+  background: var(--cds-success) !important;
+  color: #fff !important;
+}
+.cv-iconbtn--error {
+  background: var(--cds-danger) !important;
+  color: #fff !important;
+}
+.cv-iconbtn svg {
+  flex-shrink: 0;
+}
+.cv-saved {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  background: rgba(36, 161, 72, 0.12);
+  color: var(--cds-success-text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.11s ease, color 0.11s ease;
+}
+.cv-saved:hover {
+  background: var(--cds-success);
+  color: #fff;
+}
+.cv-saved:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: 1px;
+}
+.cv-saved svg {
+  flex-shrink: 0;
+}
+.cv-dl__btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--cds-blue);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.11s ease;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.cv-dl__btn:hover {
+  background: var(--cds-blue-hover);
+}
+.cv-dl__btn:active {
+  background: var(--cds-blue-active);
+}
+.cv-dl__btn:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: 1px;
+}
+.cv-dl__btn:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+.cv-dl__btn--working {
+  background: var(--cds-blue-hover);
+}
+.cv-dl__btn--done {
+  background: var(--cds-success);
+}
+.cv-dl__btn--error {
+  background: var(--cds-danger);
+}
+.cv-dl__btn svg {
+  flex-shrink: 0;
+}
+
+/* "Save all" split-button (banner toolbar) */
+.cv-dlall {
+  position: relative;
+  display: inline-block;
+}
+.cv-dlall__btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 14px;
+  background: var(--cds-blue);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.11s ease;
+  white-space: nowrap;
+}
+.cv-dlall__btn:hover {
+  background: var(--cds-blue-hover);
+}
+.cv-dlall__btn:active {
+  background: var(--cds-blue-active);
+}
+.cv-dlall__btn:focus-visible {
+  outline: 2px solid var(--cds-blue);
+  outline-offset: 1px;
+}
+.cv-dlall__btn:disabled {
+  background: var(--cds-layer-selected);
+  color: var(--cds-helper);
+  cursor: default;
+}
+.cv-dlall__btn svg {
+  flex-shrink: 0;
+}
+
+/* Toasts — Carbon high-contrast notification */
+.cv-toast-host {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.cv-toast {
+  background: #161616;
+  color: #f4f4f4;
+  padding: 12px 16px;
+  border-left: 3px solid var(--cds-blue);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.cv-toast--in {
+  opacity: 1;
+  transform: translateY(0);
+}

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hudson EDMSpro — This device</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <header class="shell">
+      <div class="shell__left">
+        <span class="shell__name">HUDSON</span><span class="shell__suffix">EDMSpro</span>
+        <span class="shell__note">This device</span>
+      </div>
+      <a class="page__demo" id="openDemo">Open demo docket →</a>
+    </header>
+    <div class="page">
+      <section class="section">
+        <h2 class="section__title">Your EDMSpro settings live in Hudson</h2>
+        <p class="section__hint">
+          Cloud connection, folder layout, file naming, contribution sharing and
+          the safety filter are set once in your Hudson account and apply on
+          every device you sign in from. This page is only for settings that are
+          genuinely specific to this browser.
+        </p>
+        <div class="auth__actions">
+          <button type="button" id="openSettings" class="btn btn--primary">
+            Open EDMSpro settings
+          </button>
+        </div>
+      </section>
+
+      <section class="section" id="authSection">
+        <h2 class="section__title">Hudson account</h2>
+        <p class="section__hint">
+          Signing in opens a Hudson window and returns an access token. This
+          extension never sees your password, and you can revoke its access from
+          your account at any time.
+        </p>
+
+        <div id="authLoggedOut" class="auth__panel">
+          <div class="auth__actions">
+            <button type="button" id="signInBtn" class="btn btn--primary">Sign in to Hudson</button>
+          </div>
+        </div>
+
+        <div id="authLoggedIn" class="auth__panel" hidden>
+          <div class="auth__signedin">
+            <div class="auth__signedin-text">
+              <div class="auth__signedin-label">Signed in as</div>
+              <div class="auth__signedin-email" id="authEmailDisplay">—</div>
+            </div>
+            <button type="button" id="signOutBtn" class="btn btn--secondary">Sign out</button>
+          </div>
+        </div>
+
+        <div id="authStatus" class="auth__status" hidden></div>
+      </section>
+
+      <section class="section">
+        <h2 class="section__title">Advanced</h2>
+        <p class="section__hint">
+          Leave both of these empty unless you are testing against a development
+          server or the sign-in window will not open on this machine.
+        </p>
+
+        <label class="field">
+          <span class="field__label">Hudson URL</span>
+          <input
+            type="url"
+            id="backendUrl"
+            class="input"
+            placeholder="https://app.hudsonlegal.tech"
+            autocomplete="off"
+          />
+        </label>
+
+        <label class="field">
+          <span class="field__label">API key (fallback sign-in)</span>
+          <input type="password" id="apiKey" class="input" autocomplete="off" />
+          <p class="section__hint">
+            Create one under Account → API keys. Used only when you are not
+            signed in above.
+          </p>
+        </label>
+      </section>
+
+      <footer class="page__ftr">
+        <span>Changes save automatically</span>
+        <span id="savedHint" class="page__saved">Saved</span>
+      </footer>
+    </div>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

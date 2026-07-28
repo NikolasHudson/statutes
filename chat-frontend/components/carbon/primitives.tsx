@@ -491,10 +491,14 @@ export function TextField({
 	className,
 	id: idProp,
 	...props
-}: React.InputHTMLAttributes<HTMLInputElement> & {
+}: React.ComponentPropsWithRef<"input"> & {
 	label?: string;
 	helper?: string;
 }) {
+	// ComponentPropsWithRef, not InputHTMLAttributes: React 19 passes `ref`
+	// through as an ordinary prop, and callers that drive the caret (the EDMSpro
+	// template fields insert a token where you clicked) need it to reach the
+	// input. It rides along in ...props.
 	// Always associate the label with the input, generating an id if none given.
 	const autoId = useId();
 	const id = idProp ?? (label ? autoId : undefined);

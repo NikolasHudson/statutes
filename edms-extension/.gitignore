@@ -1,0 +1,7 @@
+# Extension signing keys never belong in the repo. The private key for the
+# pinned `key` in manifest.json lives outside the tree (see README.md).
+*.pem
+*.crx
+
+# package-store.sh output
+dist/

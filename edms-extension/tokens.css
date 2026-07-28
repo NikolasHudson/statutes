@@ -1,0 +1,125 @@
+/*
+ * Carbon v11 design tokens for the Hudson EDMSpro extension.
+ *
+ * SOURCE OF TRUTH: chat-frontend/components/carbon/primitives.tsx (THEMES map)
+ * in the statutes repo — these are plain-hex copies of the app's `white` and
+ * `g100` token maps so the extension needs no build step. A future rebrand is
+ * a copy-paste of those maps. Reference: docs/carbon-design-system.md.
+ *
+ * Two scopes:
+ *  - :root — extension-origin pages (popup / options / side panel / viewer).
+ *    These honor prefers-color-scheme and load bundled IBM Plex Sans.
+ *  - .cv-* injected roots — in-page UI on court sites. Tokens are scoped
+ *    under the injected roots so host-page CSS variables can't collide, and
+ *    they stay on the light map regardless of OS theme (the host page is
+ *    light). No webfont is loaded into the host page.
+ */
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("fonts/IBMPlexSans-latin.woff2") format("woff2");
+  font-weight: 100 700; /* variable font; we use 400 + 600 */
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Carbon "white" theme */
+  --cds-bg: #ffffff;
+  --cds-layer: #f4f4f4;
+  --cds-layer-hover: #e8e8e8;
+  --cds-layer-selected: #e0e0e0;
+  --cds-field: #f4f4f4;
+  --cds-border: #e0e0e0;
+  --cds-border-strong: #8d8d8d;
+  --cds-text: #161616;
+  --cds-text-2: #525252;
+  --cds-helper: #6f6f6f;
+  --cds-placeholder: #a8a8a8;
+  --cds-link: #0f62fe;
+  --cds-danger-text: #da1e28;
+  --cds-success-text: #24a148;
+
+  /* Theme-independent action + support colors */
+  --cds-blue: #0f62fe;
+  --cds-blue-hover: #0353e9;
+  --cds-blue-active: #002d9c;
+  --cds-danger: #da1e28;
+  --cds-danger-hover: #b81922;
+  --cds-success: #24a148;
+  --cds-warning: #f1c21b;
+
+  /* UI-shell header — g100-dark in both themes, per Carbon convention */
+  --cds-shell-bg: #161616;
+  --cds-shell-border: #393939;
+  --cds-shell-hover: #353535;
+  --cds-shell-muted: #a8a8a8;
+
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Carbon "g100" theme */
+    --cds-bg: #161616;
+    --cds-layer: #262626;
+    --cds-layer-hover: #333333;
+    --cds-layer-selected: #393939;
+    --cds-field: #262626;
+    --cds-border: #393939;
+    --cds-border-strong: #6f6f6f;
+    --cds-text: #f4f4f4;
+    --cds-text-2: #c6c6c6;
+    --cds-helper: #8d8d8d;
+    --cds-placeholder: #6f6f6f;
+    --cds-link: #78a9ff;
+    --cds-danger-text: #fa4d56;
+    --cds-success-text: #42be65;
+  }
+}
+
+/*
+ * Injected in-page roots — always the light map (court sites are light).
+ * Every top-level element content.js injects must appear in this list;
+ * descendants inherit.
+ */
+.cv-banner,
+.cv-casepop,
+.cv-action,
+.cv-actions,
+.cv-dlall,
+.cv-dl-coltitle,
+.cv-dl-cell,
+.cv-saved,
+.cv-toast-host {
+  --cds-bg: #ffffff;
+  --cds-layer: #f4f4f4;
+  --cds-layer-hover: #e8e8e8;
+  --cds-layer-selected: #e0e0e0;
+  --cds-field: #f4f4f4;
+  --cds-border: #e0e0e0;
+  --cds-border-strong: #8d8d8d;
+  --cds-text: #161616;
+  --cds-text-2: #525252;
+  --cds-helper: #6f6f6f;
+  --cds-placeholder: #a8a8a8;
+  --cds-link: #0f62fe;
+  --cds-danger-text: #da1e28;
+  --cds-success-text: #24a148;
+  --cds-blue: #0f62fe;
+  --cds-blue-hover: #0353e9;
+  --cds-blue-active: #002d9c;
+  --cds-danger: #da1e28;
+  --cds-danger-hover: #b81922;
+  --cds-success: #24a148;
+  --cds-warning: #f1c21b;
+  --cds-shell-bg: #161616;
+  --cds-shell-border: #393939;
+  /* Injected UI keeps the host-safe system stack — no webfonts in the
+     court's page; color/spacing/border tokens carry the Carbon look. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

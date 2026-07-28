@@ -27,6 +27,13 @@ import {
 	ToggleRow,
 	useTheme,
 } from "@/components/carbon/primitives";
+import {
+	OnThisPage,
+	SaveRow,
+	type SaveState,
+	Section,
+	useSaveState,
+} from "@/components/settings/section";
 import { BRAND_NAME, MCP_SERVER_ID, mcpUrl } from "@/lib/brand";
 import {
 	type APIKey,
@@ -96,7 +103,7 @@ export default function V2AccountPage() {
 				</p>
 			) : (
 				<div className="mt-10 grid gap-12 lg:grid-cols-[11rem_minmax(0,42rem)]">
-					<OnThisPage />
+					<OnThisPage sections={SECTIONS} />
 					<div className="min-w-0 space-y-14">
 						<ProfileSection settings={settings} onSaved={setSettings} />
 						<AddressSection settings={settings} onSaved={setSettings} />
@@ -112,124 +119,17 @@ export default function V2AccountPage() {
 	);
 }
 
-function OnThisPage() {
-	const [active, setActive] = useState("profile");
-	return (
-		<nav className="sticky top-6 hidden self-start lg:block">
-			<p className="pb-2 font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.18em]">
-				On this page
-			</p>
-			{SECTIONS.map((s) => (
-				<a
-					key={s.id}
-					href={`#${s.id}`}
-					onClick={() => setActive(s.id)}
-					className={cn(
-						"flex border-l-[3px] py-1.5 pl-3 text-[13px] transition-colors",
-						active === s.id
-							? "border-[#0f62fe] font-semibold"
-							: "border-transparent text-[var(--cds-text-2)] hover:text-[var(--cds-text)]",
-					)}
-				>
-					{s.label}
-				</a>
-			))}
-		</nav>
-	);
-}
-
-// ---------------------------------------------------------------------------
-// Section scaffolding — shared save-state machinery
-// ---------------------------------------------------------------------------
-
-function Section({
-	id,
-	title,
-	desc,
-	children,
-}: {
-	id: string;
-	title: string;
-	desc: string;
-	children: React.ReactNode;
-}) {
-	return (
-		<section
-			id={id}
-			className="scroll-mt-6 border-[var(--cds-border)] border-t pt-6"
-		>
-			<h2 className="font-semibold text-sm uppercase tracking-wide">{title}</h2>
-			<p className="mt-1 text-[13px] text-[var(--cds-text-2)]">{desc}</p>
-			<div className="mt-6">{children}</div>
-		</section>
-	);
-}
-
-type SaveState = "idle" | "busy" | "saved" | "error";
-
-// One PATCH per section: run the save, flash "Saved", surface errors inline.
+// One PATCH per section, on top of the shared save-state machine: the extra
+// argument lets a section run a non-settings write (email, password) before the
+// settings PATCH and still report through the same states.
 function useSectionSave(onSaved: (s: UserSettings) => void) {
-	const [state, setState] = useState<SaveState>("idle");
-	const [error, setError] = useState<string | null>(null);
-	const save = async (
-		patch: UserSettingsPatch,
-		extra?: () => Promise<void>,
-	) => {
-		setState("busy");
-		setError(null);
-		try {
+	const { state, error, run } = useSaveState();
+	const save = (patch: UserSettingsPatch, extra?: () => Promise<void>) =>
+		run(async () => {
 			await extra?.();
-			const next = await updateSettings(patch);
-			onSaved(next);
-			setState("saved");
-			setTimeout(() => setState("idle"), 2000);
-		} catch (e) {
-			setError((e as Error).message);
-			setState("error");
-		}
-	};
+			onSaved(await updateSettings(patch));
+		});
 	return { state, error, save };
-}
-
-function SaveRow({
-	state,
-	error,
-	onSave,
-	note,
-}: {
-	state: SaveState;
-	error: string | null;
-	onSave: () => void;
-	note?: string;
-}) {
-	return (
-		<>
-			{state === "error" && error && (
-				<Notification kind="error" title="Couldn't save" className="mt-6">
-					{error}
-				</Notification>
-			)}
-			<div className="mt-6 flex items-center gap-4">
-				<BtnPrimary
-					size="md"
-					arrow={false}
-					disabled={state === "busy"}
-					onClick={onSave}
-				>
-					{state === "busy" ? "Saving…" : "Save changes"}
-				</BtnPrimary>
-				{state === "saved" ? (
-					<span className="inline-flex items-center gap-1.5 text-[13px] text-[var(--cds-success-text)]">
-						<CheckIcon className="size-4" /> Saved
-					</span>
-				) : note ? (
-					<span className="font-mono text-[11px] text-[var(--cds-helper)]">
-						{note}
-					</span>
-				) : null}
-			</div>
-		</>
-	);
 }
 
 // ---------------------------------------------------------------------------

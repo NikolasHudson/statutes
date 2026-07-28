@@ -19,6 +19,18 @@ export const COMPANY_NAME = "Hudson Legal Technologies";
 // rebrand, so treat it as a wire identifier and not as a brand string.
 export const MCP_SERVER_ID = "hudson-corpus";
 
+// The court-filing product (apps/edms + the browser extension). Long form for
+// page titles and consent copy; short form for nav entries, where "Hudson" is
+// already implied. Mirrors EDMS_PRODUCT_NAME / EDMS_PRODUCT_SHORT_NAME in
+// backend/core/brand.py.
+export const EDMS_PRODUCT_NAME = "Hudson EDMSpro";
+export const EDMS_PRODUCT_SHORT_NAME = "EDMSpro";
+
+// Chrome Web Store listing for the EDMSpro extension. Empty until the listing
+// is published — the settings page says "coming soon" rather than linking
+// somewhere that 404s. No backend twin: the server never links to the store.
+export const EDMS_EXTENSION_URL = "";
+
 // --- Origins ---------------------------------------------------------------
 // This app is served FROM the app origin, so it can derive its own URL and needs
 // no hard-coded domain. NEXT_PUBLIC_APP_URL (inlined at build time) wins when set
@@ -29,24 +41,24 @@ export const MCP_SERVER_ID = "hudson-corpus";
 
 /** Absolute origin the app is served from ("https://app.hudsonlegal.tech"), or "". */
 export function appOrigin(): string {
-  const configured = process.env.NEXT_PUBLIC_APP_URL;
-  if (configured) return configured.replace(/\/+$/, "");
-  if (typeof window !== "undefined") return window.location.origin;
-  return "";
+	const configured = process.env.NEXT_PUBLIC_APP_URL;
+	if (configured) return configured.replace(/\/+$/, "");
+	if (typeof window !== "undefined") return window.location.origin;
+	return "";
 }
 
 /** Host portion of the app origin ("app.hudsonlegal.tech"), for display. */
 export function appHost(): string {
-  const origin = appOrigin();
-  if (!origin) return "";
-  try {
-    return new URL(origin).host;
-  } catch {
-    return origin.replace(/^https?:\/\//, "");
-  }
+	const origin = appOrigin();
+	if (!origin) return "";
+	try {
+		return new URL(origin).host;
+	} catch {
+		return origin.replace(/^https?:\/\//, "");
+	}
 }
 
 /** The MCP endpoint external clients connect to, on this same origin. */
 export function mcpUrl(): string {
-  return `${appOrigin()}/mcp`;
+	return `${appOrigin()}/mcp`;
 }

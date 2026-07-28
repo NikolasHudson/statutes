@@ -235,7 +235,7 @@ ingress:
   #
   # They route to `statutes`, NOT to `mcp` — and the note this replaces (which
   # said to point them at the mcp component) was wrong. The views are Django
-  # views: apps/mcp_server/urls.py is include()d at the ROOT of core/urls.py, and
+  # views: apps/oauth_server/urls.py is include()d at the ROOT of core/urls.py, and
   # only `statutes` runs that URLConf (gunicorn core.wsgi:application). The `mcp`
   # component overrides the CMD with gunicorn apps.mcp_server.asgi:app, which is
   # build_http_app() — a /healthz short-circuit wrapping X-API-Key auth wrapping
@@ -658,3 +658,25 @@ jobs:
     deploy_on_push: true
   instance_size_slug: apps-s-1vcpu-0.5gb
   run_command: python manage.py seed_assistant_address --address assistant@hudsonlegal.tech --allow nick@nickhudson.me --allow nick@nick.law
+# The ONLY OAuth client permitted to request the `edms` scope. Open dynamic
+# registration is clamped to `mcp` (apps/oauth_server/oauth.OPEN_REGISTRATION_SCOPES),
+# and the per-client clamp in _validate_authorize_params refuses `edms` to
+# anything but this row — so without this job the extension gets "Unknown
+# client_id" in production, and with it the grant is declared here rather than
+# typed into a console, where a wrong --extension-id would point the redirect
+# URI (and therefore the authorization code) at some other extension.
+#
+# The id is pinned by the `key` in edms-extension/manifest.json; the matching
+# private key lives OUTSIDE the repo and must be backed up, or a rebuilt
+# extension gets a new id and this redirect URI stops matching.
+# Idempotent upsert (update_or_create); re-runs are no-ops.
+- name: seed-edms-oauth-client
+  kind: POST_DEPLOY
+  dockerfile_path: /Dockerfile
+  source_dir: /
+  github:
+    repo: NikolasHudson/statutes
+    branch: main
+    deploy_on_push: true
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  run_command: python manage.py seed_edms_oauth_client --extension-id gnkpejhcnkldfpmpokckgcipcgpbpekf

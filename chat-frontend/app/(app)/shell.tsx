@@ -9,6 +9,7 @@ import {
 	Building2Icon,
 	ChartColumnIcon,
 	ChevronsUpDownIcon,
+	CloudIcon,
 	CreditCardIcon,
 	GitCompareArrowsIcon,
 	LogOutIcon,
@@ -34,6 +35,7 @@ import {
 	SideNav,
 	useTheme,
 } from "@/components/carbon/primitives";
+import { EDMS_PRODUCT_SHORT_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 const NAV: NavGroup[] = [
@@ -70,6 +72,25 @@ const NAV: NavGroup[] = [
 		],
 	},
 ];
+
+// Nav entry that only appears for plans that include the product. Keyed on the
+// feature strings /api/auth/me carries. Display-only: every EDMSpro route
+// answers 402/403 on its own, and the page renders an inline "not on your
+// plan" panel, so a stale list opens nothing and strands nobody.
+const EDMS_ACCOUNT_ITEM = {
+	href: "/account/edms",
+	label: EDMS_PRODUCT_SHORT_NAME,
+	icon: CloudIcon,
+};
+
+function navFor(features: string[]): NavGroup[] {
+	if (!features.includes("edms")) return NAV;
+	return NAV.map((group) =>
+		group.group === "Account"
+			? { ...group, items: [...group.items, EDMS_ACCOUNT_ITEM] }
+			: group,
+	);
+}
 
 // Staff-only nav group — appended after the workspace group for users whose
 // /api/auth/me carries is_staff.
@@ -200,7 +221,8 @@ function UserFooter() {
 export function V2Shell({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname() ?? "/";
 	const { user } = useAuth();
-	const navGroups = user.is_staff ? [...NAV, ADMIN_NAV] : NAV;
+	const base = navFor(user.features ?? []);
+	const navGroups = user.is_staff ? [...base, ADMIN_NAV] : base;
 	// The onboarding wizard brings its own stepper rail — give it the full
 	// canvas instead of the app nav.
 	const bare = pathname === "/onboarding";

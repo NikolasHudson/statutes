@@ -53,3 +53,15 @@ django-axes>=8.0,<9
 # Structured (JSON) logging for the dedicated 'security' audit logger and the
 # request/error stream, so App Platform runtime logs are machine-parseable.
 python-json-logger>=3.1,<5
+# --- Hudson EDMSpro (apps.edms) ----------------------------------------------
+# S3-compatible client for the DigitalOcean Spaces bucket that holds opted-in
+# contributions. Imported lazily (apps/edms/storage.py) like stripe, so a deploy
+# without SPACES_* configured still boots and every other EDMSpro route works;
+# only the contribute endpoint answers 503. django-storages is deliberately NOT
+# used: this app streams to one private bucket with no read path, so a Django
+# storage backend (which exists to make FileFields work) would add surface area
+# in the one place we have promised there is none.
+boto3>=1.35,<2
+# The token encryption in apps/edms/crypto.py. Already present transitively; it
+# is named here because a direct import must not depend on someone else's tree.
+cryptography>=44.0,<49
