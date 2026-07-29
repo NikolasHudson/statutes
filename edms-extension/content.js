@@ -33,6 +33,7 @@
     blocked: { ...FALLBACK_BLOCKED },
     meta: null,
     signedIn: false,
+    entitled: true, // false only when the server says "not on your plan"
   };
 
   // ---------- shared helpers ----------
@@ -43,7 +44,12 @@
   // server-side, and the only thing a stale copy affects is the preview text.
   async function loadSettings() {
     const resp = await sendBgMessage({ type: "cv:getSettings" });
-    return resp?.ok ? resp.settings : { ...DEFAULT_SETTINGS };
+    if (resp?.ok) return { settings: resp.settings, entitled: true };
+    // A plan refusal is the one failure here that is NOT transient, and it used
+    // to be swallowed by the fallback — which is why an unentitled account got
+    // the whole docket UI anyway. Anything else (offline, server blip) keeps
+    // working on defaults; losing the product to a dropped packet is worse.
+    return { settings: { ...DEFAULT_SETTINGS }, entitled: resp?.code !== "plan" };
   }
 
   async function loadBlockedList() {
@@ -191,15 +197,20 @@
 
     const title = document.createElement("div");
     title.className = "cv-banner__title";
-    title.textContent = safety.blocked
-      ? `Public sharing blocked — ${safety.reason} case`
-      : "Hudson EDMSpro is ready on this docket";
+    const unentitled = state.signedIn && !state.entitled;
+    title.textContent = unentitled
+      ? "Hudson EDMSpro isn't on your plan"
+      : safety.blocked
+        ? `Public sharing blocked — ${safety.reason} case`
+        : "Hudson EDMSpro is ready on this docket";
 
     const sub = document.createElement("div");
     sub.className = "cv-banner__sub";
-    sub.textContent = safety.blocked
-      ? "Confidential case type. Downloads stay on this device — v1 uploads nothing."
-      : `${meta.caption || "Untitled case"} · ${meta.caseNumber || "no case #"} · ${meta.county || ""}`;
+    sub.textContent = unentitled
+      ? "Your Hudson plan doesn't include EDMSpro. Open Hudson to see your options."
+      : safety.blocked
+        ? "Confidential case type. Downloads stay on this device — v1 uploads nothing."
+        : `${meta.caption || "Untitled case"} · ${meta.caseNumber || "no case #"} · ${meta.county || ""}`;
 
     const text = document.createElement("div");
     text.appendChild(title);
@@ -213,6 +224,17 @@
 
     if (!state.signedIn) {
       right.appendChild(buildSignInBtn());
+    } else if (unentitled) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cv-signin";
+      btn.innerHTML = "<span>Open Hudson</span>";
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openSettingsPage();
+      });
+      right.appendChild(btn);
     } else if (extras?.downloadAllBtn) {
       // No contribution chip in v1: the opt-in still exists as a setting, but
       // nothing can act on it here, and a banner reading "Crowdsource: on" over
@@ -314,7 +336,10 @@
       dock.insertBefore(buildBanner(meta, safety), dock.firstChild);
     }
 
-    if (state.signedIn) {
+    // Same entitlement condition as the real docket. The demo is a sales and
+    // support surface, so showing working buttons to an account that cannot use
+    // them would misrepresent what the plan includes.
+    if (state.signedIn && state.entitled) {
       const rows = dock.querySelectorAll("[data-cv-filing-row]");
       rows.forEach((row) => {
         if (row.querySelector(".cv-action")) return;
@@ -715,7 +740,7 @@
     state.meta = meta;
     const safety = safetyCheck(meta);
 
-    if (state.signedIn) {
+    if (state.signedIn && state.entitled) {
       // Add a 4th "EDMSpro" column to the docket table.
       const tableRows = [...docket.rows];
       const headerRow = tableRows[0];
@@ -752,7 +777,9 @@
         docket.parentNode.insertBefore(banner, docket);
       }
     } else if (!document.querySelector(".cv-banner[data-cv-real]")) {
-      // Signed-out: banner only, no column, no row actions.
+      // Signed out, OR signed in without the plan: banner only, no column and
+      // no row actions. The buttons are the product, so withholding them IS
+      // the paywall on this surface — the server refuses the token separately.
       const banner = buildBanner(meta, safety);
       banner.setAttribute("data-cv-real", "1");
       docket.parentNode.insertBefore(banner, docket);
@@ -767,11 +794,13 @@
     // 401, and the signed-out banner needs none of it.
     state.signedIn = await loadSignedIn();
     if (state.signedIn) {
-      const [settings, blocked] = await Promise.all([loadSettings(), loadBlockedList()]);
-      state.settings = settings;
+      const [loaded, blocked] = await Promise.all([loadSettings(), loadBlockedList()]);
+      state.settings = loaded.settings;
+      state.entitled = loaded.entitled;
       state.blocked = blocked;
     } else {
       state.settings = { ...DEFAULT_SETTINGS };
+      state.entitled = true;
       state.blocked = { ...FALLBACK_BLOCKED };
     }
     if (await injectDemo()) return;

@@ -55,7 +55,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
-from core.brand import BRAND_NAME
+from core.brand import BRAND_NAME, EDMS_PRODUCT_NAME
 
 from .models import (
     AUTH_CODE_TTL_SECONDS,
@@ -93,6 +93,18 @@ SUPPORTED_SCOPES = ["mcp", "edms"]
 # ``scope=edms``, and phish a signed-in attorney into consenting.
 OPEN_REGISTRATION_SCOPES = {"mcp"}
 
+# Scopes that may only be granted to a user whose plan includes the feature,
+# checked at authorize time — i.e. before a token exists.
+#
+# ``mcp`` is deliberately absent, and the asymmetry is the point. Every MCP tool
+# call goes through ``gate_request`` → ``require_feature``, so an unentitled MCP
+# token can be issued and simply does nothing. EDMSpro v1 is the opposite: the
+# product is preview-and-download, which the extension performs entirely in the
+# browser against the court's own site, so after sign-in it never asks Hudson
+# for permission again. A token is the whole entitlement, which means issuance
+# is the only place a paywall can bite.
+SCOPE_REQUIRED_FEATURE = {"edms": "edms"}
+
 # What each scope actually lets a client do, in the user's words. This is the
 # consent screen's whole job — a screen that says "scope: edms" and nothing else
 # is a click-through, not a decision.
@@ -119,6 +131,23 @@ def allowed_scopes(client: OAuthClient) -> set[str]:
     """
     registered = set((client.scope or "").split()) & set(SUPPORTED_SCOPES)
     return registered or {"mcp"}
+
+
+def _unentitled_scope(user, scope: str) -> str | None:
+    """The first requested scope ``user``'s plan does not cover, or ``None``.
+
+    Returns a human label, not the scope token — this ends up in an OAuth
+    ``error_description`` the extension shows verbatim, and "EDMSpro" means
+    something to an attorney where "edms" does not.
+    """
+    from apps.api.auth import allowed_features_for
+
+    allowed = allowed_features_for(user)
+    for name in (scope or "").split():
+        feature = SCOPE_REQUIRED_FEATURE.get(name)
+        if feature is not None and feature not in allowed:
+            return EDMS_PRODUCT_NAME if name == "edms" else name
+    return None
 
 
 def scope_grants(scope: str) -> list[str]:
@@ -493,6 +522,18 @@ def authorize(request: HttpRequest) -> HttpResponse:
         # authorize URL (with all OAuth params) in ?next= so the login page
         # can land the user back here to consent.
         return redirect_to_login(request.get_full_path())
+
+    # Entitlement, now that we know who is asking. Refused BEFORE the consent
+    # screen renders, so an unentitled user is told why instead of approving a
+    # grant that would be useless — and before the POST branch can mint a code.
+    missing = _unentitled_scope(request.user, params["scope"])
+    if missing is not None:
+        return _redirect_error(
+            params["redirect_uri"],
+            "access_denied",
+            f"{missing} is not included in your plan",
+            params["state"],
+        )
 
     if request.method == "GET":
         return render(

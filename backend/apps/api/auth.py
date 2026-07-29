@@ -62,15 +62,44 @@ FEATURES_BY_TIER: dict[str, set[str]] = {
 }
 
 
+# Every feature the product defines, derived rather than restated so a feature
+# added to a tier above cannot be forgotten here.
+ALL_FEATURES: frozenset[str] = frozenset().union(*FEATURES_BY_TIER.values())
+
+
+def allowed_features_for(user) -> set[str]:
+    """The features ``user`` may actually use.
+
+    One answer, read by both the display list and the enforcement gate, so the
+    nav and the 403 can never disagree about what someone owns.
+
+    Staff get everything, unconditionally and without a plan. They operate the
+    product: a staff account that has to be comped a subscription before it can
+    reproduce a customer's bug is a support burden, not a security boundary, and
+    ``has_paid_access`` already exempts them from the billing half of the gate —
+    this makes the feature half agree.
+    """
+    # Deliberately duck-typed: the enforcement path is handed whatever the
+    # credential carries — a real User, or a lightweight principal that only
+    # promises ``.tier``. Requiring ``is_authenticated`` here would silently
+    # empty the set for those callers and 403 a request that should pass. The
+    # anonymous case is handled where it can actually occur, in features_for.
+    if user is None:
+        return set()
+    if getattr(user, "is_staff", False):
+        return set(ALL_FEATURES)
+    return set(FEATURES_BY_TIER.get(getattr(user, "tier", None), set()))
+
+
 def features_for(user) -> list[str]:
-    """The feature strings this user's plan includes, sorted.
+    """The feature strings this user may use, sorted.
 
     Display-only — served by ``/api/auth/me`` so the SPA can hide nav entries
     for products the user has no plan for. Every endpoint still enforces its own
     gate server-side; a stale or forged list buys nothing."""
     if user is None or not getattr(user, "is_authenticated", False):
         return []
-    return sorted(FEATURES_BY_TIER.get(user.tier, set()))
+    return sorted(allowed_features_for(user))
 
 
 @dataclass
@@ -128,8 +157,7 @@ def require_feature_for_user(user, feature: str) -> None:
             "An active plan is required to use the API. Start your free trial "
             "at Account → Billing in the app.",
         )
-    allowed = FEATURES_BY_TIER.get(user.tier, set())
-    if feature not in allowed:
+    if feature not in allowed_features_for(user):
         raise HttpError(
             403,
             f"Feature '{feature}' is not available on the {user.tier} tier.",

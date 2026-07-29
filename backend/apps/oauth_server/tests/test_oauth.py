@@ -195,6 +195,34 @@ class OAuthFlowMixin:
         body["client_id"] = reg["client_id"]
         return body
 
+    def _entitle(self):
+        """Give the flow's user a plan that includes ``edms``.
+
+        Since the paywall moved to token issuance, minting an edms token needs
+        an entitled user. These tests are about scope boundaries, not billing,
+        so they say so explicitly rather than depending on the default tier."""
+        self.user.tier = "solo"
+        self.user.save(update_fields=["tier"])
+
+    def _seed_first_party_client(self, scope="edms"):
+        """The row ``manage.py seed_edms_oauth_client`` writes: created
+        directly, deliberately never through the open /oauth/register.
+
+        Upserts, like the command it stands in for, so a test may drive the
+        authorize flow more than once."""
+        client, _ = OAuthClient.objects.update_or_create(
+            client_id="hudson-edmspro-extension",
+            defaults={
+                "client_secret_hash": "",
+                "client_name": "Hudson EDMSpro",
+                "redirect_uris": [REDIRECT_URI],
+                "token_endpoint_auth_method": OAuthClient.AuthMethod.NONE,
+                "grant_types": ["authorization_code", "refresh_token"],
+                "scope": scope,
+            },
+        )
+        return client
+
 
 # ---------------------------------------------------------------------------
 # Discovery metadata
@@ -864,19 +892,6 @@ class ScopeBoundaryTests(OAuthFlowMixin, TestCase):
     keep working.
     """
 
-    def _seed_first_party_client(self, scope="edms"):
-        """The row ``manage.py seed_edms_oauth_client`` writes: created
-        directly, deliberately never through the open /oauth/register."""
-        return OAuthClient.objects.create(
-            client_id="hudson-edmspro-extension",
-            client_secret_hash="",
-            client_name="Hudson EDMSpro",
-            redirect_uris=[REDIRECT_URI],
-            token_endpoint_auth_method=OAuthClient.AuthMethod.NONE,
-            grant_types=["authorization_code", "refresh_token"],
-            scope=scope,
-        )
-
     def test_open_registration_clamps_away_edms(self):
         """A self-registered client asking for edms is granted mcp instead.
         RFC 7591 lets us narrow, and the response says what was granted."""
@@ -922,6 +937,7 @@ class ScopeBoundaryTests(OAuthFlowMixin, TestCase):
 
     def test_first_party_client_may_obtain_edms(self):
         """The clamp must not break the product it was added for."""
+        self._entitle()
         verifier, challenge = _pkce_pair()
         client = self._seed_first_party_client()
         code = self.obtain_code(client.client_id, challenge, scope="edms")
@@ -961,6 +977,7 @@ class ScopeBoundaryTests(OAuthFlowMixin, TestCase):
         Without this, an extension token — whose consent screen listed only
         the three filing grants — drives the entire paid research surface.
         """
+        self._entitle()
         verifier, challenge = _pkce_pair()
         client = self._seed_first_party_client()
         code = self.obtain_code(client.client_id, challenge, scope="edms")
@@ -997,3 +1014,76 @@ class ScopeBoundaryTests(OAuthFlowMixin, TestCase):
         )
         self.assertEqual(status, 204)
         self.assertEqual(recorder.calls[0]["mcp_api_key"].user, self.user)
+
+
+# ---------------------------------------------------------------------------
+# Entitlement at token issuance
+# ---------------------------------------------------------------------------
+
+class EdmsEntitlementTests(OAuthFlowMixin, TestCase):
+    """EDMSpro v1 is a paid feature, and issuance is the only place that can
+    enforce it.
+
+    The product is preview-and-download, performed by the extension in the
+    browser against the court's own site; after sign-in it never asks Hudson
+    for permission again. So a 403 on ``/api/edms/*`` gates nothing that
+    matters — holding a token IS the entitlement, and the check has to happen
+    before one exists.
+    """
+
+    def _authorize(self, scope="edms"):
+        _verifier, challenge = _pkce_pair()
+        client = self._seed_first_party_client(scope=scope)
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            "/oauth/authorize",
+            data={
+                **self.authorize_params(client.client_id, challenge, scope=scope),
+                "action": "approve",
+            },
+        )
+        self.assertEqual(resp.status_code, 302, getattr(resp, "content", b""))
+        return parse_qs(urlsplit(resp["Location"]).query)
+
+    def test_free_tier_is_refused_the_edms_scope(self):
+        query = self._authorize()
+        self.assertEqual(query["error"], ["access_denied"])
+        self.assertIn("not included in your plan", query["error_description"][0])
+        self.assertNotIn("code", query)
+        self.assertFalse(OAuthAuthorizationCode.objects.exists())
+
+    def test_refusal_names_the_product_not_the_scope_token(self):
+        """The description is shown to an attorney by the extension verbatim."""
+        query = self._authorize()
+        self.assertIn("EDMSpro", query["error_description"][0])
+
+    def test_paid_tier_is_granted(self):
+        self.user.tier = "solo"
+        self.user.save(update_fields=["tier"])
+        self.assertIn("code", self._authorize())
+
+    def test_staff_are_granted_without_any_plan(self):
+        """Staff operate the product; they must never need a comped
+        subscription to reproduce a customer's problem."""
+        self.user.tier = "free"
+        self.user.is_staff = True
+        self.user.save(update_fields=["tier", "is_staff"])
+        self.assertIn("code", self._authorize())
+
+    def test_mcp_scope_is_not_gated_at_issuance(self):
+        """Deliberate asymmetry: every MCP tool call re-checks the feature at
+        call time, so an unentitled mcp token is harmless. Gating it here would
+        break connectors that legitimately hold one."""
+        self.user.tier = "free"
+        self.user.save(update_fields=["tier"])
+        self.assertIn("code", self._authorize(scope="mcp"))
+
+    def test_the_gate_reads_the_plan_at_authorize_time(self):
+        """Downgrade then retry: no cached decision survives the plan change."""
+        self.user.tier = "solo"
+        self.user.save(update_fields=["tier"])
+        self.assertIn("code", self._authorize())
+        OAuthAuthorizationCode.objects.all().delete()
+        self.user.tier = "free"
+        self.user.save(update_fields=["tier"])
+        self.assertEqual(self._authorize()["error"], ["access_denied"])
