@@ -64,4 +64,4 @@ python-json-logger>=3.1,<5
 boto3>=1.35,<2
 # The token encryption in apps/edms/crypto.py. Already present transitively; it
 # is named here because a direct import must not depend on someone else's tree.
-cryptography>=44.0,<49
+cryptography>=50.0.0,<51
