@@ -258,6 +258,10 @@ class MetadataTests(TestCase):
                 self.assertEqual(
                     meta["code_challenge_methods_supported"], ["S256"]
                 )
+                self.assertIs(
+                    meta["authorization_response_iss_parameter_supported"],
+                    True,
+                )
                 self.assertIn(
                     "none", meta["token_endpoint_auth_methods_supported"]
                 )
@@ -471,6 +475,27 @@ class AuthorizeTests(OAuthFlowMixin, TestCase):
         query = parse_qs(urlsplit(resp["Location"]).query)
         self.assertEqual(query["error"], ["access_denied"])
         self.assertEqual(OAuthAuthorizationCode.objects.count(), 0)
+
+    def test_authorization_responses_carry_rfc9207_iss(self):
+        """RFC 9207 §2: success AND error redirects both name the issuer, so
+        a client registered with several authorization servers (every MCP
+        client) can detect a mix-up attack before sending the code anywhere."""
+        verifier, challenge = _pkce_pair()
+        reg = self.register_client()
+        self.client.force_login(self.user)
+        params = self.authorize_params(reg["client_id"], challenge)
+        resp = self.client.post(
+            "/oauth/authorize", data={**params, "action": "approve"}
+        )
+        query = parse_qs(urlsplit(resp["Location"]).query)
+        self.assertIn("code", query)
+        self.assertEqual(query["iss"], ["http://testserver"])
+        resp = self.client.post(
+            "/oauth/authorize", data={**params, "action": "deny"}
+        )
+        query = parse_qs(urlsplit(resp["Location"]).query)
+        self.assertEqual(query["error"], ["access_denied"])
+        self.assertEqual(query["iss"], ["http://testserver"])
 
     def test_consent_post_requires_csrf_token(self):
         """The consent POST is the one browser-facing state change in the flow;

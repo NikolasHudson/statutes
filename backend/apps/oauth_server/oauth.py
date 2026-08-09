@@ -237,6 +237,7 @@ def authorization_server_metadata(request: HttpRequest) -> JsonResponse:
             "response_types_supported": sorted(SUPPORTED_RESPONSE_TYPES),
             "grant_types_supported": sorted(SUPPORTED_GRANT_TYPES),
             "code_challenge_methods_supported": ["S256"],
+            "authorization_response_iss_parameter_supported": True,
             "token_endpoint_auth_methods_supported": sorted(
                 SUPPORTED_AUTH_METHODS
             ),
@@ -417,11 +418,19 @@ def _error_page(request, description: str, status: int = 400) -> HttpResponse:
 
 
 def _redirect_error(
-    redirect_uri: str, error: str, description: str, state: str
+    request: HttpRequest,
+    redirect_uri: str,
+    error: str,
+    description: str,
+    state: str,
 ) -> HttpResponse:
     params = {"error": error, "error_description": description}
     if state:
         params["state"] = state
+    # RFC 9207: every authorization response — error or success — names its
+    # issuer, so a client registered with several servers can detect a mix-up
+    # attack (a flow it believes belongs to another AS answered by this one).
+    params["iss"] = issuer(request)
     sep = "&" if "?" in redirect_uri else "?"
     resp = HttpResponse(status=302)
     resp["Location"] = f"{redirect_uri}{sep}{urlencode(params)}"
@@ -453,6 +462,7 @@ def _validate_authorize_params(request, params: dict):
     state = params.get("state", "")
     if params.get("response_type") != "code":
         return None, _redirect_error(
+            request,
             redirect_uri,
             "unsupported_response_type",
             "only response_type=code is supported",
@@ -460,6 +470,7 @@ def _validate_authorize_params(request, params: dict):
         )
     if not params.get("code_challenge"):
         return None, _redirect_error(
+            request,
             redirect_uri,
             "invalid_request",
             "code_challenge is required (PKCE)",
@@ -467,6 +478,7 @@ def _validate_authorize_params(request, params: dict):
         )
     if params.get("code_challenge_method", "S256") != "S256":
         return None, _redirect_error(
+            request,
             redirect_uri,
             "invalid_request",
             "only code_challenge_method=S256 is supported",
@@ -475,6 +487,7 @@ def _validate_authorize_params(request, params: dict):
     resource = params.get("resource", "")
     if resource and not _resource_matches(resource, request):
         return None, _redirect_error(
+            request,
             redirect_uri,
             "invalid_target",
             "resource does not identify this MCP server",
@@ -483,7 +496,11 @@ def _validate_authorize_params(request, params: dict):
     requested = (params.get("scope") or "").split()
     if any(s not in SUPPORTED_SCOPES for s in requested):
         return None, _redirect_error(
-            redirect_uri, "invalid_scope", "unsupported scope requested", state
+            request,
+            redirect_uri,
+            "invalid_scope",
+            "unsupported scope requested",
+            state,
         )
     # A client may only ask for what it is registered for. Validating against
     # SUPPORTED_SCOPES alone would let any self-registered client request
@@ -491,6 +508,7 @@ def _validate_authorize_params(request, params: dict):
     grantable = allowed_scopes(client)
     if any(s not in grantable for s in requested):
         return None, _redirect_error(
+            request,
             redirect_uri,
             "invalid_scope",
             "client is not registered for the requested scope",
@@ -529,6 +547,7 @@ def authorize(request: HttpRequest) -> HttpResponse:
     missing = _unentitled_scope(request.user, params["scope"])
     if missing is not None:
         return _redirect_error(
+            request,
             params["redirect_uri"],
             "access_denied",
             f"{missing} is not included in your plan",
@@ -562,6 +581,7 @@ def authorize(request: HttpRequest) -> HttpResponse:
     state = params["state"]
     if request.POST.get("action") != "approve":
         return _redirect_error(
+            request,
             params["redirect_uri"],
             "access_denied",
             "the user denied the request",
@@ -584,6 +604,7 @@ def authorize(request: HttpRequest) -> HttpResponse:
     out = {"code": raw_code}
     if state:
         out["state"] = state
+    out["iss"] = issuer(request)  # RFC 9207, as in _redirect_error
     sep = "&" if "?" in params["redirect_uri"] else "?"
     resp = HttpResponse(status=302)
     resp["Location"] = f"{params['redirect_uri']}{sep}{urlencode(out)}"
