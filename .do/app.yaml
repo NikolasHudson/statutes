@@ -84,6 +84,20 @@ envs:
 - key: DOCLING_INTERNAL_TOKEN
   scope: RUN_TIME
   type: SECRET
+# Cloudflare origin lock. The zone's request-header Transform Rule stamps
+# X-Origin-Lock: <this value> on every proxied request; Django
+# (core/middleware.py:OriginLockMiddleware), the mcp ASGI wrapper
+# (apps/mcp_server/server.py:_with_origin_lock) and the chat-frontend Next
+# middleware (chat-frontend/middleware.ts) all 403 edge traffic without it,
+# closing the direct *.ondigitalocean.app bypass this file's client-IP note
+# below calls out. App-level so every component reads ONE value; docling and
+# the workers/jobs ignore it. Health probes are exempt in each component
+# (/api/health, /healthz), so the probe path never needs the header. Inert
+# until set — set it in the App Platform UI to the SAME value as the
+# Cloudflare rule (and as the marketing app's copy; see marketing-app.yaml).
+- key: ORIGIN_LOCK_SECRET
+  scope: RUN_TIME
+  type: SECRET
 # Email assistant (apps/mail). Postmark server token for outbound replies via
 # anymail; the webhook token authenticates Postmark's inbound POSTs to
 # /api/email/inbound?token=... (set the same value in the Postmark webhook
@@ -470,10 +484,15 @@ services:
   http_port: 8080
   instance_count: 1
   instance_size_slug: apps-s-1vcpu-0.5gb
-  # HTTP health check (#30): probe the app root so an up-but-broken Next.js
-  # process is pulled from rotation rather than relying on a bare TCP probe.
+  # HTTP health check (#30) so an up-but-broken Next.js process is pulled from
+  # rotation rather than relying on a bare TCP probe. /healthz (not /): the
+  # probe hits the pod directly with no Cloudflare-stamped X-Origin-Lock
+  # header, and / would 403 once the origin lock is armed. The route
+  # (app/healthz/route.ts) is exempted in chat-frontend/middleware.ts.
+  # ROLLOUT ORDER: flip this path only on/after the deploy that ships the
+  # /healthz route — pointing the probe at a 404 fails the deployment.
   health_check:
-    http_path: /
+    http_path: /healthz
     timeout_seconds: 5
     failure_threshold: 3
   # NEXT_PUBLIC_* are inlined into the bundle at BUILD and cannot be corrected at

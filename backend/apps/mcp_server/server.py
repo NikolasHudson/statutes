@@ -25,6 +25,7 @@ The Claude Desktop install flow lives in apps/mcp_server/README.md.
 from __future__ import annotations
 
 import argparse
+import hmac
 import os
 import sys
 
@@ -363,6 +364,51 @@ def _with_healthz(app):
     return wrapper
 
 
+def _with_origin_lock(app):
+    """Wrap an ASGI app so HTTP requests must carry the Cloudflare-stamped
+    ``X-Origin-Lock`` header (see core/middleware.py:OriginLockMiddleware —
+    same contract, ASGI transport: this component doesn't run the Django
+    middleware stack).
+
+    Inert while ``ORIGIN_LOCK_SECRET`` is empty, and the setting is read
+    per-request so ``override_settings`` works in tests. Sits INSIDE
+    ``_with_healthz`` — the App Platform probe hits the pod directly and never
+    transits Cloudflare — and OUTSIDE ``api_key_middleware``, so bypass
+    traffic is rejected before it can exercise auth at all."""
+
+    async def wrapper(scope, receive, send):
+        if scope.get("type") != "http":
+            await app(scope, receive, send)
+            return
+
+        from django.conf import settings
+
+        secret = getattr(settings, "ORIGIN_LOCK_SECRET", "") or ""
+        if secret:
+            supplied = b""
+            for raw_name, raw_value in scope.get("headers", []):
+                if raw_name.lower() == b"x-origin-lock":
+                    supplied = raw_value
+                    break
+            if not hmac.compare_digest(supplied, secret.encode()):
+                body = b'{"error": "forbidden"}'
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 403,
+                        "headers": [
+                            (b"content-type", b"application/json"),
+                            (b"content-length", str(len(body)).encode("ascii")),
+                        ],
+                    }
+                )
+                await send({"type": "http.response.body", "body": body})
+                return
+        await app(scope, receive, send)
+
+    return wrapper
+
+
 def build_http_app():
     """Construct the production ASGI app: Django-bootstrapped, streamable-HTTP MCP
     wrapped in X-API-Key auth and an auth-exempt health endpoint.
@@ -382,7 +428,9 @@ def build_http_app():
 
     from .auth import api_key_middleware
 
-    return _with_healthz(api_key_middleware(server.streamable_http_app()))
+    return _with_healthz(
+        _with_origin_lock(api_key_middleware(server.streamable_http_app()))
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

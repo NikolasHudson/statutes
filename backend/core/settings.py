@@ -332,6 +332,15 @@ env = environ.Env(
     # Empty = https://<region>.digitaloceanspaces.com. Override only for a
     # non-DO S3 endpoint or a local MinIO in dev.
     SPACES_ENDPOINT=(str, ""),
+    # Shared secret proving a request transited Cloudflare: the zone's
+    # request-header Transform Rule stamps X-Origin-Lock with this value and
+    # OriginLockMiddleware rejects edge traffic without it — otherwise the
+    # public *.ondigitalocean.app origin hostname bypasses every edge control
+    # (WAF, rate limits, the CF-Connecting-IP trust chain in .do/app.yaml).
+    # Empty = lock off (dev, tests, local). Must match the Cloudflare rule
+    # byte-for-byte; to rotate, update the rule first, then this env — the
+    # middleware accepts a single value, so rotation has a brief 403 window.
+    ORIGIN_LOCK_SECRET=(str, ""),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
@@ -345,6 +354,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+ORIGIN_LOCK_SECRET = env("ORIGIN_LOCK_SECRET")
 
 # Server-side OpenAI key for the /api/chat endpoint (no longer BYOK).
 OPENAI_API_KEY = env("OPENAI_API_KEY")
@@ -539,6 +549,10 @@ MIDDLEWARE = [
     # health probe (pod-IP Host, plain HTTP) so the tightened ALLOWED_HOSTS /
     # SECURE_SSL_REDIRECT don't 400/301 it. See core/middleware.py.
     "core.middleware.HealthCheckMiddleware",
+    # Then the Cloudflare origin lock: reject anything that skipped the edge
+    # (direct *.ondigitalocean.app traffic). Inert while ORIGIN_LOCK_SECRET
+    # is unset; the health probe above is answered before it runs.
+    "core.middleware.OriginLockMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     # WhiteNoise serves collected static (Django admin + the built React

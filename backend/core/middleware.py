@@ -17,6 +17,8 @@ probe never trips host validation. Keep the payload in sync with that view
 
 from __future__ import annotations
 
+import hmac
+
 from django.conf import settings
 from django.http import (
     HttpResponseForbidden,
@@ -60,6 +62,35 @@ class HealthCheckMiddleware:
     def __call__(self, request):
         if request.path in _HEALTH_PATHS:
             return JsonResponse({"status": "ok"})
+        return self.get_response(request)
+
+
+class OriginLockMiddleware:
+    """Reject edge traffic that did not transit Cloudflare.
+
+    A request-header Transform Rule on the zone stamps every proxied request
+    with ``X-Origin-Lock: <ORIGIN_LOCK_SECRET>``. The App Platform origin
+    hostname (``*.ondigitalocean.app``) is publicly reachable, so without this
+    check every edge control — WAF rules, rate limiting, and the
+    CF-Connecting-IP trust chain documented in .do/app.yaml — can be bypassed
+    by talking to the origin directly.
+
+    Inert while ``ORIGIN_LOCK_SECRET`` is empty (dev, tests, local runs), and
+    read per-request so ``override_settings`` works in tests. Must sit AFTER
+    HealthCheckMiddleware: the container probe hits the pod directly (no
+    Cloudflare, no header) and is answered before this runs. Everything else
+    reaching this service is edge traffic and must carry the header.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        secret = getattr(settings, "ORIGIN_LOCK_SECRET", "") or ""
+        if secret:
+            supplied = request.headers.get("X-Origin-Lock", "")
+            if not hmac.compare_digest(supplied.encode(), secret.encode()):
+                return HttpResponseForbidden("Forbidden.")
         return self.get_response(request)
 
 

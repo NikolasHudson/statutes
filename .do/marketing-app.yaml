@@ -129,8 +129,14 @@ services:
   instance_size_slug: apps-s-1vcpu-0.5gb
   # HTTP health check so an up-but-broken Next process is pulled from rotation
   # rather than relying on a bare TCP probe (which a hung Node still passes).
+  # /healthz (not /): the probe hits the pod directly with no
+  # Cloudflare-stamped X-Origin-Lock header, and / would 403 once the origin
+  # lock is armed. The route (app/healthz/route.ts) is exempted in
+  # middleware.ts. ROLLOUT ORDER: flip this path only on/after the deploy
+  # that ships the /healthz route — pointing the probe at a 404 fails the
+  # deployment.
   health_check:
-    http_path: /
+    http_path: /healthz
     timeout_seconds: 5
     failure_threshold: 3
   envs:
@@ -226,5 +232,16 @@ services:
   # authorises to /api/marketing/* paths, so a leak cannot be used to assert a
   # source IP against the login lockout or the audit trail.
   - key: MARKETING_PROXY_TOKEN
+    scope: RUN_TIME
+    type: SECRET
+  # Cloudflare origin lock (see the statutes app.yaml for the full story):
+  # the zone Transform Rule stamps X-Origin-Lock on every proxied request and
+  # middleware.ts 403s anything without it, closing the direct
+  # *.ondigitalocean.app bypass. Same value as the statutes app and the
+  # Cloudflare rule — three places, one string, set in the UI, no plaintext
+  # here. RUN_TIME: the Next middleware reads it per-request; build-time
+  # prerender fetches go OUT to API_ORIGIN and don't need it. The /healthz
+  # probe path is exempt in middleware.ts (health_check below points there).
+  - key: ORIGIN_LOCK_SECRET
     scope: RUN_TIME
     type: SECRET
