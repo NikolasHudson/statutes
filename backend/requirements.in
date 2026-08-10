@@ -21,7 +21,7 @@ openai>=1.50,<3
 striprtf>=0.0.26,<1
 # MCP server. The CLI extra pulls in uvicorn for the optional HTTP transport
 # and typer for the dev CLI.
-mcp[cli]>=1.0,<2
+mcp[cli]>=1.28.1,<2
 # --- Production serving (App Platform) ---
 # WSGI server for the web process.
 gunicorn>=23.0,<27
