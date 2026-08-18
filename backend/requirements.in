@@ -7,13 +7,13 @@
 Django>=5.1,<5.2
 django-ninja>=1.3,<2
 django-cors-headers>=4.6,<5
-django-environ>=0.11,<1
+django-environ>=0.14.0,<1
 psycopg[binary]>=3.2,<4
-pgvector>=0.3,<1
+pgvector>=0.5.0,<1
 # Optional at import time — embedding/expansion clients fall back to the
 # deterministic fake / no-op when these aren't installed or no API key is set.
-voyageai>=0.3,<1
-anthropic>=0.39,<1
+voyageai>=0.5.0,<1
+anthropic>=0.122.0,<1
 # OpenAI client used by the /api/chat test endpoint (frontend test page).
 # Only imported lazily inside that view.
 openai>=1.50,<3
@@ -30,7 +30,7 @@ gunicorn>=23.0,<27
 whitenoise>=6.8,<7
 # Backs Django's RedisCache: the per-user chat quota and API rate limiter
 # must share a durable store across processes/deploys.
-redis>=5.2,<9
+redis>=8.1.0,<9
 # Outbound email via Postmark (the email-assistant surface, apps/mail). Anymail
 # abstracts the ESP so a later SES/Mailgun move is a settings swap, not code.
 # Only the backend is used; inbound is our own webhook (apps/mail/api.py).
@@ -45,7 +45,7 @@ markdown-it-py>=3.0,<4
 # Imported lazily (apps/billing/stripe_api.py) so a checkout without it — or a
 # deploy with no STRIPE_SECRET_KEY — still boots and still serves every
 # non-billing route; the three Stripe-calling endpoints answer 503 instead.
-stripe>=15.3,<16
+stripe>=15.5.0,<16
 # --- Auth hardening / observability (security findings #6,#15,#26) ---
 # Brute-force login throttle + lockout, keyed on IP+username against the shared
 # cache (Redis in prod). See AXES_* in core/settings.py.
@@ -61,7 +61,7 @@ python-json-logger>=3.1,<5
 # used: this app streams to one private bucket with no read path, so a Django
 # storage backend (which exists to make FileFields work) would add surface area
 # in the one place we have promised there is none.
-boto3>=1.35,<2
+boto3>=1.43.72,<2
 # The token encryption in apps/edms/crypto.py. Already present transitively; it
 # is named here because a direct import must not depend on someone else's tree.
 cryptography>=44.0,<49
