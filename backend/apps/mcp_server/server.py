@@ -30,6 +30,8 @@ import os
 import sys
 
 import django
+from asgiref.sync import sync_to_async
+from django.db import connections
 
 from core.brand import MCP_SERVER_ID
 
@@ -409,6 +411,73 @@ def _with_origin_lock(app):
     return wrapper
 
 
+def _close_old_connections() -> None:
+    """``django.db.close_old_connections()`` for this thread's connections,
+    skipping any that are inside an atomic block.
+
+    At a request boundary in production no connection is (each tool's ORM
+    work commits or rolls back inside its own sync call), so there this is
+    exactly Django's hook: drop the connection if it errored and no longer
+    answers, or if it outlived ``CONN_MAX_AGE``, and re-arm the per-request
+    ``CONN_HEALTH_CHECKS`` ping. The guard exists for tests: ``TestCase``
+    wraps each test in ``atomic()``, and closing that connection mid-
+    transaction is precisely what ``django.test.Client`` avoids by
+    disconnecting ``close_old_connections`` from the request signals — we call
+    the hook directly, so the same escape hatch is expressed as a guard."""
+    for conn in connections.all(initialized_only=True):
+        if conn.in_atomic_block:
+            continue
+        conn.close_if_unusable_or_obsolete()
+
+
+async def _recycle_db_connections() -> None:
+    """Run ``_close_old_connections`` on the ``thread_sensitive`` executor —
+    the one thread every ORM call in this process uses (auth middleware + all
+    tool handlers). Django connections are thread-local, so a close anywhere
+    else would be a no-op for the connection that matters."""
+    await sync_to_async(_close_old_connections, thread_sensitive=True)()
+
+
+def _with_db_hygiene(app):
+    """Wrap an ASGI app so every HTTP request begins and ends with Django's
+    ``close_old_connections()`` — the connection-lifecycle hook Django's own
+    handlers fire via ``request_started`` / ``request_finished``, which this
+    raw ASGI stack never emits.
+
+    Without it the worker's persistent connection (``CONN_MAX_AGE``) is never
+    aged out, health-checked, or dropped after an error: it lives until the
+    DB side hangs up, and from then on every request that lands on the worker
+    fails with ``OperationalError: the connection is closed`` until the
+    process is restarted. That was the 2026-08-18 prod incident: an idle
+    connection took an SSL EOF at 19:28 UTC and one of the two gunicorn
+    workers 500'd ~50% of MCP traffic for two hours; ``/healthz`` stayed
+    green because it never touches the ORM.
+
+    The hook is cheap when nothing is wrong (a few attribute checks; with
+    ``CONN_HEALTH_CHECKS`` on, one ``SELECT 1`` per request) and Django
+    reconnects lazily on the next query when the connection was stale,
+    errored, or past ``CONN_MAX_AGE``. The trailing call is in ``finally`` so
+    an inner exception still resets the connection for the next request.
+
+    Sits INSIDE ``_with_healthz`` and ``_with_origin_lock`` — neither touches
+    the ORM, and probes / bypass traffic must not cost a DB round trip — and
+    OUTSIDE ``api_key_middleware``, whose credential lookup is the request's
+    first ORM call. Non-HTTP scopes (Starlette lifespan) pass straight
+    through."""
+
+    async def wrapper(scope, receive, send):
+        if scope.get("type") != "http":
+            await app(scope, receive, send)
+            return
+        await _recycle_db_connections()
+        try:
+            await app(scope, receive, send)
+        finally:
+            await _recycle_db_connections()
+
+    return wrapper
+
+
 def build_http_app():
     """Construct the production ASGI app: Django-bootstrapped, streamable-HTTP MCP
     wrapped in X-API-Key auth and an auth-exempt health endpoint.
@@ -421,15 +490,18 @@ def build_http_app():
     Stateless + JSON mode (set in ``build_server``) means every worker process
     and every instance can serve any request, so multi-worker / multi-instance
     serving is safe. Layering, outermost first: ``/healthz`` short-circuit →
-    ``X-API-Key`` auth → FastMCP streamable-HTTP app (which itself applies the
-    transport-security Host/Origin/Content-Type checks)."""
+    origin lock → DB connection hygiene → ``X-API-Key`` auth → FastMCP
+    streamable-HTTP app (which itself applies the transport-security
+    Host/Origin/Content-Type checks)."""
     _bootstrap_django()
     server = build_server()
 
     from .auth import api_key_middleware
 
     return _with_healthz(
-        _with_origin_lock(api_key_middleware(server.streamable_http_app()))
+        _with_origin_lock(
+            _with_db_hygiene(api_key_middleware(server.streamable_http_app()))
+        )
     )
 
 

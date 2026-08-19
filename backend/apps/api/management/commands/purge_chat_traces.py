@@ -25,6 +25,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db import close_old_connections
 from django.utils import timezone
 
 from apps.api.models import ChatTrace, SearchLog, VerificationRun
@@ -74,9 +75,15 @@ class Command(BaseCommand):
 
         # Long-lived worker mode. A transient failure (e.g. a DB blip) must not
         # kill the loop, so each pass is guarded and we sleep before retrying.
+        # close_old_connections() before each pass is what makes the retry
+        # meaningful: outside a Django request nothing else ever recycles the
+        # persistent connection (CONN_MAX_AGE), so once the DB side drops it
+        # every later pass would fail with "the connection is closed" for the
+        # life of the process (see apps/mcp_server/server._with_db_hygiene).
         interval = options["interval"]
         self.stdout.write(f"Starting trace-purge loop (every {interval}s).")
         while True:
+            close_old_connections()
             try:
                 self._purge_once(options)
             except Exception as exc:  # noqa: BLE001 - keep the worker alive

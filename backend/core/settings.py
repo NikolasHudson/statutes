@@ -599,8 +599,17 @@ ASGI_APPLICATION = "core.asgi.application"
 DATABASES = {"default": env.db("DATABASE_URL")}
 # Persistent connections in prod (App Platform → Managed PG). Managed
 # Postgres requires TLS; sslmode is also accepted directly in DATABASE_URL.
+#
+# CONN_HEALTH_CHECKS: ping (``SELECT 1``) a persistent connection once per
+# request cycle before reusing it, so a connection the DB side dropped
+# (idle timeout, failover, Saturday maintenance) is replaced BEFORE the first
+# query fails rather than after. The check only runs when something calls
+# ``close_old_connections()`` — Django's request handlers do; the MCP ASGI
+# app (``apps/mcp_server/server._with_db_hygiene``) and the ``--forever``
+# management-command workers do it explicitly.
 if not DEBUG:
     DATABASES["default"]["CONN_MAX_AGE"] = 60
+    DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
     DATABASES["default"].setdefault("OPTIONS", {}).setdefault(
         "sslmode", env("DATABASE_SSLMODE", default="require")
     )

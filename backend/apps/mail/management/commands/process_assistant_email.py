@@ -15,6 +15,7 @@ from __future__ import annotations
 import time
 
 from django.core.management.base import BaseCommand
+from django.db import close_old_connections
 
 from apps.mail.services import claim_pending, process_inbound
 
@@ -53,6 +54,11 @@ class Command(BaseCommand):
             f"Starting email-assistant loop (poll every {interval}s)."
         )
         while True:
+            # Recycle a stale/dropped persistent connection before each pass;
+            # nothing else does outside a Django request, and a dropped
+            # connection would otherwise fail every pass until redeploy (same
+            # bug class as apps/mcp_server/server._with_db_hygiene).
+            close_old_connections()
             try:
                 processed = self._one_pass(options["batch"])
             except Exception as exc:  # noqa: BLE001 — keep the worker alive
