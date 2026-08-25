@@ -20,9 +20,9 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.12.0+cpu
 torchvision==0.27.0+cpu
-docling>=2.0,<3
+docling>=2.121.0,<3
 # ASGI app + server. python-multipart is intentionally omitted — /extract
 # takes the raw request body (filename via the X-Filename header), so there's
 # no multipart parsing on this side.
-fastapi>=0.115,<1
-uvicorn[standard]>=0.30,<1
+fastapi>=0.141.1,<1
+uvicorn[standard]>=0.52.4,<1
