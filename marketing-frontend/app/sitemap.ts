@@ -8,9 +8,12 @@ const STATIC_ROUTES = [
 	"/articles",
 	"/consulting",
 	"/contact",
+	"/data",
+	"/data/most-cited-cases",
 	"/pricing",
 	"/products",
 	"/products/corpus",
+	"/products/edms",
 	"/products/mcp",
 	"/products/email",
 ];

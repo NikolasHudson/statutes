@@ -1,0 +1,25 @@
+{
+  "slug": "citation-concentration",
+  "as_of": "2026-08-13",
+  "provenance": "Corpus-wide citation-graph counts computed 2026-08-13 from the same Hudson Corpus snapshot as most-cited-cases.json (same 475,375 opinion-to-opinion edges across 76,725 Iowa appellate decisions). Read by data brief 001. Refresh together with most-cited-cases.json; the page asserts the two as-of dates and edge totals agree.",
+  "definitions": {
+    "never_cited": "decisions with no citing Iowa appellate opinion in the graph",
+    "never_cited_share": "never_cited / decisions",
+    "at_least_100": "decisions cited by at least 100 distinct opinions (likewise 500, 1000)",
+    "fifty_corpus_share": "the fifty as a percentage of all decisions (50 / decisions * 100)",
+    "fifty_one_in": "one citation in every N goes to one of the fifty (edges / edges into the fifty, rounded)",
+    "varnum_cites": "citing opinions for Varnum v. Brien, 763 N.W.2d 862 (Iowa 2009), canonical node only"
+  },
+  "numbers": {
+    "edges": 475375,
+    "decisions": 76725,
+    "never_cited": 29088,
+    "never_cited_share": 0.379,
+    "at_least_100": 238,
+    "at_least_500": 12,
+    "at_least_1000": 6,
+    "fifty_corpus_share": 0.065,
+    "fifty_one_in": 21,
+    "varnum_cites": 143
+  }
+}

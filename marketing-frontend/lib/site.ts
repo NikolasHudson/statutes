@@ -17,6 +17,13 @@ export const COMPANY_NAME = "Hudson Legal Technologies";
 // connector. Must stay in step with backend/core/brand.py (the wire ID).
 export const MCP_SERVER_ID = "hudson-corpus";
 
+// The court-filing product (the browser extension + apps/edms). Long form on
+// first reference; short form where "Hudson" is already implied. Mirrors
+// EDMS_PRODUCT_NAME / EDMS_PRODUCT_SHORT_NAME in backend/core/brand.py and
+// chat-frontend/lib/brand.ts — a rename is those three files.
+export const EDMS_PRODUCT_NAME = "Hudson EDMSpro";
+export const EDMS_PRODUCT_SHORT_NAME = "EDMSpro";
+
 // --- Origins ---------------------------------------------------------------
 
 // NEXT_PUBLIC_* is INLINED AT BUILD TIME. An unset one cannot be recovered at

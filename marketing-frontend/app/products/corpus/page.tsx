@@ -1,10 +1,13 @@
 // Product page for Hudson Corpus — the flagship grounded legal-research
-// product, in the Carbon (IBM design system) register.
+// product, laid out the way ibm.com/products/* is (see
+// components/marketing/product-page.tsx for the shell): breadcrumb, a leadspace
+// whose H1 is the product's name, a sticky in-page nav carrying the section
+// anchors and the primary action, then Overview → Features → Use cases →
+// Resources → Pricing → "Take the next step".
 //
-// Lives under the marketing tree (/products/corpus) on the shared Carbon
-// chrome (components/marketing/carbon.tsx): dark #161616 leadspace, light and
-// ink bands alternating, hairline rules, Plex-light display type, square
-// Blue-60 actions. Server component (carries <metadata>).
+// Still the Carbon register the rest of the site uses: dark #161616 bands
+// alternating with the gray-10 and white layers, hairline rules, Plex-light
+// display type, square Blue-60 actions. Server component (carries <metadata>).
 
 import {
 	BadgeCheckIcon,
@@ -17,26 +20,46 @@ import {
 import type { Metadata } from "next";
 import {
 	CarbonPage,
+	Eyebrow,
 	Frame,
 	HairlineLink,
-	INK,
-	PageHero,
-	SectionHead,
 	SolidLink,
-	TextLink,
 } from "@/components/marketing/carbon";
 import {
+	ARTICLES_HREF,
 	CONSULTING_HREF,
-	PRODUCTS_INDEX_HREF,
+	CONTACT_HREF,
+	DATA_HREF,
+	MCP_PRODUCT_HREF,
+	PRICING_HREF,
 } from "@/components/marketing/chrome";
 import { ProductFamily } from "@/components/marketing/product-family";
+import {
+	FeatureTabs,
+	type ProductFeature,
+} from "@/components/marketing/product-features";
+import {
+	NextStep,
+	PlanBand,
+	ProductLeadspace,
+	ProductSection,
+	type Resource,
+	ResourceCards,
+	StatRow,
+	type UseCase,
+	UseCaseGrid,
+} from "@/components/marketing/product-page";
+import {
+	ProductSubnav,
+	type SubnavSection,
+} from "@/components/marketing/product-subnav";
 import {
 	type CorpusStats,
 	corpusSourceProse,
 	fetchCorpusStats,
+	formatCount,
 } from "@/lib/api";
-import { APP_URL } from "@/lib/site";
-import { cn } from "@/lib/utils";
+import { APP_URL, BRAND_NAME } from "@/lib/site";
 
 // Every source list on this page is DERIVED, like / and /products already do.
 //
@@ -63,191 +86,188 @@ export async function generateMetadata(): Promise<Metadata> {
 	};
 }
 
+const SECTIONS: SubnavSection[] = [
+	{ id: "overview", label: "Overview" },
+	{ id: "features", label: "Features" },
+	{ id: "use-cases", label: "Use cases" },
+	{ id: "resources", label: "Resources" },
+	{ id: "pricing", label: "Pricing" },
+];
+
 export default async function CorpusProductPage() {
 	const stats = await fetchCorpusStats();
 	return (
 		<CarbonPage>
-			<Hero stats={stats} />
-			<HeroShot />
-			<FeatureSections stats={stats} />
-			<CapabilityGrid />
-			<CtaBand />
-			<ProductFamily current="corpus" n="05" />
+			<Lead stats={stats} />
+			<ProductSubnav product={BRAND_NAME} sections={SECTIONS} />
+			<Overview stats={stats} />
+			<Features stats={stats} />
+			<UseCases />
+			<Resources />
+			<Pricing />
+			<NextStep
+				title="See Hudson Corpus on your next question."
+				body="In beta now. Ask, follow the citation to the source, and see what grounded research feels like."
+				actions={
+					<>
+						<SolidLink href={APP_URL}>Get started</SolidLink>
+						<HairlineLink href={CONSULTING_HREF}>
+							Book a consultation
+						</HairlineLink>
+					</>
+				}
+				explore={[
+					{ label: "Pricing", href: PRICING_HREF },
+					{ label: "Research & data", href: DATA_HREF },
+					{ label: "Articles", href: ARTICLES_HREF },
+					{ label: "Consulting", href: CONSULTING_HREF },
+					{ label: "Contact us", href: CONTACT_HREF },
+				]}
+			/>
+			<ProductFamily current="corpus" />
 		</CarbonPage>
 	);
 }
 
 // ---------------------------------------------------------------------------
-// Hero — dark leadspace; the primary product shot follows in a light band
+// Leadspace — product name as the headline, the promise under it, the
+// assistant capture in the right column
 // ---------------------------------------------------------------------------
 
-function Hero({ stats }: { stats: CorpusStats }) {
+function Lead({ stats }: { stats: CorpusStats }) {
 	return (
-		<PageHero
-			eyebrow="Products — Hudson Corpus"
-			title={
-				<>
-					Grounded legal research,
-					<br />
-					with the citation built in.
-				</>
-			}
+		<ProductLeadspace
+			product={BRAND_NAME}
+			tagline="Grounded legal research, with the citation built in."
 			lede={`One assistant over the Iowa ${sourceList(stats)} — every answer traced to the currently-effective text, every citation verified before you see it.`}
 			actions={
 				<>
 					<SolidLink href={APP_URL}>Start researching</SolidLink>
-					<HairlineLink href="#features">Tour the product</HairlineLink>
+					<HairlineLink href="#features">See the features</HairlineLink>
 				</>
+			}
+			visual={
+				// Cropped: the leadspace wants the answer and its verification
+				// steps, not the whole workspace. The uncropped capture is the
+				// Ask tab's, below.
+				<Frame
+					src="/marketing/corpus/assistant.png"
+					alt="The Hudson Corpus assistant answering a question with verified citations"
+					caption="Assistant — answer with verified citations"
+					aspect="16 / 10"
+					className="border-[#393939]"
+				/>
 			}
 		/>
 	);
 }
 
-function HeroShot() {
+// ---------------------------------------------------------------------------
+// Overview — the claim, then the corpus by the numbers
+// ---------------------------------------------------------------------------
+
+// One tile per populated source, largest first, straight off /api/browse/sources.
+// A degraded fetch (dev, no backend) yields no sources and StatRow renders
+// nothing — an empty row beats a row of em dashes presented as figures.
+function statTiles(stats: CorpusStats) {
+	return stats.sources.slice(0, 4).map((s) => ({
+		value: formatCount(s.entries),
+		label: s.name.replace(/^Iowa\s+/, ""),
+		sub: s.entry_label,
+	}));
+}
+
+function Overview({ stats }: { stats: CorpusStats }) {
 	return (
-		<section className="bg-background">
-			<div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-20">
-				<Frame
-					src="/marketing/corpus/assistant.png"
-					alt="The Hudson Corpus assistant answering a question with verified citations"
-					caption="Assistant — answer with verified citations"
-				/>
-			</div>
-		</section>
+		<ProductSection
+			id="overview"
+			label="Overview"
+			title="Research that shows its work."
+			intro={`Hudson Corpus is one research surface over the Iowa ${sourceList(stats)} — ${formatCount(stats.documents)} documents, retrieved, quoted, and cited by an assistant that cannot answer from memory. Ask in plain English or by citation number; every claim comes back attached to the provision or opinion it came from.`}
+		>
+			<p className="mt-6 max-w-2xl text-[17px] text-foreground/80 leading-[1.75]">
+				The difference is what happens before you see the answer. Retrieval runs
+				against the human-reviewed text, a deterministic pass checks every quote
+				and citation against its source, and anything superseded or overruled is
+				flagged rather than quietly served. No support in the record, no answer.
+			</p>
+			<StatRow items={statTiles(stats)} />
+		</ProductSection>
 	);
 }
 
 // ---------------------------------------------------------------------------
-// 01–03 Feature sections — SectionHead, then a full-width Frame. The app
-// screens are dense (sidebars + rails + fine text), so they take the full
-// container width; the supporting points sit in a ruled row beneath. Bands
-// alternate dark / light / dark to keep the Carbon rhythm.
+// Features — the rail of surfaces, then what holds the answers up
 // ---------------------------------------------------------------------------
 
-type FeatureBlock = {
-	n: string;
-	label: string;
-	title: string;
-	body: string;
-	points: string[];
-	shot: string;
-	alt: string;
-	caption: string;
-};
-
-function blocks(stats: CorpusStats): FeatureBlock[] {
+function features(stats: CorpusStats): ProductFeature[] {
 	return [
 		{
-			n: "01",
+			id: "ask",
+			label: "Ask",
+			title: "Ask in plain English. Get the citation.",
+			body: "The assistant shows its work as it goes — what it searched, which sections it read, and how many citations and quotations survived verification — then answers from that record and nothing else.",
+			points: [
+				"Every step of the research run, in the open",
+				"Quotes and citations checked before you see them",
+				"Follow any citation straight to the text",
+			],
+			shot: {
+				src: "/marketing/corpus/assistant.png",
+				alt: "The Hudson Corpus assistant answering a question with verified citations",
+				caption: "Assistant — answer with verified citations",
+			},
+		},
+		{
+			id: "browse",
 			label: "Browse",
 			title: "The whole corpus, one library.",
-			body: "Statutes, rules, and decisions in a single, navigable workspace — search across everything or drill into one source.",
+			body: "Statutes, rules, and decisions in a single navigable workspace — search across everything at once or drill into one source and read it end to end.",
 			points: [
 				`Iowa ${sourceList(stats)} side by side`,
 				"Jump from a search hit straight into context",
-				"Live counts so you know the coverage",
+				"Live counts, so you know the coverage",
 			],
-			shot: "/marketing/corpus/browse.png",
-			alt: "The Hudson Corpus library / browse view",
-			caption: "Browse — the unified library",
+			shot: {
+				src: "/marketing/corpus/browse.png",
+				alt: "The Hudson Corpus library / browse view",
+				caption: "Browse — the unified library",
+			},
 		},
 		{
-			n: "02",
+			id: "read",
 			label: "Read",
 			title: "Read the source, not a summary.",
-			body: "Open the effective text with its citation, effective date, and enacting session law attached — and follow inline links to the official publication.",
+			body: "Open the effective text with its citation, effective date, and enacting session law attached — and follow inline links straight to the official publication.",
 			points: [
 				"Currently-in-force text, version-aware",
 				"Citation & effective date on every provision",
 				"One click to the official source",
 			],
-			shot: "/marketing/corpus/reader.png",
-			alt: "The Hudson Corpus statute / case reader",
-			caption: "Reader — the effective text",
+			shot: {
+				src: "/marketing/corpus/reader.png",
+				alt: "The Hudson Corpus statute / case reader",
+				caption: "Reader — the effective text",
+			},
 		},
 		{
-			n: "03",
+			id: "search",
 			label: "Search",
 			title: "Search that finds what you mean.",
-			body: "Full-text, trigram, and vector embeddings fused with Reciprocal Rank Fusion — type a citation number or describe the issue and the on-point provision surfaces either way.",
+			body: "Full-text, trigram, and vector embeddings fused with Reciprocal Rank Fusion — type a citation number or describe the issue, and the on-point provision surfaces either way.",
 			points: [
 				"Keyword precision + semantic recall",
 				"Filter by source, court, and date",
 				"Ranked, cited results — not ten blue links",
 			],
-			shot: "/marketing/corpus/search.png",
-			alt: "The Hudson Corpus search results view",
-			caption: "Search — hybrid results",
+			shot: {
+				src: "/marketing/corpus/search.png",
+				alt: "The Hudson Corpus search results view",
+				caption: "Search — hybrid results",
+			},
 		},
 	];
 }
-
-function FeatureSection({ b, dark }: { b: FeatureBlock; dark: boolean }) {
-	return (
-		<section
-			id={b.n === "01" ? "features" : undefined}
-			className={cn(
-				"scroll-mt-20",
-				dark ? cn("text-white", INK) : "bg-background",
-			)}
-		>
-			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
-				<SectionHead
-					n={b.n}
-					label={b.label}
-					title={b.title}
-					tone={dark ? "dark" : "light"}
-				/>
-
-				<p
-					className={cn(
-						"mt-10 max-w-xl text-[17px] leading-[1.75]",
-						dark ? "text-[#c6c6c6]" : "text-foreground/80",
-					)}
-				>
-					{b.body}
-				</p>
-
-				<Frame
-					src={b.shot}
-					alt={b.alt}
-					caption={b.caption}
-					className={cn("mt-12", dark && "border-[#393939]")}
-				/>
-
-				<ul className="mt-12 grid gap-x-8 gap-y-8 sm:grid-cols-3">
-					{b.points.map((p) => (
-						<li
-							key={p}
-							className={cn(
-								"border-t pt-5 text-[14px] leading-snug",
-								dark
-									? "border-[#393939] text-[#c6c6c6]"
-									: "border-border text-foreground/85",
-							)}
-						>
-							{p}
-						</li>
-					))}
-				</ul>
-			</div>
-		</section>
-	);
-}
-
-function FeatureSections({ stats }: { stats: CorpusStats }) {
-	return (
-		<>
-			{blocks(stats).map((b, i) => (
-				<FeatureSection key={b.n} b={b} dark={i % 2 === 0} />
-			))}
-		</>
-	);
-}
-
-// ---------------------------------------------------------------------------
-// 04 — Capability grid: the substance that needs no screenshot
-// ---------------------------------------------------------------------------
 
 type Capability = { icon: LucideIcon; title: string; body: string };
 
@@ -284,23 +304,32 @@ const CAPABILITIES: Capability[] = [
 	},
 ];
 
-function CapabilityGrid() {
+function Features({ stats }: { stats: CorpusStats }) {
 	return (
-		<section className="scroll-mt-20 bg-background">
-			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
-				<SectionHead
-					n="04"
-					label="Under the hood"
-					title="Why the answers hold up."
-				/>
+		<ProductSection
+			id="features"
+			tone="layer"
+			label="Features"
+			title="One workspace for the whole record."
+			intro="Browse, read, search, and ask — four views of the same corpus, so a question that starts as a hunch ends on the page that governs it."
+			link={{ label: "See the developer tools", href: MCP_PRODUCT_HREF }}
+		>
+			<div className="mt-14">
+				<FeatureTabs features={features(stats)} />
+			</div>
 
-				<div className="mt-14 grid gap-px border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
+			<div className="mt-20 border-border border-t pt-10">
+				<Eyebrow>Under the hood</Eyebrow>
+				<h3 className="mt-6 max-w-3xl font-light text-2xl leading-snug sm:text-3xl">
+					Why the answers hold up.
+				</h3>
+				<div className="mt-12 grid gap-px border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
 					{CAPABILITIES.map((c) => {
 						const Icon = c.icon;
 						return (
 							<div key={c.title} className="bg-card p-8">
 								<Icon className="size-5" strokeWidth={1.5} aria-hidden />
-								<h3 className="mt-6 font-semibold text-[15px]">{c.title}</h3>
+								<h4 className="mt-6 font-semibold text-[15px]">{c.title}</h4>
 								<p className="mt-2 text-[13.5px] text-muted-foreground leading-relaxed">
 									{c.body}
 								</p>
@@ -308,41 +337,124 @@ function CapabilityGrid() {
 						);
 					})}
 				</div>
-
-				<div className="mt-14">
-					<TextLink href={PRODUCTS_INDEX_HREF}>All products</TextLink>
-				</div>
 			</div>
-		</section>
+		</ProductSection>
 	);
 }
 
 // ---------------------------------------------------------------------------
-// CTA band — left-aligned, declarative
+// Use cases — who reaches for it, and for what
 // ---------------------------------------------------------------------------
 
-function CtaBand() {
+const USE_CASES: UseCase[] = [
+	{
+		audience: "Litigation",
+		title: "Check the brief before it is filed.",
+		body: "Every citation in a draft validated against the corpus and every quotation checked verbatim against its source — the pass you would do by hand, done in one.",
+	},
+	{
+		audience: "Advisory work",
+		title: "Answer the client with the text in force.",
+		body: "Provisions carry their effective date and enacting session law, and a version that is no longer the operative one says so before you rely on it.",
+	},
+	{
+		audience: "Agency practice",
+		title: "The rule beside the statute it implements.",
+		body: "The Administrative Code sits in the same library as the Code, with the links between statute and rule mapped rather than left for you to chase.",
+	},
+	{
+		audience: "Appellate research",
+		title: "Follow the authority, not a summary.",
+		body: "Search by issue or by citation, read the opinion itself, and see negative-treatment flags on decisions the citation graph says have moved.",
+	},
+	{
+		audience: "Solos & small firms",
+		title: "A research department that fits in a tab.",
+		body: "No seat minimum, no per-search meter, and nothing to learn beyond asking the question the way you would ask a colleague.",
+	},
+	{
+		audience: "Building with AI",
+		title: "The same corpus, inside your own tools.",
+		body: "Grounded retrieval behind a production MCP endpoint and an email address — read-only, keyed, and stamped with its source and as-of date.",
+	},
+];
+
+function UseCases() {
 	return (
-		<section className={cn("text-white", INK)}>
-			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-24">
-				<div className="flex flex-col gap-10 border-[#393939] border-t pt-10 lg:flex-row lg:items-end lg:justify-between">
-					<div className="max-w-2xl">
-						<h2 className="font-light text-3xl sm:text-4xl">
-							See Hudson Corpus on your next question.
-						</h2>
-						<p className="mt-4 text-[#c6c6c6] text-lg leading-relaxed">
-							In beta now. Ask, follow the citation to the source, and see what
-							grounded research feels like.
-						</p>
-					</div>
-					<div className="flex shrink-0 flex-col gap-3 sm:flex-row">
-						<SolidLink href={APP_URL}>Get started</SolidLink>
-						<HairlineLink href={CONSULTING_HREF}>
-							Book a consultation
-						</HairlineLink>
-					</div>
-				</div>
-			</div>
-		</section>
+		<ProductSection
+			id="use-cases"
+			tone="dark"
+			label="Use cases"
+			title="Where it fits in practice."
+			intro="The same corpus, reached for in six different moments of a working week."
+		>
+			<UseCaseGrid items={USE_CASES} tone="dark" />
+		</ProductSection>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Resources
+// ---------------------------------------------------------------------------
+
+const RESOURCES: Resource[] = [
+	{
+		type: "Data brief 001",
+		title: "The Most-Cited Cases in Iowa",
+		body: "The fifty decisions Iowa's appellate courts cite most, counted from every citation in the corpus — a list of workhorse standards, not landmarks, with the full table and method on the page.",
+		href: "/data/most-cited-cases",
+		cta: "Read the brief",
+	},
+	{
+		type: "Series",
+		title: "Data briefs",
+		body: "One question per brief, answered from the full record and frozen when published: which cases do the work, what changes, who regulates.",
+		href: "/data",
+		cta: "See the series",
+	},
+	{
+		type: "Writing",
+		title: "Articles & analysis",
+		body: "Our writing on grounded retrieval, citation verification, and where legal AI goes wrong — and what we do about it.",
+		href: ARTICLES_HREF,
+		cta: "Read the articles",
+	},
+	{
+		type: "For developers",
+		title: "The MCP endpoint",
+		body: "Ten read-only tools over this corpus — citation lookup, hybrid search, version history, brief auditing — for Claude and any MCP client.",
+		href: MCP_PRODUCT_HREF,
+		cta: "See the tools",
+	},
+];
+
+function Resources() {
+	return (
+		<ProductSection
+			id="resources"
+			label="Resources"
+			title="What we learn, we publish."
+			intro="The corpus is also a research instrument. When it answers a question about Iowa law that nobody has answered from the whole record before, we write it up — numbers frozen, methodology on the page."
+			link={{ label: "All research & data", href: DATA_HREF }}
+		>
+			<ResourceCards items={RESOURCES} />
+		</ProductSection>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Pricing
+// ---------------------------------------------------------------------------
+
+function Pricing() {
+	return (
+		<ProductSection
+			id="pricing"
+			tone="layer"
+			label="Pricing"
+			title="One product. Terms you can plan around."
+		>
+			<PlanBand included="Every plan includes the full corpus, unlimited cited research, the citator's negative-treatment flags, the MCP connector, and the email assistant. Firm adds brief cite-check uploads, seats, and an org console." />
+		</ProductSection>
 	);
 }

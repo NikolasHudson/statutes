@@ -1,6 +1,7 @@
-// Page for the MCP endpoint — Hudson Corpus as a production MCP surface, in the
-// Carbon register (see /products/corpus for the pattern). MCP is a *door* into
-// Hudson Corpus, not a separately-branded product: name it for what it is.
+// Page for the MCP endpoint — Hudson Corpus as a production MCP surface, on
+// the ibm.com-style product shell (components/marketing/product-page.tsx).
+// MCP is a *door* into Hudson Corpus, not a separately-branded product: name it
+// for what it is.
 //
 // Copy is grounded in the shipped server (backend/apps/mcp_server): ten
 // read-only tools, stateless JSON at the app's /mcp endpoint, and two ways in —
@@ -25,16 +26,30 @@ import {
 import type { Metadata } from "next";
 import {
 	CarbonPage,
+	CodeFrame,
 	HairlineLink,
-	INK,
-	PageHero,
-	SectionHead,
 	SolidLink,
 } from "@/components/marketing/carbon";
-import { CONSULTING_HREF } from "@/components/marketing/chrome";
+import {
+	CONSULTING_HREF,
+	CONTACT_HREF,
+	PRICING_HREF,
+	PRODUCT_HREF,
+} from "@/components/marketing/chrome";
 import { ProductFamily } from "@/components/marketing/product-family";
-import { APP_HOST, APP_URL, MCP_SERVER_ID, MCP_URL } from "@/lib/site";
-import { cn } from "@/lib/utils";
+import {
+	NextStep,
+	PlanBand,
+	ProductLeadspace,
+	ProductSection,
+	type UseCase,
+	UseCaseGrid,
+} from "@/components/marketing/product-page";
+import {
+	ProductSubnav,
+	type SubnavSection,
+} from "@/components/marketing/product-subnav";
+import { APP_URL, MCP_SERVER_ID, MCP_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
 	title: "MCP endpoint — Hudson Corpus in your AI tools",
@@ -42,56 +57,102 @@ export const metadata: Metadata = {
 		"A production MCP endpoint over the Iowa Code, Court Rules, and caselaw. Ten grounded, read-only tools — citation lookup, hybrid search, version history, brief auditing — for Claude and any MCP client.",
 };
 
+const PRODUCT = "MCP endpoint";
+
+const SECTIONS: SubnavSection[] = [
+	{ id: "overview", label: "Overview" },
+	{ id: "connect", label: "Connect" },
+	{ id: "tools", label: "Tools" },
+	{ id: "reliability", label: "Reliability" },
+	{ id: "use-cases", label: "Use cases" },
+	{ id: "pricing", label: "Pricing" },
+];
+
 export default function McpProductPage() {
 	return (
 		<CarbonPage>
-			<Hero />
+			<ProductLeadspace
+				product={PRODUCT}
+				tagline="The Iowa legal corpus, inside your AI tools."
+				lede={
+					<>
+						The corpus behind Hudson research, exposed as a production MCP
+						endpoint at{" "}
+						<span className="font-mono text-[0.95em] text-white">
+							{MCP_URL}
+						</span>
+						. Ten grounded, read-only tools for Claude Desktop, Claude Code, and
+						any MCP-capable agent.
+					</>
+				}
+				actions={
+					<>
+						<SolidLink href={APP_URL}>Get an API key</SolidLink>
+						<HairlineLink href="#tools">See the tools</HairlineLink>
+					</>
+				}
+				visual={
+					<CodeFrame
+						caption="Claude Code — one command"
+						code={CLAUDE_CODE_CMD}
+						url={`${MCP_URL.replace(/^https?:\/\//, "")}`}
+					/>
+				}
+			/>
+			<ProductSubnav product={PRODUCT} sections={SECTIONS} />
+			<Overview />
 			<Connect />
 			<ToolCatalog />
-			<Guarantees />
-			<CtaBand />
-			<ProductFamily current="mcp" n="04" />
+			<Reliability />
+			<UseCases />
+			<Pricing />
+			<NextStep
+				title="Point your agent at the corpus."
+				body="Create a key, paste the config, and your assistant is doing grounded Iowa research in minutes. Building something bigger on it? We should talk."
+				actions={
+					<>
+						<SolidLink href={APP_URL}>Get an API key</SolidLink>
+						<HairlineLink href={CONSULTING_HREF}>
+							Book a consultation
+						</HairlineLink>
+					</>
+				}
+				explore={[
+					{ label: "Hudson Corpus", href: PRODUCT_HREF },
+					{ label: "Pricing", href: PRICING_HREF },
+					{ label: "Consulting", href: CONSULTING_HREF },
+					{ label: "Contact us", href: CONTACT_HREF },
+				]}
+			/>
+			<ProductFamily current="mcp" />
 		</CarbonPage>
 	);
 }
 
 // ---------------------------------------------------------------------------
-// Hero
+// Overview
 // ---------------------------------------------------------------------------
 
-function Hero() {
+function Overview() {
 	return (
-		<PageHero
-			eyebrow="Hudson Corpus — MCP endpoint"
-			title={
-				<>
-					The Iowa legal corpus,
-					<br />
-					inside your AI tools.
-				</>
-			}
-			lede={
-				<>
-					The corpus behind Hudson research, exposed as a production MCP
-					endpoint at{" "}
-					<span className="font-mono text-[0.95em] text-white">{MCP_URL}</span>.
-					Ten grounded, read-only tools — citation lookup, hybrid search,
-					version history, brief auditing — for Claude Desktop, Claude Code, and
-					any MCP-capable agent.
-				</>
-			}
-			actions={
-				<>
-					<SolidLink href={APP_URL}>Get an API key</SolidLink>
-					<HairlineLink href="#tools">See the tools</HairlineLink>
-				</>
-			}
-		/>
+		<ProductSection
+			id="overview"
+			label="Overview"
+			title="One endpoint, ten grounded tools."
+			intro="Everything the research product knows how to do against the Iowa corpus — resolve a citation, search across statutes and decisions, walk a section's version history, audit a brief — offered to your own agent as tools it can call directly."
+		>
+			<p className="mt-6 max-w-2xl text-[17px] text-foreground/80 leading-[1.75]">
+				It is the same retrieval stack the browser product runs on, reached
+				through the protocol instead of a page: stateless JSON over HTTPS,
+				authenticated per call with an OAuth token or a key you create yourself,
+				and read-only from end to end.
+			</p>
+		</ProductSection>
 	);
 }
 
 // ---------------------------------------------------------------------------
-// 01 — Connect: the config is the product shot
+// Connect — the config is the product shot
 // ---------------------------------------------------------------------------
 
 // The env var holding the key in the user's own config. The name is a local
@@ -115,57 +176,40 @@ const DESKTOP_CONFIG = `{
 const CLAUDE_CODE_CMD = `claude mcp add --transport http ${MCP_SERVER_ID} \\
   ${MCP_URL} --header "X-API-Key: <your key>"`;
 
-function CodeFrame({ caption, code }: { caption: string; code: string }) {
-	return (
-		<figure className="border border-border bg-card">
-			<figcaption className="flex items-center justify-between gap-4 border-border border-b px-4 py-2.5 font-mono text-[11px] text-muted-foreground">
-				<span className="truncate">{caption}</span>
-				<span className="shrink-0">{APP_HOST}/mcp</span>
-			</figcaption>
-			<pre className="overflow-x-auto bg-[#161616] p-5 font-mono text-[13px] text-[#e0e0e0] leading-relaxed">
-				<code>{code}</code>
-			</pre>
-		</figure>
-	);
-}
-
 function Connect() {
 	return (
-		<section className="bg-background">
-			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
-				<SectionHead n="01" label="Connect" title="One config block away." />
-				<p className="mt-10 max-w-xl text-[17px] text-foreground/80 leading-[1.75]">
-					Two ways in. Clients that speak OAuth 2.0 discover the endpoint,
-					register themselves, and send you through a consent screen — no key to
-					copy. Everything else sends a key you create in your account. Either
-					way the whole corpus shows up in your assistant's tool list.
-				</p>
-				<div className="mt-12 grid gap-6 lg:grid-cols-2">
+		<ProductSection
+			id="connect"
+			tone="layer"
+			label="Connect"
+			title="One config block away."
+			intro="Two ways in. Clients that speak OAuth 2.0 discover the endpoint, register themselves, and send you through a consent screen — no key to copy. Everything else sends a key you create in your account. Either way the whole corpus shows up in your assistant's tool list."
+		>
+			<div className="mt-14 grid gap-6 lg:grid-cols-2">
+				<CodeFrame
+					caption="Claude Desktop — claude_desktop_config.json"
+					code={DESKTOP_CONFIG}
+				/>
+				<div className="flex flex-col gap-6">
 					<CodeFrame
-						caption="Claude Desktop — claude_desktop_config.json"
-						code={DESKTOP_CONFIG}
+						caption="Claude Code — one command"
+						code={CLAUDE_CODE_CMD}
 					/>
-					<div className="flex flex-col gap-6">
-						<CodeFrame
-							caption="Claude Code — one command"
-							code={CLAUDE_CODE_CMD}
-						/>
-						<p className="border-border border-t pt-5 text-[14px] text-foreground/85 leading-relaxed">
-							Every request carries either an OAuth{" "}
-							<span className="font-mono text-[0.95em]">Bearer</span> token or
-							an <span className="font-mono text-[0.95em]">X-API-Key</span> —
-							stateless JSON over HTTPS, so it works the same from a laptop, a
-							CI job, or an agent fleet.
-						</p>
-					</div>
+					<p className="border-border border-t pt-5 text-[14px] text-foreground/85 leading-relaxed">
+						Every request carries either an OAuth{" "}
+						<span className="font-mono text-[0.95em]">Bearer</span> token or an{" "}
+						<span className="font-mono text-[0.95em]">X-API-Key</span> —
+						stateless JSON over HTTPS, so it works the same from a laptop, a CI
+						job, or an agent fleet.
+					</p>
 				</div>
 			</div>
-		</section>
+		</ProductSection>
 	);
 }
 
 // ---------------------------------------------------------------------------
-// 02 — Tool catalog: the ten registered tools, verbatim names
+// Tools — the ten registered tools, verbatim names
 // ---------------------------------------------------------------------------
 
 type Tool = { name: string; body: string };
@@ -215,36 +259,29 @@ const TOOLS: Tool[] = [
 
 function ToolCatalog() {
 	return (
-		<section id="tools" className={cn("scroll-mt-20 text-white", INK)}>
-			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
-				<SectionHead
-					n="02"
-					label="The tools"
-					title="Ten tools. All read-only. All grounded."
-					tone="dark"
-				/>
-				<p className="mt-10 max-w-xl text-[#c6c6c6] text-[17px] leading-[1.75]">
-					Every response carries an official-source URL and an as-of-date stamp,
-					so an agent can't accidentally cite stale text — the same discipline
-					the human-facing product holds itself to.
-				</p>
-				<div className="mt-14 grid gap-px border border-[#393939] bg-[#393939] sm:grid-cols-2">
-					{TOOLS.map((t) => (
-						<div key={t.name} className="bg-[#161616] p-8">
-							<h3 className="font-mono text-[14px] text-[#78a9ff]">{t.name}</h3>
-							<p className="mt-3 text-[#c6c6c6] text-[13.5px] leading-relaxed">
-								{t.body}
-							</p>
-						</div>
-					))}
-				</div>
+		<ProductSection
+			id="tools"
+			tone="dark"
+			label="The tools"
+			title="Ten tools. All read-only. All grounded."
+			intro="Every response carries an official-source URL and an as-of-date stamp, so an agent can't accidentally cite stale text — the same discipline the human-facing product holds itself to."
+		>
+			<div className="mt-14 grid gap-px border border-[#393939] bg-[#393939] sm:grid-cols-2">
+				{TOOLS.map((t) => (
+					<div key={t.name} className="bg-[#161616] p-8">
+						<h3 className="font-mono text-[#78a9ff] text-[14px]">{t.name}</h3>
+						<p className="mt-3 text-[#c6c6c6] text-[13.5px] leading-relaxed">
+							{t.body}
+						</p>
+					</div>
+				))}
 			</div>
-		</section>
+		</ProductSection>
 	);
 }
 
 // ---------------------------------------------------------------------------
-// 03 — Guarantees
+// Reliability
 // ---------------------------------------------------------------------------
 
 type Guarantee = { icon: LucideIcon; title: string; body: string };
@@ -282,61 +319,83 @@ const GUARANTEES: Guarantee[] = [
 	},
 ];
 
-function Guarantees() {
+function Reliability() {
 	return (
-		<section className="bg-background">
-			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
-				<SectionHead
-					n="03"
-					label="Under the hood"
-					title="Built so agents can't go wrong quietly."
-				/>
-				<div className="mt-14 grid gap-px border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
-					{GUARANTEES.map((g) => {
-						const Icon = g.icon;
-						return (
-							<div key={g.title} className="bg-card p-8">
-								<Icon className="size-5" strokeWidth={1.5} aria-hidden />
-								<h3 className="mt-6 font-semibold text-[15px]">{g.title}</h3>
-								<p className="mt-2 text-[13.5px] text-muted-foreground leading-relaxed">
-									{g.body}
-								</p>
-							</div>
-						);
-					})}
-				</div>
+		<ProductSection
+			id="reliability"
+			label="Reliability"
+			title="Built so agents can't go wrong quietly."
+		>
+			<div className="mt-14 grid gap-px border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
+				{GUARANTEES.map((g) => {
+					const Icon = g.icon;
+					return (
+						<div key={g.title} className="bg-card p-8">
+							<Icon className="size-5" strokeWidth={1.5} aria-hidden />
+							<h3 className="mt-6 font-semibold text-[15px]">{g.title}</h3>
+							<p className="mt-2 text-[13.5px] text-muted-foreground leading-relaxed">
+								{g.body}
+							</p>
+						</div>
+					);
+				})}
 			</div>
-		</section>
+		</ProductSection>
 	);
 }
 
 // ---------------------------------------------------------------------------
-// 04 — CTA band
+// Use cases
 // ---------------------------------------------------------------------------
 
-function CtaBand() {
+const USE_CASES: UseCase[] = [
+	{
+		audience: "In your editor",
+		title: "Research without leaving the draft.",
+		body: "Claude Code and Claude Desktop pick the tools up from your config, so a citation check is a question in the window you are already in.",
+	},
+	{
+		audience: "Firm automation",
+		title: "Audit every brief on the way out.",
+		body: "audit_brief validates the citations, verifies the quotations, and checks currency in one call — a pass a script can run on every filing.",
+	},
+	{
+		audience: "Current awareness",
+		title: "Know what changed since last week.",
+		body: "list_recent_amendments turns the sweep somebody used to do by hand into a scheduled job that reports only what moved.",
+	},
+	{
+		audience: "Product teams",
+		title: "Ground your own assistant in real law.",
+		body: "Stateless JSON over HTTPS, authenticated per call and safe to retry — the retrieval layer you would otherwise have to build and keep current.",
+	},
+];
+
+function UseCases() {
 	return (
-		<section className={cn("text-white", INK)}>
-			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-24">
-				<div className="flex flex-col gap-10 border-[#393939] border-t pt-10 lg:flex-row lg:items-end lg:justify-between">
-					<div className="max-w-2xl">
-						<h2 className="font-light text-3xl sm:text-4xl">
-							Point your agent at the corpus.
-						</h2>
-						<p className="mt-4 text-[#c6c6c6] text-lg leading-relaxed">
-							Create a key, paste the config, and your assistant is doing
-							grounded Iowa research in minutes. Building something bigger on
-							it? We should talk.
-						</p>
-					</div>
-					<div className="flex shrink-0 flex-col gap-3 sm:flex-row">
-						<SolidLink href={APP_URL}>Get an API key</SolidLink>
-						<HairlineLink href={CONSULTING_HREF}>
-							Book a consultation
-						</HairlineLink>
-					</div>
-				</div>
-			</div>
-		</section>
+		<ProductSection
+			id="use-cases"
+			tone="layer"
+			label="Use cases"
+			title="What people point at it."
+		>
+			<UseCaseGrid items={USE_CASES} tone="light" />
+		</ProductSection>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Pricing
+// ---------------------------------------------------------------------------
+
+function Pricing() {
+	return (
+		<ProductSection
+			id="pricing"
+			label="Pricing"
+			title="Included with your plan."
+		>
+			<PlanBand included="The MCP endpoint is not billed separately — every plan includes the connector, keys you create and revoke yourself, and the same corpus the browser product reads." />
+		</ProductSection>
 	);
 }

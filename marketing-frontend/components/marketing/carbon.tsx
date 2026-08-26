@@ -23,6 +23,8 @@ import {
 	ARTICLES_HREF,
 	CONSULTING_HREF,
 	CONTACT_HREF,
+	DATA_HREF,
+	EDMS_PRODUCT_HREF,
 	EMAIL_PRODUCT_HREF,
 	MCP_PRODUCT_HREF,
 	PRICING_HREF,
@@ -141,55 +143,77 @@ export function SectionHead({
 const heroStep =
 	"animate-[hero-rise_700ms_ease-out_both] motion-reduce:animate-none";
 
+// `visual` is opt-in: without it the hero is untouched (every other page).
+// With it, the visual paints the whole band as a background layer — the way
+// the home hero does — and the copy is held to the left of it so the two never
+// meet. Deliberately not a boxed second column: any box, however masked, shows
+// its own edges against the ink. The visual is responsible for fading itself
+// out where the copy is. It's decoration, so it stays off the narrow
+// viewports, where a full-bleed layer would sit under the text.
 export function PageHero({
 	eyebrow,
 	title,
 	lede,
 	actions,
+	visual,
 }: {
 	eyebrow: string;
 	title: React.ReactNode;
 	lede?: React.ReactNode;
 	actions?: React.ReactNode;
+	visual?: React.ReactNode;
 }) {
-	return (
-		<section className={cn("text-white", INK)}>
-			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-24">
-				<div className={heroStep}>
-					<Eyebrow tone="dark">{eyebrow}</Eyebrow>
-				</div>
-				<h1
+	const copy = (
+		<div className={cn(visual && "lg:max-w-[58%]")}>
+			<div className={heroStep}>
+				<Eyebrow tone="dark">{eyebrow}</Eyebrow>
+			</div>
+			<h1
+				className={cn(
+					"mt-8 max-w-5xl font-light text-4xl leading-[1.1] [animation-delay:100ms] sm:text-5xl lg:text-[3.5rem]",
+					heroStep,
+				)}
+			>
+				{title}
+			</h1>
+			<div
+				aria-hidden
+				className="mt-10 h-0.5 w-24 origin-left animate-[hero-draw_500ms_ease-out_both] bg-[#0f62fe] [animation-delay:300ms] motion-reduce:animate-none"
+			/>
+			{lede && (
+				<p
 					className={cn(
-						"mt-8 max-w-5xl font-light text-4xl leading-[1.1] [animation-delay:100ms] sm:text-5xl lg:text-[3.5rem]",
+						"mt-10 max-w-2xl text-[#c6c6c6] text-lg leading-relaxed [animation-delay:400ms]",
 						heroStep,
 					)}
 				>
-					{title}
-				</h1>
+					{lede}
+				</p>
+			)}
+			{actions && (
+				<div
+					className={cn(
+						"mt-12 flex flex-col gap-3 [animation-delay:500ms] sm:flex-row sm:items-center",
+						heroStep,
+					)}
+				>
+					{actions}
+				</div>
+			)}
+		</div>
+	);
+	return (
+		<section className={cn("relative overflow-hidden text-white", INK)}>
+			{visual && (
 				<div
 					aria-hidden
-					className="mt-10 h-0.5 w-24 origin-left animate-[hero-draw_500ms_ease-out_both] bg-[#0f62fe] [animation-delay:300ms] motion-reduce:animate-none"
-				/>
-				{lede && (
-					<p
-						className={cn(
-							"mt-10 max-w-2xl text-[#c6c6c6] text-lg leading-relaxed [animation-delay:400ms]",
-							heroStep,
-						)}
-					>
-						{lede}
-					</p>
-				)}
-				{actions && (
-					<div
-						className={cn(
-							"mt-12 flex flex-col gap-3 [animation-delay:500ms] sm:flex-row sm:items-center",
-							heroStep,
-						)}
-					>
-						{actions}
-					</div>
-				)}
+					className="hidden animate-[hero-fade_1200ms_ease-out_both] [animation-delay:500ms] motion-reduce:animate-none lg:block"
+				>
+					{visual}
+				</div>
+			)}
+			<div className="relative mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-24">
+				{copy}
 			</div>
 		</section>
 	);
@@ -308,6 +332,36 @@ export function Frame({
 	);
 }
 
+// The Frame's sibling for the products whose surface is text, not pixels: same
+// hairline border and mono caption bar, with an ink code block in place of the
+// capture. Used by the MCP page's config blocks and the feature panels.
+export function CodeFrame({
+	caption,
+	code,
+	url = APP_HOST,
+	className,
+}: {
+	caption: string;
+	code: string;
+	url?: string;
+	className?: string;
+}) {
+	return (
+		// min-w-0 so the pre's own horizontal scroll is what absorbs a long line —
+		// as a flex/grid item the figure would otherwise be sized to the widest
+		// line of code and push the layout past the viewport.
+		<figure className={cn("min-w-0 border border-border bg-card", className)}>
+			<figcaption className="flex items-center justify-between gap-4 border-border border-b px-4 py-2.5 font-mono text-[11px] text-muted-foreground">
+				<span className="truncate">{caption}</span>
+				<span className="shrink-0">{url}</span>
+			</figcaption>
+			<pre className="overflow-x-auto bg-[#161616] p-5 font-mono text-[13px] text-[#e0e0e0] leading-relaxed">
+				<code>{code}</code>
+			</pre>
+		</figure>
+	);
+}
+
 // ---------------------------------------------------------------------------
 // Footer — ibm.com register: near-black, hairline top rule, gray link columns
 // ---------------------------------------------------------------------------
@@ -317,9 +371,10 @@ const FOOTER_COLS: {
 	links: { label: string; href: string }[];
 }[] = [
 	{
-		heading: "Product",
+		heading: "Products",
 		links: [
 			{ label: "Hudson Corpus", href: PRODUCT_HREF },
+			{ label: "Hudson EDMSpro", href: EDMS_PRODUCT_HREF },
 			{ label: "MCP endpoint", href: MCP_PRODUCT_HREF },
 			{ label: "Email assistant", href: EMAIL_PRODUCT_HREF },
 			{ label: "Open the app", href: APP_URL },
@@ -329,6 +384,7 @@ const FOOTER_COLS: {
 		heading: "Resources",
 		links: [
 			{ label: "Articles", href: ARTICLES_HREF },
+			{ label: "Data briefs", href: DATA_HREF },
 			{ label: "Pricing", href: PRICING_HREF },
 			{ label: "Documentation", href: APP_URL },
 		],
@@ -356,7 +412,10 @@ const FOOTER_COLS: {
 
 export function CarbonFooter() {
 	return (
-		<footer className="border-[#393939] border-t bg-[#161616] text-white">
+		<footer
+			data-print="hide"
+			className="border-[#393939] border-t bg-[#161616] text-white"
+		>
 			<div className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
 				<div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(4,1fr)]">
 					<div className="max-w-xs">

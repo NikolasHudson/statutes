@@ -115,3 +115,216 @@
 		transform: scaleX(1);
 	}
 }
+
+/* Full-bleed hero visuals fade in place: hero-rise's translate would show as a
+   shift of the whole band. */
+@keyframes hero-fade {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+/* Products mega menu (components/marketing/carbon-nav.tsx): the panel drops
+   from under the header bar rather than appearing all at once. */
+@keyframes mega-drop {
+	from {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Print: the page as a document, not a bleached copy of one. The ink bands,
+   rules and category dots carry meaning here, so backgrounds print as drawn;
+   what drops out is the chrome you cannot use on paper — nav, footer, filter
+   bars, copy buttons — marked `data-print="hide"` at the source.
+   scripts/print-pdf.mjs renders these rules headlessly; Cmd-P gets the same
+   document. */
+@media print {
+	*,
+	*::before,
+	*::after {
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+
+	/* Removes the element outright, so never put it on a grid child that has
+	   items after it — that shifts every later item one slot. Such children
+	   take print:invisible instead. */
+	[data-print="hide"] {
+		display: none !important;
+	}
+
+	/* The paper-only counterpart: a line that only makes sense in a document,
+	   e.g. counts that live in their own columns on screen. */
+	[data-print="show"] {
+		display: block !important;
+	}
+
+	/* An index row on paper: no numeric columns (they fold into the row) and
+	   no disclosure to click, so the name takes the width it deserves. */
+	[data-print="row"] {
+		grid-template-columns: 0.9rem 2rem minmax(0, 1fr) !important;
+	}
+
+	/* A sticky bar that survives into print repeats or floats. */
+	.sticky {
+		position: static !important;
+	}
+
+	/* Every disclosure prints open. Chrome hides a closed <details> with
+	   content-visibility on ::details-content; other engines hide the children,
+	   so both paths are reopened. */
+	details::details-content {
+		content-visibility: visible !important;
+		block-size: auto !important;
+	}
+
+	details > summary ~ * {
+		display: revert !important;
+	}
+
+	details > summary {
+		list-style: none;
+	}
+
+	/* Keep a heading with what it introduces; never split a quotation. */
+	summary,
+	figure,
+	blockquote,
+	h1,
+	h2,
+	h3,
+	h4 {
+		break-inside: avoid;
+	}
+
+	summary,
+	h1,
+	h2,
+	h3,
+	h4 {
+		break-after: avoid;
+	}
+
+	body {
+		background: #fff;
+	}
+
+	/* ---------------------------------------------------------------------
+	   The ink document. A brief whose design is a dark band does not want a
+	   white frame around it, so these pages print full bleed.
+
+	   Chrome paints only the page box and never the @page margins, so full
+	   bleed means printing with zero margins (scripts/print-pdf.mjs --bleed).
+	   The safe area comes back as padding on [data-print="paper"], which
+	   `box-decoration-break: clone` re-applies at every page fragment — that
+	   is what keeps text off the paper edge on continuation pages.
+	   --------------------------------------------------------------------- */
+	[data-print="paper"] {
+		box-decoration-break: clone;
+		-webkit-box-decoration-break: clone;
+		background: #161616 !important;
+		color: #f4f4f4 !important;
+		padding: 0.62in 0.6in 0.66in !important;
+	}
+
+	html:has([data-print="paper"]),
+	html:has([data-print="paper"]) body {
+		background: #161616 !important;
+	}
+
+	/* The hero is the cover; every section opens a page of its own. */
+	[data-print="paper"] > header {
+		break-after: page;
+	}
+
+	/* Screen spacing between bands is wasted on paper, where a page break
+	   already separates them — and the space it wastes is what pushes a
+	   paragraph's last lines onto a page of their own. */
+	[data-print="paper"] > section {
+		break-before: page;
+		padding-top: 0 !important;
+		padding-bottom: 0.25in !important;
+	}
+
+	/* The closing note rides with the methodology, and never breaks: a document
+	   should not end on two orphan lines. */
+	[data-print="paper"] > section[data-print-join] {
+		break-before: auto;
+		break-inside: avoid;
+	}
+
+	[data-print="paper"] figure,
+	[data-print="paper"] li,
+	[data-print="paper"] svg {
+		break-inside: avoid;
+	}
+
+	/* A scroll box on screen is a clipped box on paper. */
+	[data-print="scroll"] {
+		max-height: none !important;
+		overflow: visible !important;
+	}
+
+	[data-print="scroll"] table {
+		min-width: 0 !important;
+		font-size: 9.5px !important;
+	}
+
+	/* Running feet: fixed elements repeat on every printed page. */
+	[data-print="runner"] {
+		display: flex !important;
+		position: fixed;
+		right: 0.6in;
+		bottom: 0.26in;
+		left: 0.6in;
+		justify-content: space-between;
+		border-top: 1px solid #393939;
+		padding-top: 5px;
+		color: #6f6f6f;
+		font-size: 7.5pt;
+	}
+
+	/* Sections designed on paper stock, restated in ink so the document reads
+	   as one piece. Keyed to the palette hexes the components carry: if one is
+	   renamed the print loses a shade, it does not break. */
+	[data-print="ink"] .bg-white,
+	[data-print="ink"].bg-white,
+	[data-print="ink"] .bg-\[\#f4f4f4\],
+	[data-print="ink"].bg-\[\#f4f4f4\] {
+		background-color: transparent !important;
+	}
+
+	[data-print="ink"] .text-\[\#161616\],
+	[data-print="ink"].text-\[\#161616\] {
+		color: #f4f4f4 !important;
+	}
+
+	[data-print="ink"] .text-\[\#525252\],
+	[data-print="ink"] .text-\[\#6f6f6f\] {
+		color: #a8a8a8 !important;
+	}
+
+	[data-print="ink"] .text-\[\#0f62fe\] {
+		color: #78a9ff !important;
+	}
+
+	[data-print="ink"] .border-\[\#e0e0e0\] {
+		border-color: #393939 !important;
+	}
+
+	[data-print="ink"] .border-\[\#161616\] {
+		border-color: #6f6f6f !important;
+	}
+
+	[data-print="ink"] .before\:border-\[\#0f62fe\]::before {
+		border-color: #78a9ff !important;
+	}
+}
