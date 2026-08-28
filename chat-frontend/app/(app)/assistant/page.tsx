@@ -20,7 +20,7 @@ import {
 	SquareIcon,
 	XIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-gate";
 import {
 	type AssistantMessage,
@@ -34,6 +34,12 @@ import {
 	SelectField,
 	Tag,
 } from "@/components/carbon/primitives";
+import {
+	type AskHandle,
+	BarActions,
+	BarContext,
+	useAskHandle,
+} from "@/components/carbon/workspace-bar";
 import { BRAND_NAME } from "@/lib/brand";
 import {
 	type BrowseSource,
@@ -117,6 +123,20 @@ export default function V2AssistantPage() {
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const [model, setModel] = useState<string>(CHAT_MODELS[0].id);
 	const [scope, setScope] = useState<string>(SCOPE_ALL);
+	// The workspace bar's "Ask the assistant" row drops its text into the
+	// composer; `n` makes a repeat of the same text land again.
+	const [seed, setSeed] = useState<{ text: string; n: number }>({
+		text: "",
+		n: 0,
+	});
+	const askHandle = useMemo<AskHandle>(
+		() => ({
+			label: "Ask the assistant",
+			run: (q) => setSeed({ text: q, n: Date.now() }),
+		}),
+		[],
+	);
+	useAskHandle(askHandle);
 	const [sources, setSources] = useState<BrowseSource[]>([]);
 	const [busy, setBusy] = useState(false);
 	const abortRef = useRef<AbortController | null>(null);
@@ -464,36 +484,36 @@ export default function V2AssistantPage() {
 			/>
 
 			<div className="flex min-w-0 flex-1 flex-col">
-				{/* Header — scope + model */}
-				<header className="flex h-14 shrink-0 items-center gap-3 border-[var(--cds-border)] border-b px-5 sm:px-8">
+				{/* Workspace bar: brand / scope on the left, scope + model selects on the right. */}
+				<BarContext>
 					<p className="min-w-0 truncate text-sm">
 						<span className="text-[var(--cds-text-2)]">{BRAND_NAME}</span>
 						<span className="mx-2 text-[var(--cds-helper)]">/</span>
 						<span className="font-semibold">{activeSourceName}</span>
 					</p>
-					<div className="ml-auto flex items-center gap-2">
-						<SelectField
-							aria-label="Search scope"
-							options={[
-								{ value: SCOPE_ALL, label: "All sources" },
-								...sources.map((s) => ({ value: s.slug, label: s.name })),
-							]}
-							value={scope}
-							onChange={(e) => setScope(e.target.value)}
-							className="w-44"
-						/>
-						<SelectField
-							aria-label="Model"
-							options={CHAT_MODELS.map((m) => ({
-								value: m.id,
-								label: m.name,
-							}))}
-							value={model}
-							onChange={(e) => setModel(e.target.value)}
-							className="w-36"
-						/>
-					</div>
-				</header>
+				</BarContext>
+				<BarActions>
+					<SelectField
+						aria-label="Search scope"
+						options={[
+							{ value: SCOPE_ALL, label: "All sources" },
+							...sources.map((s) => ({ value: s.slug, label: s.name })),
+						]}
+						value={scope}
+						onChange={(e) => setScope(e.target.value)}
+						className="w-44"
+					/>
+					<SelectField
+						aria-label="Model"
+						options={CHAT_MODELS.map((m) => ({
+							value: m.id,
+							label: m.name,
+						}))}
+						value={model}
+						onChange={(e) => setModel(e.target.value)}
+						className="w-36"
+					/>
+				</BarActions>
 
 				{/* Thread */}
 				<div
@@ -536,6 +556,7 @@ export default function V2AssistantPage() {
 
 				<Composer
 					busy={busy}
+					seed={seed}
 					onSend={send}
 					onVerify={sendVerify}
 					onStop={stop}
@@ -611,11 +632,11 @@ function ThreadRail({
 		);
 
 	// A contextual panel of the chat workspace, not a second nav: layer
-	// background groups it with the content, and its header shares the chat
-	// header's height + bottom border so the line runs continuously across.
+	// background groups it with the content, and its header shares the
+	// workspace bar's height + bottom border so the line runs continuously across.
 	return (
 		<aside className="hidden w-64 shrink-0 flex-col border-[var(--cds-border)] border-r bg-[var(--cds-layer)] xl:flex">
-			<div className="flex h-14 shrink-0 items-center justify-between border-[var(--cds-border)] border-b pr-2 pl-4">
+			<div className="flex h-12 shrink-0 items-center justify-between border-[var(--cds-border)] border-b pr-2 pl-4">
 				<p className="font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.18em]">
 					Chats
 				</p>
@@ -786,11 +807,13 @@ function EmptyState({ onAsk }: { onAsk: (q: string) => void }) {
 
 function Composer({
 	busy,
+	seed,
 	onSend,
 	onVerify,
 	onStop,
 }: {
 	busy: boolean;
+	seed: { text: string; n: number };
 	onSend: (text: string) => void;
 	onVerify: (text: string, file: File | null) => void;
 	onStop: () => void;
@@ -812,6 +835,13 @@ function Composer({
 		el.style.height = "auto";
 		el.style.height = `${Math.min(el.scrollHeight, 192)}px`;
 	}, [draft]);
+
+	// Text handed in from the workspace bar's "Ask the assistant" row.
+	useEffect(() => {
+		if (!seed.n) return;
+		setDraft(seed.text);
+		taRef.current?.focus();
+	}, [seed]);
 
 	const verifying = verifyMode || !!file;
 	const canSubmit = !busy && (!!draft.trim() || !!file);

@@ -1,7 +1,7 @@
 "use client";
 
 // Statute/rule section reader — /api/browse/nodes/<id> rendered in Carbon:
-// breadcrumb toolbar (with copy-citation / compare / print), the enumerated
+// workspace-bar breadcrumb + actions (copy-citation / compare / print), the enumerated
 // body outline (parsing shared with the legacy pane via lib/statute-format),
 // and a metadata rail (citation, official source, in-text citations, history,
 // neighboring sections). Improves on the legacy pane in one way: in-text
@@ -15,7 +15,7 @@ import {
 	PrinterIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
 	type ReactNode,
 	Suspense,
@@ -30,6 +30,7 @@ import {
 	Panel,
 	Tag,
 } from "@/components/carbon/primitives";
+import { BarActions, BarContext } from "@/components/carbon/workspace-bar";
 import {
 	browseChapter,
 	browseNode,
@@ -38,7 +39,7 @@ import {
 	type NodeDetail,
 } from "@/lib/iowa-browse";
 import { parseStatuteBlocks, statuteIndentRem } from "@/lib/statute-format";
-import { useSearchHighlight } from "@/lib/use-search-highlight";
+import { useDocumentSearch } from "@/lib/use-document-search";
 
 // useSearchParams() must be read inside a Suspense boundary.
 export default function V2SectionPage() {
@@ -133,10 +134,10 @@ function SectionReader({
 	chapter: ChapterDetail | null;
 	searchQuery: string;
 }) {
-	const router = useRouter();
 	const articleRef = useRef<HTMLElement>(null);
 	const [copied, setCopied] = useState(false);
-	const highlightMatches = useSearchHighlight(articleRef, searchQuery, true);
+	// Find-in-section lives in the workspace bar's field; seeded by ?q=.
+	useDocumentSearch(articleRef, searchQuery, "This section");
 	const tail = node.citation.trim().split(/\s+/).pop() || node.citation;
 
 	const copyCitation = async () => {
@@ -160,8 +161,7 @@ function SectionReader({
 
 	return (
 		<div className="flex h-full min-h-0 flex-col">
-			{/* Toolbar */}
-			<div className="flex h-12 shrink-0 items-center gap-1 border-[var(--cds-border)] border-b px-5 print:hidden sm:px-8">
+			<BarContext>
 				<p className="min-w-0 truncate text-sm">
 					<Link
 						href="/"
@@ -190,47 +190,30 @@ function SectionReader({
 					<span className="mx-2 text-[var(--cds-helper)]">/</span>
 					<span className="font-semibold">{tail}</span>
 				</p>
-				<div className="ml-auto flex shrink-0 items-center gap-1">
-					{searchQuery && highlightMatches !== null && (
-						<span className="mr-1 hidden items-center gap-2 sm:flex">
-							<Tag kind={highlightMatches > 0 ? "blue" : "gray"}>
-								{highlightMatches > 0
-									? `${highlightMatches.toLocaleString()} match${highlightMatches === 1 ? "" : "es"}`
-									: "No matches"}
-							</Tag>
-							<button
-								type="button"
-								onClick={() => router.replace(`/section/${node.id}`)}
-								className="text-[11px] text-[var(--cds-helper)] transition-colors hover:text-[var(--cds-text)] hover:underline"
-								title="Clear search highlighting"
-							>
-								Clear
-							</button>
-						</span>
+			</BarContext>
+			<BarActions>
+				<ToolbarButton onClick={copyCitation}>
+					{copied ? (
+						<CheckIcon className="size-4 text-[var(--cds-success-text)]" />
+					) : (
+						<CopyIcon className="size-4" />
 					)}
-					<ToolbarButton onClick={copyCitation}>
-						{copied ? (
-							<CheckIcon className="size-4 text-[var(--cds-success-text)]" />
-						) : (
-							<CopyIcon className="size-4" />
-						)}
-						{copied ? "Copied" : "Copy citation"}
-					</ToolbarButton>
-					{node.source_slug === "iowa-code" && (
-						<Link
-							href={`/compare?node=${node.id}`}
-							className="flex h-9 items-center gap-2 px-3 text-[13px] text-[var(--cds-text-2)] transition-colors hover:bg-[var(--cds-layer-hover)] hover:text-[var(--cds-text)]"
-						>
-							<GitCompareArrowsIcon className="size-4" />
-							Compare editions
-						</Link>
-					)}
-					<ToolbarButton onClick={() => window.print()}>
-						<PrinterIcon className="size-4" />
-						Print
-					</ToolbarButton>
-				</div>
-			</div>
+					{copied ? "Copied" : "Copy citation"}
+				</ToolbarButton>
+				{node.source_slug === "iowa-code" && (
+					<Link
+						href={`/compare?node=${node.id}`}
+						className="flex h-9 items-center gap-2 px-3 text-[13px] text-[var(--cds-text-2)] transition-colors hover:bg-[var(--cds-layer-hover)] hover:text-[var(--cds-text)]"
+					>
+						<GitCompareArrowsIcon className="size-4" />
+						Compare editions
+					</Link>
+				)}
+				<ToolbarButton onClick={() => window.print()}>
+					<PrinterIcon className="size-4" />
+					Print
+				</ToolbarButton>
+			</BarActions>
 
 			<div className="flex min-h-0 flex-1">
 				{/* Center — the section */}
@@ -287,8 +270,7 @@ function SectionReader({
 						)}
 					</div>
 				</article>
-
-				{/* Right rail — metadata */}
+				;{/* Right rail — metadata */}
 				<aside
 					aria-label="Section metadata"
 					className="hidden w-80 shrink-0 space-y-6 overflow-y-auto border-[var(--cds-border)] border-l p-5 print:hidden xl:block"
@@ -366,6 +348,7 @@ function SectionReader({
 						/>
 					</Panel>
 				</aside>
+				;
 			</div>
 		</div>
 	);

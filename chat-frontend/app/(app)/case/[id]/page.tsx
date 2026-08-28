@@ -2,8 +2,9 @@
 
 // Carbon case reader — /case/<id>, wired to /api/browse/cases/<id>.
 //
-// Layout (desktop): a 48px toolbar (breadcrumb + cite · find · copy · print ·
-// Ask), then three panes — outline/details/display rail (lg+), the reading
+// Layout (desktop): the workspace bar carries the breadcrumb + cite, the
+// search field (find-in-opinion + corpus suggest) and Copy · Print · Ask;
+// below it three panes — outline/details/display rail (lg+), the reading
 // column (caption → authority strip → opinions), and the citator rail (xl+:
 // Citing decisions · Authorities · Ask). Below xl the citator and Ask open
 // in a drawer; below lg a bottom bar (Outline · Citator · Ask · Display)
@@ -18,13 +19,11 @@ import {
 	MessageSquareTextIcon,
 	PrinterIcon,
 	ScaleIcon,
-	SearchIcon,
 	TypeIcon,
-	XIcon,
 } from "lucide-react";
 import { IBM_Plex_Serif } from "next/font/google";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
 	type ReactNode,
 	Suspense,
@@ -36,6 +35,7 @@ import {
 } from "react";
 import { type DocAskHandle, useDocAsk } from "@/components/carbon/doc-ask";
 import { Notification, Tag } from "@/components/carbon/primitives";
+import { BarActions, BarContext } from "@/components/carbon/workspace-bar";
 import { AuthorityStrip } from "@/components/case-reader/authority-strip";
 import {
 	CitatorPanel,
@@ -66,7 +66,7 @@ import {
 	type ReaderPrefs,
 	saveReaderPrefs,
 } from "@/lib/reader-prefs";
-import { useSearchHighlight } from "@/lib/use-search-highlight";
+import { useDocumentSearch } from "@/lib/use-document-search";
 import { cn } from "@/lib/utils";
 
 const plexSerif = IBM_Plex_Serif({
@@ -178,7 +178,6 @@ function CaseReader({
 	data: CaseDetail;
 	searchQuery: string;
 }) {
-	const router = useRouter();
 	const scrollRef = useRef<HTMLElement>(null);
 	const askRef = useRef<DocAskHandle>(null);
 
@@ -192,14 +191,9 @@ function CaseReader({
 		saveReaderPrefs(p);
 	};
 
-	// Find in opinion — seeded by the search click-through, editable here.
-	const [find, setFind] = useState(searchQuery);
-	const [findLive, setFindLive] = useState(searchQuery);
-	useEffect(() => {
-		const t = window.setTimeout(() => setFindLive(find.trim()), 200);
-		return () => window.clearTimeout(t);
-	}, [find]);
-	const matches = useSearchHighlight(scrollRef, findLive, true);
+	// Find in opinion lives in the workspace bar's field; the reader only
+	// highlights what it is sent (seeded by a results click-through).
+	useDocumentSearch(scrollRef, searchQuery, "This opinion");
 
 	const [copied, setCopied] = useState(false);
 	const [tab, setTab] = useState<CitatorTab>("citing");
@@ -281,8 +275,7 @@ function CaseReader({
 	return (
 		<CiteHoverProvider cases={data.cited_cases}>
 			<div className={cn("flex h-full min-h-0 flex-col", plexSerif.variable)}>
-				{/* Toolbar */}
-				<div className="flex h-12 shrink-0 items-center gap-1 border-[var(--cds-border)] border-b px-4 print:hidden sm:px-6">
+				<BarContext>
 					<p className="min-w-0 truncate text-sm">
 						<Link
 							href="/"
@@ -298,72 +291,43 @@ function CaseReader({
 							</span>
 						)}
 					</p>
-					<div className="ml-auto flex shrink-0 items-center gap-1">
-						<label className="mr-2 hidden h-8 w-56 items-center gap-2 border-[var(--cds-border-strong)] border-b bg-[var(--cds-field)] px-3 text-[13px] focus-within:border-[#0f62fe] lg:flex">
-							<SearchIcon className="size-4 shrink-0 text-[var(--cds-helper)]" />
-							<input
-								type="search"
-								value={find}
-								onChange={(e) => setFind(e.target.value)}
-								placeholder="Find in opinion"
-								aria-label="Find in opinion"
-								className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--cds-placeholder)] [&::-webkit-search-cancel-button]:hidden"
-							/>
-							{findLive && matches !== null ? (
-								<span className="shrink-0 font-mono text-[11px] text-[var(--cds-helper)] tabular-nums">
-									{matches.toLocaleString()}
-								</span>
-							) : null}
-							{find && (
-								<button
-									type="button"
-									aria-label="Clear find"
-									onClick={() => {
-										setFind("");
-										if (searchQuery) router.replace(`/case/${data.id}`);
-									}}
-									className="shrink-0 text-[var(--cds-helper)] hover:text-[var(--cds-text)]"
-								>
-									<XIcon className="size-3.5" />
-								</button>
-							)}
-						</label>
-						<ToolbarButton onClick={copyCitation} className="hidden sm:flex">
-							{copied ? (
-								<CheckIcon className="size-4 text-[var(--cds-success-text)]" />
-							) : (
-								<CopyIcon className="size-4" />
-							)}
-							{copied ? "Copied" : "Copy citation"}
-						</ToolbarButton>
-						<ToolbarButton
-							onClick={() => window.print()}
-							className="hidden sm:flex"
-						>
-							<PrinterIcon className="size-4" />
-							Print
-						</ToolbarButton>
-						<ToolbarButton
-							onClick={() => openCitator("citing")}
-							className="hidden lg:flex xl:hidden"
-						>
-							<ScaleIcon className="size-4" />
-							Citator
-							<span className="font-mono text-[11px] text-[var(--cds-helper)] tabular-nums">
-								{data.citing_count.toLocaleString()}
-							</span>
-						</ToolbarButton>
-						<button
-							type="button"
-							onClick={() => openCitator("ask")}
-							className="ml-2 hidden h-9 items-center gap-2 bg-[#0f62fe] px-4 text-[13px] text-white transition-colors hover:bg-[#0353e9] lg:flex"
-						>
-							<MessageSquareTextIcon className="size-4" />
-							Ask about this case
-							<span className="font-mono text-[11px] opacity-70">/</span>
-						</button>
-					</div>
-				</div>
+				</BarContext>
+				<BarActions>
+					<ToolbarButton onClick={copyCitation} className="hidden sm:flex">
+						{copied ? (
+							<CheckIcon className="size-4 text-[var(--cds-success-text)]" />
+						) : (
+							<CopyIcon className="size-4" />
+						)}
+						{copied ? "Copied" : "Copy citation"}
+					</ToolbarButton>
+					<ToolbarButton
+						onClick={() => window.print()}
+						className="hidden sm:flex"
+					>
+						<PrinterIcon className="size-4" />
+						Print
+					</ToolbarButton>
+					<ToolbarButton
+						onClick={() => openCitator("citing")}
+						className="hidden lg:flex xl:hidden"
+					>
+						<ScaleIcon className="size-4" />
+						Citator
+						<span className="font-mono text-[11px] text-[var(--cds-helper)] tabular-nums">
+							{data.citing_count.toLocaleString()}
+						</span>
+					</ToolbarButton>
+					<button
+						type="button"
+						onClick={() => openCitator("ask")}
+						className="ml-2 hidden h-9 items-center gap-2 bg-[#0f62fe] px-4 text-[13px] text-white transition-colors hover:bg-[#0353e9] lg:flex"
+					>
+						<MessageSquareTextIcon className="size-4" />
+						Ask about this case
+						<span className="font-mono text-[11px] opacity-70">/</span>
+					</button>
+				</BarActions>
 
 				<div className="flex min-h-0 flex-1">
 					{/* Left rail — outline · details · display */}

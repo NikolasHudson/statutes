@@ -1,6 +1,6 @@
 "use client";
 
-// App chrome for the Carbon app (SIDEBAR_PLAN.md). At md+ every route opens
+// App chrome for the Carbon app (SIDEBAR_PLAN.md, SEARCH_BAR_PLAN.md). At md+ every route opens
 // with a 48px navy icon rail; resting the pointer on it (or tabbing into it)
 // fans a 256px flyout out over the content, and "Keep open" / `[` docks the
 // full nav in flow — remembered per user. Below md the dark ShellHeader stays
@@ -36,6 +36,10 @@ import {
 	SideNav,
 	useTheme,
 } from "@/components/carbon/primitives";
+import {
+	WorkspaceBar,
+	WorkspaceBarProvider,
+} from "@/components/carbon/workspace-bar";
 import { EDMS_PRODUCT_SHORT_NAME } from "@/lib/brand";
 import { loadDocked, saveDocked } from "@/lib/nav-prefs";
 import { cn } from "@/lib/utils";
@@ -449,7 +453,7 @@ export function V2Shell({ children }: { children: React.ReactNode }) {
 	);
 
 	return (
-		<>
+		<WorkspaceBarProvider>
 			<ShellHeader
 				homeHref="/"
 				onMenu={bare ? undefined : () => setMobileOpen((o) => !o)}
@@ -541,10 +545,16 @@ export function V2Shell({ children }: { children: React.ReactNode }) {
 						)}
 					</>
 				)}
-				<main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-					{children}
+				<main className="flex min-w-0 flex-1 flex-col">
+					{/* The workspace bar (SEARCH_BAR_PLAN.md): context · search ·
+					    actions on every route. The Library home keeps its hero
+					    search instead. */}
+					{!bare && pathname !== "/" && <WorkspaceBar />}
+					<div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+						{children}
+					</div>
 				</main>
 			</div>
-		</>
+		</WorkspaceBarProvider>
 	);
 }

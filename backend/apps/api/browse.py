@@ -17,6 +17,7 @@ import json
 import re
 
 from django.http import HttpResponse, HttpResponseNotModified, JsonResponse
+from django.db import OperationalError, connection, transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Coalesce
@@ -28,6 +29,7 @@ from apps.corpus.models import (
     CrossReference,
     Edition,
     Node,
+    NodeType,
     NodeVersion,
     ReporterCitation,
     ReviewStatus,
@@ -1200,6 +1202,258 @@ def search(
             "results": page,
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Suggest (typeahead for the reader's search field)
+# ---------------------------------------------------------------------------
+
+# Bounds for /suggest. It runs on every keystroke, so every query it issues
+# is index-backed and capped: a reporter cite or section number is an exact
+# lookup; names and catchlines go through the pg_trgm word-similarity
+# operator (GIN ``corpus_node_heading_trgm``), but the candidate set is
+# LIMITed *before* the similarity sort — a generic query like "state v"
+# matches thousands of headings at similarity 1.0, and sorting them all was
+# ~700 ms; 200 arbitrary candidates sorted is ~25 ms and, for a query that
+# generic, no less useful. ``statement_timeout`` is the backstop: a query
+# that still blows the budget degrades to an empty group instead of a
+# 500 (and is not edge-cached).
+SUGGEST_MAX_QUERY_CHARS = 120
+SUGGEST_MIN_QUERY_CHARS = 2
+SUGGEST_NAME_MIN_CHARS = 3  # trigram similarity is noise below three chars
+SUGGEST_CANDIDATES = 300
+SUGGEST_PER_GROUP = 5
+SUGGEST_STATEMENT_TIMEOUT_MS = 400
+
+# "554", "554.2314", "§ 554.2314", "554.23" (partial) — chapter[.section].
+_SECTION_QUERY_RE = re.compile(
+    r"^\s*§?\s*(\d{1,4}[A-Z]?)(?:\.(\d{0,6}[A-Za-z]?))?\s*$"
+)
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
+# pg_trgm indexes letters/digits only: a query without a two-character word
+# has no trigrams, so the GIN index can't serve it and ``<%`` would fall back
+# to a sequential scan over every heading. Skip the fuzzy lookups instead.
+_HAS_WORD_RE = re.compile(r"[A-Za-z0-9]{2,}")
+
+_SUGGEST_CASES_SQL = """
+    SELECT c.id
+    FROM (
+        SELECT n.id, n.heading, n.source_metadata
+        FROM corpus_node n
+        WHERE n.source_id = %s
+          AND n.node_type_id = %s
+          AND %s <%% n.heading
+        LIMIT %s
+    ) c
+    ORDER BY word_similarity(%s, c.heading) DESC,
+             similarity(%s, c.heading) DESC,
+             c.source_metadata->>'date_filed' DESC NULLS LAST,
+             c.id
+    LIMIT %s
+"""
+
+# Sections are visible only with an open, approved version — the same rule
+# every other browse route applies — so a pending ingest never surfaces here.
+_SUGGEST_VISIBLE_SECTION = """
+    n.source_id = %s AND n.node_type_id = %s AND NOT n.is_repealed
+    AND EXISTS (
+        SELECT 1 FROM corpus_nodeversion v
+        WHERE v.node_id = n.id AND v.effective_to IS NULL
+          AND v.review_status = 'approved'
+    )
+"""
+
+_SUGGEST_SECTIONS_SQL = f"""
+    SELECT c.id
+    FROM (
+        SELECT n.id, n.heading, n.path
+        FROM corpus_node n
+        WHERE {_SUGGEST_VISIBLE_SECTION}
+          AND %s <%% n.heading
+        LIMIT %s
+    ) c
+    ORDER BY word_similarity(%s, c.heading) DESC,
+             similarity(%s, c.heading) DESC,
+             c.path, c.id
+    LIMIT %s
+"""
+
+# ``path LIKE 'prefix%'`` hits the varchar_pattern_ops index Django adds for
+# the indexed CharField; the prefix is built from the regex groups above, so
+# it carries no LIKE metacharacters.
+_SUGGEST_SECTION_PREFIX_SQL = f"""
+    SELECT n.id
+    FROM corpus_node n
+    WHERE {_SUGGEST_VISIBLE_SECTION}
+      AND n.path LIKE %s
+    ORDER BY n.path
+    LIMIT %s
+"""
+
+
+def _fuzzy_ok(q: str) -> bool:
+    return len(q) >= SUGGEST_NAME_MIN_CHARS and bool(_HAS_WORD_RE.search(q))
+
+
+def _clean_suggest_query(q: str | None) -> str:
+    q = _CONTROL_CHARS_RE.sub(" ", q or "")
+    q = " ".join(q.split())
+    return q[:SUGGEST_MAX_QUERY_CHARS]
+
+
+def _suggest_case_row(node: Node, *, exact: bool = False) -> dict:
+    md = node.source_metadata or {}
+    return {
+        "case_id": node.id,
+        "case_name": node.heading,
+        "court_id": md.get("court_id", ""),
+        "court_name": md.get("court_name", ""),
+        "date_filed": md.get("date_filed", ""),
+        "citation": _reporter_citation(md.get("citations")),
+        "exact": exact,
+    }
+
+
+def _suggest_section_row(node: Node, *, exact: bool = False) -> dict:
+    parent = node.parent
+    return {
+        "node_id": node.id,
+        "path": node.path,
+        "heading": " ".join((node.heading or "").split()),
+        "citation": f"{node.source.citation_abbreviation} § {node.path}",
+        "chapter": (
+            {
+                "ordinal": parent.path,
+                "heading": " ".join((parent.heading or "").split()),
+            }
+            if parent is not None
+            else None
+        ),
+        "exact": exact,
+    }
+
+
+def _nodes_in_order(ids: list[int], *, parent: bool = False) -> list[Node]:
+    if not ids:
+        return []
+    qs = Node.objects.filter(pk__in=ids).select_related("source")
+    if parent:
+        qs = qs.select_related("parent")
+    by_id = {n.id: n for n in qs}
+    return [by_id[i] for i in ids if i in by_id]
+
+
+def _suggest_cases(cur, q: str) -> list[dict]:
+    src = Source.objects.filter(slug="iowa-caselaw").first()
+    if src is None:
+        return []
+    rows: list[dict] = []
+    seen: set[int] = set()
+
+    # Reporter cite → the one decision it names, pinned. Ambiguous or
+    # unknown cites fall through to the name lookup.
+    pinned = _resolve_reporter_citation(q)
+    if pinned is not None:
+        for node in _nodes_in_order([pinned]):
+            rows.append(_suggest_case_row(node, exact=True))
+            seen.add(node.id)
+
+    if _fuzzy_ok(q) and not _SECTION_QUERY_RE.match(q):
+        dec_type = NodeType.objects.filter(source=src, key="decision").first()
+        if dec_type is None:
+            return rows
+        cur.execute(
+            _SUGGEST_CASES_SQL,
+            [src.id, dec_type.id, q, SUGGEST_CANDIDATES, q, q, SUGGEST_PER_GROUP + len(seen)],
+        )
+        ids = [int(r[0]) for r in cur.fetchall() if int(r[0]) not in seen]
+        for node in _nodes_in_order(ids[:SUGGEST_PER_GROUP]):
+            rows.append(_suggest_case_row(node))
+    return rows
+
+
+def _suggest_sections(cur, q: str) -> list[dict]:
+    src = Source.objects.filter(slug="iowa-code").first()
+    sec_type = (
+        NodeType.objects.filter(source=src, key="section").first()
+        if src is not None
+        else None
+    )
+    if src is None or sec_type is None:
+        return []
+    rows: list[dict] = []
+    seen: set[int] = set()
+
+    m = _SECTION_QUERY_RE.match(q)
+    if m:
+        chapter, section = m.group(1), m.group(2)
+        # A full "chapter.section" resolves exactly through the citation
+        # parser (same path as /resolve); best-effort — a parser quirk must
+        # never take the field down.
+        if section:
+            try:
+                lr = lookup_citation(f"{chapter}.{section}", source=src)
+                if lr.found and lr.node is not None and lr.version is not None:
+                    node = Node.objects.select_related("source", "parent").get(
+                        pk=lr.node.id
+                    )
+                    rows.append(_suggest_section_row(node, exact=True))
+                    seen.add(node.id)
+            except Exception:  # noqa: BLE001 — suggest must degrade, never 500
+                pass
+        # Sibling sections by number prefix: "554.23" → 554.2301…; a bare
+        # chapter number lists that chapter's sections (not "5540.…").
+        prefix = f"{chapter}.{section or ''}"
+        cur.execute(
+            _SUGGEST_SECTION_PREFIX_SQL,
+            [src.id, sec_type.id, f"{prefix}%", SUGGEST_PER_GROUP + len(seen)],
+        )
+        ids = [int(r[0]) for r in cur.fetchall() if int(r[0]) not in seen]
+        for node in _nodes_in_order(ids[:SUGGEST_PER_GROUP], parent=True):
+            rows.append(_suggest_section_row(node))
+        return rows
+
+    if _fuzzy_ok(q):
+        cur.execute(
+            _SUGGEST_SECTIONS_SQL,
+            [src.id, sec_type.id, q, SUGGEST_CANDIDATES, q, q, SUGGEST_PER_GROUP],
+        )
+        ids = [int(r[0]) for r in cur.fetchall()]
+        for node in _nodes_in_order(ids, parent=True):
+            rows.append(_suggest_section_row(node))
+    return rows
+
+
+@browse_router.get("/suggest", auth=None)
+def suggest(request, q: str = ""):
+    """Typeahead for the reader's search field: known-item lookups only —
+    case names, reporter cites, section numbers and catchlines — never a
+    concept search (that is what ``/search`` and the results page are for).
+
+    Every lookup is index-backed and capped (see the ``SUGGEST_*`` bounds):
+    a name/catchline query goes through pg_trgm word similarity with the
+    candidate set limited before the sort, an exact cite/number is a pinned
+    row flagged ``exact``. Public and edge-cached like the rest of browse;
+    a query that trips the statement timeout returns whatever groups
+    completed, marked ``partial`` and uncached."""
+    q = _clean_suggest_query(q)
+    payload: dict = {"query": q, "cases": [], "sections": []}
+    if len(q) < SUGGEST_MIN_QUERY_CHARS:
+        return _cached_json(request, payload)
+
+    try:
+        # SET LOCAL only sticks inside an explicit transaction. The timeout is
+        # a module constant, never request input, so inlining it is safe.
+        with transaction.atomic(), connection.cursor() as cur:
+            cur.execute(f"SET LOCAL statement_timeout = {int(SUGGEST_STATEMENT_TIMEOUT_MS)}")
+            payload["cases"] = _suggest_cases(cur, q)
+            payload["sections"] = _suggest_sections(cur, q)
+    except OperationalError:
+        payload["partial"] = True
+        resp = JsonResponse(payload)
+        resp["Cache-Control"] = "no-store"
+        return resp
+    return _cached_json(request, payload)
 
 
 def _intkey(s: str) -> tuple:

@@ -18,6 +18,7 @@ import {
 	Suspense,
 	useCallback,
 	useEffect,
+	useMemo,
 	useState,
 } from "react";
 import {
@@ -31,7 +32,10 @@ import {
 	Tag,
 	type TagKind,
 } from "@/components/carbon/primitives";
-import { CarbonSearchBar } from "@/components/carbon/search-bar";
+import {
+	type SearchSubmit,
+	useSearchSubmitHandle,
+} from "@/components/carbon/workspace-bar";
 import {
 	type BrowseSearchResult,
 	type ResearchSearchResponse,
@@ -81,7 +85,10 @@ function ResultsScreen() {
 
 	const query = (searchParams.get("q") ?? "").trim();
 	const page = Math.max(1, Number(searchParams.get("page")) || 1);
-	const filters = advancedFromParams(searchParams);
+	const filters = useMemo(
+		() => advancedFromParams(searchParams),
+		[searchParams],
+	);
 	const modeOverride = modeFromParams(searchParams);
 	const sort = sortFromParams(searchParams);
 
@@ -152,7 +159,17 @@ function ResultsScreen() {
 
 	const onFilters = (f: AdvancedFilters) => pushSearch(query, f);
 	// A new query drops the mode override — the classifier should get first say.
-	const onQuery = (q: string) => pushSearch(q, filters, 1, null);
+	const onQuery = useCallback(
+		(q: string) => pushSearch(q, filters, 1, null),
+		[pushSearch, filters],
+	);
+	// The workspace bar's field is this page's query box: prefilled with the
+	// URL's q, ↵ re-runs the search with the current filters.
+	const submitHandle = useMemo<SearchSubmit>(
+		() => ({ seed: query, submit: onQuery }),
+		[query, onQuery],
+	);
+	useSearchSubmitHandle(submitHandle);
 	const onSort = (s: string) => pushSearch(query, filters, 1, modeOverride, s);
 
 	// Stale = the data on screen answers a different query than the URL asks
@@ -173,8 +190,6 @@ function ResultsScreen() {
 
 	return (
 		<div className="px-5 py-8 sm:px-8">
-			<CarbonSearchBar initial={query} onSearch={onQuery} />
-
 			<div className="mt-6 flex flex-wrap items-baseline gap-x-4 gap-y-1">
 				<h1 className="font-light text-2xl sm:text-3xl">
 					{query ? <>Results for &ldquo;{query}&rdquo;</> : "Search the corpus"}

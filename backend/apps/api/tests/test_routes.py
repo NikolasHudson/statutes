@@ -359,6 +359,115 @@ class BrowseDetailQueryCountTests(TestCase):
         )
 
 
+class BrowseSuggestTests(TestCase):
+    """/api/browse/suggest — the known-item typeahead behind the reader's
+    search field. Public, bounded, and blind to anything without an open
+    approved version (a pending ingest never surfaces)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        # 714.16 "Consumer fraud" with an approved version (the minimal
+        # corpus) + a *pending* sibling that must never be suggested.
+        cls.source, cls.section, cls.version = make_iowa_corpus_minimal()
+        cls.pending = Node.objects.create(
+            source=cls.source, node_type=cls.section.node_type,
+            parent=cls.section.parent, ordinal="17", path="714.17",
+            heading="Consumer protection fund",
+        )
+        NodeVersion.objects.create(
+            node=cls.pending, body_text="Pending text.",
+            effective_from=dt.date(2025, 1, 1), content_hash="pending-hash",
+            review_status=ReviewStatus.PENDING,
+        )
+        cls.kirk, _, _ = make_caselaw_case(
+            cl_cluster_id=800, cl_opinion_id=8000, case_name="Kirk v. Ridgway",
+            date_filed="1985-08-21", citations=["373 N.W.2d 491"],
+        )
+        cls.berg, _, _ = make_caselaw_case(
+            cl_cluster_id=801, cl_opinion_id=8010, case_name="Berg v. Ridgway",
+            date_filed="1966-02-08", citations=["140 N.W.2d 95"],
+        )
+        ReporterCitation.objects.create(
+            cl_citation_id=373491, cl_cluster_id=800, reporter="N.W.2d",
+            volume="373", page="491", to_node=cls.kirk,
+        )
+
+    def setUp(self):
+        cache.clear()
+        reset_default_source_cache()
+        self.client = Client()
+
+    def _get(self, q: str):
+        resp = self.client.get("/api/browse/suggest", {"q": q})
+        self.assertEqual(resp.status_code, 200, resp.content[:200])
+        return resp, resp.json()
+
+    def test_short_or_blank_query_returns_empty_groups(self):
+        for q in ("", "k", "   "):
+            _, body = self._get(q)
+            self.assertEqual(body["cases"], [])
+            self.assertEqual(body["sections"], [])
+
+    def test_case_name_word_match(self):
+        _, body = self._get("ridgway")
+        names = [c["case_name"] for c in body["cases"]]
+        self.assertIn("Kirk v. Ridgway", names)
+        self.assertIn("Berg v. Ridgway", names)
+        kirk = next(c for c in body["cases"] if c["case_id"] == self.kirk.id)
+        self.assertEqual(kirk["citation"], "373 N.W.2d 491")
+        self.assertEqual(kirk["court_id"], "iowa")
+        self.assertEqual(kirk["date_filed"], "1985-08-21")
+        self.assertFalse(kirk["exact"])
+        self.assertEqual(body["sections"], [])
+
+    def test_reporter_cite_is_pinned_exact(self):
+        _, body = self._get("373 N.W.2d 491")
+        self.assertEqual(
+            [(c["case_id"], c["exact"]) for c in body["cases"]],
+            [(self.kirk.id, True)],
+        )
+
+    def test_section_number_exact_then_prefix(self):
+        _, body = self._get("714.16")
+        first = body["sections"][0]
+        self.assertEqual(first["node_id"], self.section.id)
+        self.assertTrue(first["exact"])
+        self.assertEqual(first["citation"], "Iowa Code § 714.16")
+        self.assertEqual(first["chapter"]["ordinal"], "714")
+        self.assertEqual(body["cases"], [])
+
+        _, body = self._get("§ 714")
+        paths = [s["path"] for s in body["sections"]]
+        self.assertIn("714.16", paths)
+        self.assertNotIn("714.17", paths)  # pending
+
+    def test_catchline_word_match_skips_pending(self):
+        _, body = self._get("consumer")
+        paths = [s["path"] for s in body["sections"]]
+        self.assertEqual(paths, ["714.16"])
+        _, body = self._get("protection")
+        self.assertEqual(body["sections"], [])
+
+    def test_query_is_clamped_and_sanitised(self):
+        _, body = self._get("z" * 500)
+        self.assertEqual(len(body["query"]), 120)
+        _, body = self._get("consumer\x00\x01fraud")
+        self.assertEqual(body["query"], "consumer fraud")
+        self.assertEqual([s["path"] for s in body["sections"]], ["714.16"])
+
+    def test_symbol_only_query_is_empty_not_a_scan(self):
+        resp, body = self._get("%_%")
+        self.assertEqual(body["cases"], [])
+        self.assertEqual(body["sections"], [])
+        self.assertNotIn("partial", body)
+        self.assertTrue(resp["Cache-Control"].startswith("public"))
+
+    def test_public_and_edge_cached(self):
+        resp, _ = self._get("ridgway")
+        self.assertTrue(resp["Cache-Control"].startswith("public"))
+        self.assertIn("ETag", resp)
+
+
 class BrowseCacheHeaderTests(TestCase):
     """Browse read endpoints must be Cloudflare/browser cacheable: a shared
     Cache-Control TTL plus an ETag that drives 304 revalidation."""

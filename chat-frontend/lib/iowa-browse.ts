@@ -342,8 +342,8 @@ export class BrowseError extends Error {
   }
 }
 
-async function json<T>(path: string): Promise<T> {
-  const r = await fetch(path, { credentials: "include" });
+async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const r = await fetch(path, { credentials: "include", signal });
   if (!r.ok) {
     let detail = `HTTP ${r.status}`;
     try {
@@ -429,6 +429,44 @@ export const browseSearch = (
   params.set("offset", String((Math.max(1, page) - 1) * SEARCH_PAGE_SIZE));
   return json<BrowseSearchResponse>(`/api/browse/search?${params.toString()}`);
 };
+
+// --- Suggest (the reader's search field) -----------------------------------
+
+// Known-item typeahead: case names / reporter cites and Iowa Code section
+// numbers / catchlines. `exact` marks a pinned cite or section-number hit.
+// Never a concept search — that is /results. `partial` means the server hit
+// its time budget and returned what it had.
+export type SuggestCase = {
+  case_id: number;
+  case_name: string;
+  court_id: string;
+  court_name: string;
+  date_filed: string;
+  citation: string;
+  exact: boolean;
+};
+
+export type SuggestSection = {
+  node_id: number;
+  path: string;
+  heading: string;
+  citation: string;
+  chapter: { ordinal: string; heading: string } | null;
+  exact: boolean;
+};
+
+export type SuggestResponse = {
+  query: string;
+  cases: SuggestCase[];
+  sections: SuggestSection[];
+  partial?: boolean;
+};
+
+export const browseSuggest = (q: string, signal?: AbortSignal) =>
+  json<SuggestResponse>(
+    `/api/browse/suggest?q=${encodeURIComponent(q)}`,
+    signal,
+  );
 
 // --- Authed research search (/api/research/search) -------------------------
 
