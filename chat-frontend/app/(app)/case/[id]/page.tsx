@@ -1,57 +1,71 @@
 "use client";
 
-// Carbon case reader — the three-pane decision console wired to
-// /api/browse/cases/<id>. Document structure (opinion parsing, outline,
-// citation building, scroll-spy) comes from lib/case-format.ts, shared with
-// the legacy reader; this file is the Carbon skin: outline/details rail,
-// Plex-Serif opinion column with star pagination and linked citations, and a
-// cited-authorities rail. Citator treatment is honestly "pending" — the
-// case→case treatment graph isn't served yet.
+// Carbon case reader — /case/<id>, wired to /api/browse/cases/<id>.
+//
+// Layout (desktop): a 48px toolbar (breadcrumb + cite · find · copy · print ·
+// Ask), then three panes — outline/details/display rail (lg+), the reading
+// column (caption → authority strip → opinions), and the citator rail (xl+:
+// Citing decisions · Authorities · Ask). Below xl the citator and Ask open
+// in a drawer; below lg a bottom bar (Outline · Citator · Ask · Display)
+// replaces both rails. Document structure (opinion parsing, outline,
+// citation building, scroll-spy) comes from lib/case-format.ts; rendering
+// pieces live in components/case-reader/.
 
 import {
 	CheckIcon,
-	CircleDashedIcon,
 	CopyIcon,
-	ExternalLinkIcon,
-	MinusIcon,
-	PlusIcon,
+	ListIcon,
+	MessageSquareTextIcon,
 	PrinterIcon,
+	ScaleIcon,
+	SearchIcon,
+	TypeIcon,
+	XIcon,
 } from "lucide-react";
 import { IBM_Plex_Serif } from "next/font/google";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
-	Fragment,
 	type ReactNode,
 	Suspense,
+	useCallback,
 	useEffect,
 	useMemo,
 	useRef,
 	useState,
 } from "react";
+import { type DocAskHandle, useDocAsk } from "@/components/carbon/doc-ask";
+import { Notification, Tag } from "@/components/carbon/primitives";
+import { AuthorityStrip } from "@/components/case-reader/authority-strip";
 import {
-	KVList,
-	Notification,
-	Panel,
-	Tag,
-} from "@/components/carbon/primitives";
+	CitatorPanel,
+	type CitatorTab,
+} from "@/components/case-reader/citator-rail";
+import { CiteHoverProvider } from "@/components/case-reader/cite-hover-card";
+import { Drawer } from "@/components/case-reader/drawer";
+import { courtLong } from "@/components/case-reader/format";
+import { OpinionBody, SegmentBody } from "@/components/case-reader/opinion";
 import {
-	type Block,
+	Details,
+	DisplayControls,
+	Outline,
+} from "@/components/case-reader/outline-rail";
+import {
 	buildCitation,
-	COURT_CITE,
 	caseSections,
-	isHeadingLine,
-	parseOpinion,
-	RUNIN,
-	STAR,
 	useActiveSection,
 } from "@/lib/case-format";
 import {
 	browseCase,
 	type CaseDetail,
-	type CaseSegment,
+	type CaseOpinion,
 	fmtEffective,
 } from "@/lib/iowa-browse";
+import {
+	loadReaderPrefs,
+	type ReaderPrefs,
+	saveReaderPrefs,
+} from "@/lib/reader-prefs";
 import { useSearchHighlight } from "@/lib/use-search-highlight";
 import { cn } from "@/lib/utils";
 
@@ -132,7 +146,29 @@ function CasePageInner() {
 		);
 	}
 
-	return <CaseReader data={data} searchQuery={searchQuery} />;
+	// Keyed by case so the Ask conversation and rail state start fresh.
+	return <CaseReader key={data.id} data={data} searchQuery={searchQuery} />;
+}
+
+type Panel = "outline" | "citator" | "ask" | "display";
+
+// The citator rail shows at Tailwind's xl breakpoint; below it the same
+// panel opens in a drawer.
+const isRailVisible = () =>
+	typeof window !== "undefined" &&
+	window.matchMedia("(min-width: 1280px)").matches;
+
+// True when a keystroke belongs to a field, so global shortcuts stay out of
+// the way — same guard as the shell's "[" and the DocChat "/" shortcut.
+function isTypingTarget(target: EventTarget | null): boolean {
+	const el = target as HTMLElement | null;
+	return !!(
+		el &&
+		(el.tagName === "INPUT" ||
+			el.tagName === "TEXTAREA" ||
+			el.tagName === "SELECT" ||
+			el.isContentEditable)
+	);
 }
 
 function CaseReader({
@@ -144,34 +180,48 @@ function CaseReader({
 }) {
 	const router = useRouter();
 	const scrollRef = useRef<HTMLElement>(null);
-	const [fontSize, setFontSize] = useState(16);
+	const askRef = useRef<DocAskHandle>(null);
+
+	// Display prefs — read synchronously in the initializer. This tree only
+	// mounts client-side (AuthGate renders a placeholder until the session
+	// resolves), so there is no SSR markup to disagree with, and reading
+	// up front spares the whole opinion a second layout at the default size.
+	const [prefs, setPrefs] = useState<ReaderPrefs>(() => loadReaderPrefs());
+	const updatePrefs = (p: ReaderPrefs) => {
+		setPrefs(p);
+		saveReaderPrefs(p);
+	};
+
+	// Find in opinion — seeded by the search click-through, editable here.
+	const [find, setFind] = useState(searchQuery);
+	const [findLive, setFindLive] = useState(searchQuery);
+	useEffect(() => {
+		const t = window.setTimeout(() => setFindLive(find.trim()), 200);
+		return () => window.clearTimeout(t);
+	}, [find]);
+	const matches = useSearchHighlight(scrollRef, findLive, true);
+
 	const [copied, setCopied] = useState(false);
-	const highlightMatches = useSearchHighlight(scrollRef, searchQuery, true);
+	const [tab, setTab] = useState<CitatorTab>("citing");
+	const [panel, setPanel] = useState<Panel | null>(null);
+	const closePanel = useCallback(() => setPanel(null), []);
+
+	const ask = useDocAsk(data.id);
 
 	const sections = useMemo(() => caseSections(data), [data]);
 	const ids = useMemo(() => sections.map((s) => s.id), [sections]);
 	const active = useActiveSection(ids, scrollRef);
 
-	const details = useMemo(() => {
-		const d: [string, string][] = [];
-		const add = (label: string, value: string) => {
-			if (value?.trim()) d.push([label, value.trim()]);
-		};
-		add("Disposition", data.disposition);
-		add("Posture", data.posture);
-		add("Nature of suit", data.nature_of_suit);
-		add("Panel", data.judges);
-		return d;
-	}, [data]);
+	const court = courtLong(data.court_id, data.court_name);
+	const primaryCite = data.citations[0] ?? "";
 
-	const court = data.court_name || COURT_CITE[data.court_id] || data.court_id;
-	const hasAuthorities =
-		data.cited_cases.length > 0 || data.external_citation_count > 0;
-
-	const jump = (id: string) =>
+	// Stable so the memoized Outline doesn't re-render on every reader tick.
+	const jump = useCallback((id: string) => {
 		scrollRef.current
 			?.querySelector(`#${CSS.escape(id)}`)
 			?.scrollIntoView({ behavior: "smooth", block: "start" });
+		setPanel(null);
+	}, []);
 
 	const copyCitation = async () => {
 		try {
@@ -183,514 +233,419 @@ function CaseReader({
 		}
 	};
 
+	// Open the citator on a tab: in the rail at xl+, in the drawer below.
+	const openCitator = useCallback((t: CitatorTab) => {
+		setTab(t);
+		if (isRailVisible()) setPanel(null);
+		else setPanel(t === "ask" ? "ask" : "citator");
+		if (t === "ask") {
+			// Composer mounts on the next paint when the tab/drawer changes.
+			window.setTimeout(() => askRef.current?.focus(), 30);
+		}
+	}, []);
+	const openCiting = useCallback(() => openCitator("citing"), [openCitator]);
+	const openAuthorities = useCallback(
+		() => openCitator("authorities"),
+		[openCitator],
+	);
+
+	// "/" opens Ask (never from a field; once in the composer it owns "/").
+	useEffect(() => {
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+			if (isTypingTarget(e.target)) return;
+			e.preventDefault();
+			openCitator("ask");
+		};
+		document.addEventListener("keydown", onKeyDown);
+		return () => document.removeEventListener("keydown", onKeyDown);
+	}, [openCitator]);
+
+	const bodyFont =
+		prefs.family === "serif"
+			? "[font-family:var(--font-plex-serif)]"
+			: "[font-family:var(--font-plex-sans)]";
+	const measure = prefs.measure === "narrow" ? "max-w-[44rem]" : "max-w-4xl";
+
+	const citatorPanel = (header: boolean) => (
+		<CitatorPanel
+			data={data}
+			tab={tab}
+			onTab={setTab}
+			ask={ask}
+			askRef={askRef}
+			header={header}
+		/>
+	);
+
 	return (
-		<div className={cn("flex h-full min-h-0 flex-col", plexSerif.variable)}>
-			{/* Toolbar */}
-			<div className="flex h-12 shrink-0 items-center gap-1 border-[var(--cds-border)] border-b px-5 print:hidden sm:px-8">
-				<p className="min-w-0 truncate text-sm">
-					<Link
-						href="/"
-						className="text-[var(--cds-text-2)] hover:text-[var(--cds-link)] hover:underline"
-					>
-						Library
-					</Link>
-					<span className="mx-2 text-[var(--cds-helper)]">/</span>
-					<span className="font-semibold">{data.case_name}</span>
-				</p>
-				<div className="ml-auto flex shrink-0 items-center gap-1">
-					{searchQuery && highlightMatches !== null && (
-						<span className="mr-1 hidden items-center gap-2 sm:flex">
-							<Tag kind={highlightMatches > 0 ? "blue" : "gray"}>
-								{highlightMatches > 0
-									? `${highlightMatches.toLocaleString()} match${highlightMatches === 1 ? "" : "es"}`
-									: "No matches"}
-							</Tag>
-							<button
-								type="button"
-								onClick={() => router.replace(`/case/${data.id}`)}
-								className="text-[11px] text-[var(--cds-helper)] transition-colors hover:text-[var(--cds-text)] hover:underline"
-								title="Clear search highlighting"
-							>
-								Clear
-							</button>
-						</span>
-					)}
-					<div className="mr-2 hidden items-center border border-[var(--cds-border)] sm:flex">
+		<CiteHoverProvider cases={data.cited_cases}>
+			<div className={cn("flex h-full min-h-0 flex-col", plexSerif.variable)}>
+				{/* Toolbar */}
+				<div className="flex h-12 shrink-0 items-center gap-1 border-[var(--cds-border)] border-b px-4 print:hidden sm:px-6">
+					<p className="min-w-0 truncate text-sm">
+						<Link
+							href="/"
+							className="text-[var(--cds-text-2)] hover:text-[var(--cds-link)] hover:underline"
+						>
+							Library
+						</Link>
+						<span className="mx-2 text-[var(--cds-helper)]">/</span>
+						<span className="font-semibold">{data.case_name}</span>
+						{primaryCite && (
+							<span className="ml-2.5 hidden font-mono text-[12px] text-[var(--cds-helper)] md:inline">
+								{primaryCite}
+							</span>
+						)}
+					</p>
+					<div className="ml-auto flex shrink-0 items-center gap-1">
+						<label className="mr-2 hidden h-8 w-56 items-center gap-2 border-[var(--cds-border-strong)] border-b bg-[var(--cds-field)] px-3 text-[13px] focus-within:border-[#0f62fe] lg:flex">
+							<SearchIcon className="size-4 shrink-0 text-[var(--cds-helper)]" />
+							<input
+								type="search"
+								value={find}
+								onChange={(e) => setFind(e.target.value)}
+								placeholder="Find in opinion"
+								aria-label="Find in opinion"
+								className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--cds-placeholder)] [&::-webkit-search-cancel-button]:hidden"
+							/>
+							{findLive && matches !== null ? (
+								<span className="shrink-0 font-mono text-[11px] text-[var(--cds-helper)] tabular-nums">
+									{matches.toLocaleString()}
+								</span>
+							) : null}
+							{find && (
+								<button
+									type="button"
+									aria-label="Clear find"
+									onClick={() => {
+										setFind("");
+										if (searchQuery) router.replace(`/case/${data.id}`);
+									}}
+									className="shrink-0 text-[var(--cds-helper)] hover:text-[var(--cds-text)]"
+								>
+									<XIcon className="size-3.5" />
+								</button>
+							)}
+						</label>
+						<ToolbarButton onClick={copyCitation} className="hidden sm:flex">
+							{copied ? (
+								<CheckIcon className="size-4 text-[var(--cds-success-text)]" />
+							) : (
+								<CopyIcon className="size-4" />
+							)}
+							{copied ? "Copied" : "Copy citation"}
+						</ToolbarButton>
+						<ToolbarButton
+							onClick={() => window.print()}
+							className="hidden sm:flex"
+						>
+							<PrinterIcon className="size-4" />
+							Print
+						</ToolbarButton>
+						<ToolbarButton
+							onClick={() => openCitator("citing")}
+							className="hidden lg:flex xl:hidden"
+						>
+							<ScaleIcon className="size-4" />
+							Citator
+							<span className="font-mono text-[11px] text-[var(--cds-helper)] tabular-nums">
+								{data.citing_count.toLocaleString()}
+							</span>
+						</ToolbarButton>
 						<button
 							type="button"
-							aria-label="Smaller text"
-							onClick={() => setFontSize((p) => Math.max(14, p - 1))}
-							className="flex size-9 items-center justify-center transition-colors hover:bg-[var(--cds-layer-hover)]"
+							onClick={() => openCitator("ask")}
+							className="ml-2 hidden h-9 items-center gap-2 bg-[#0f62fe] px-4 text-[13px] text-white transition-colors hover:bg-[#0353e9] lg:flex"
 						>
-							<MinusIcon className="size-3.5" />
-						</button>
-						<span className="w-10 text-center font-mono text-[11px] text-[var(--cds-helper)] tabular-nums">
-							{fontSize}px
-						</span>
-						<button
-							type="button"
-							aria-label="Larger text"
-							onClick={() => setFontSize((p) => Math.min(22, p + 1))}
-							className="flex size-9 items-center justify-center transition-colors hover:bg-[var(--cds-layer-hover)]"
-						>
-							<PlusIcon className="size-3.5" />
+							<MessageSquareTextIcon className="size-4" />
+							Ask about this case
+							<span className="font-mono text-[11px] opacity-70">/</span>
 						</button>
 					</div>
-					<ToolbarButton onClick={copyCitation}>
-						{copied ? (
-							<CheckIcon className="size-4 text-[var(--cds-success-text)]" />
-						) : (
-							<CopyIcon className="size-4" />
-						)}
-						{copied ? "Copied" : "Copy citation"}
-					</ToolbarButton>
-					<ToolbarButton onClick={() => window.print()}>
-						<PrinterIcon className="size-4" />
-						Print
-					</ToolbarButton>
 				</div>
-			</div>
 
-			<div className="flex min-h-0 flex-1">
-				{/* Left rail — outline scroll-spy + details */}
-				{(sections.length > 1 || details.length > 0) && (
-					<aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-[var(--cds-border)] border-r py-6 print:hidden lg:flex">
-						{sections.length > 1 && (
-							<nav aria-label="Document outline">
-								<p className="px-4 pb-2 font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.18em]">
-									Outline
-								</p>
-								{sections.map((s) => (
-									<button
-										key={s.id}
-										type="button"
-										onClick={() => jump(s.id)}
-										aria-current={active === s.id ? "true" : undefined}
-										style={{ paddingLeft: `${0.875 + s.depth * 1.125}rem` }}
-										className={cn(
-											"flex w-full border-l-[3px] py-1.5 pr-3 text-left text-[13px] transition-colors",
-											active === s.id
-												? "border-[#0f62fe] font-semibold"
-												: "border-transparent text-[var(--cds-text-2)] hover:text-[var(--cds-text)]",
-										)}
-									>
-										<span className="truncate">{s.label}</span>
-									</button>
-								))}
-							</nav>
-						)}
-						{details.length > 0 && (
-							<>
-								<p className="px-4 pt-8 pb-2 font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.18em]">
-									Details
-								</p>
-								<dl className="text-xs">
-									{details.map(([k, v]) => (
-										<div key={k} className="px-4 py-1.5">
-											<dt className="text-[var(--cds-helper)]">{k}</dt>
-											<dd className="mt-0.5">{v}</dd>
-										</div>
-									))}
-								</dl>
-							</>
-						)}
+				<div className="flex min-h-0 flex-1">
+					{/* Left rail — outline · details · display */}
+					<aside className="hidden w-56 shrink-0 flex-col gap-8 overflow-y-auto border-[var(--cds-border)] border-r py-6 print:hidden lg:flex">
+						<Outline sections={sections} active={active} onJump={jump} />
+						<Details data={data} />
+						<DisplayControls prefs={prefs} onChange={updatePrefs} />
 					</aside>
-				)}
 
-				{/* Center — the document */}
-				<article
-					ref={scrollRef}
-					aria-label={data.case_name}
-					className="min-w-0 flex-1 overflow-y-auto print:overflow-visible"
-				>
-					<div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
-						<header>
-							<p className="font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.22em]">
-								{court}
-							</p>
-							<h1 className="mt-3 font-light text-3xl sm:text-4xl">
-								{data.case_name}
-							</h1>
-							{data.case_name_full &&
-								data.case_name_full !== data.case_name && (
-									<p className="mt-2 text-[var(--cds-text-2)] text-sm">
-										{data.case_name_full}
-									</p>
-								)}
-							{data.citations.length > 0 && (
-								<p className="mt-3 font-mono text-[13px]">
-									{data.citations.join(" · ")}
+					{/* Center — the document */}
+					<article
+						ref={scrollRef}
+						aria-label={data.case_name}
+						className="min-w-0 flex-1 overflow-y-auto pb-14 print:overflow-visible lg:pb-0"
+					>
+						<div className={cn("mx-auto px-5 py-8 sm:px-8 sm:py-10", measure)}>
+							<header>
+								<p className="flex flex-wrap items-center gap-x-2.5 font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.22em]">
+									<span>{court}</span>
+									{data.date_filed && (
+										<>
+											<span className="text-[var(--cds-border-strong)]">·</span>
+											<span>Decided {fmtEffective(data.date_filed)}</span>
+										</>
+									)}
 								</p>
-							)}
-							<p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[var(--cds-text-2)]">
-								{data.date_filed && (
-									<span>Decided {fmtEffective(data.date_filed)}</span>
-								)}
-								{data.docket_number && <span>No. {data.docket_number}</span>}
-								{data.precedential_status && (
-									<Tag kind="gray">{data.precedential_status}</Tag>
-								)}
-							</p>
-
-							<div className="mt-4 flex flex-wrap items-center gap-3">
-								<Tag kind="outline">
-									<CircleDashedIcon className="size-3" />
-									Citator treatment — not yet available
-								</Tag>
-								{data.official_url && (
-									<a
-										href={data.official_url}
-										target="_blank"
-										rel="noopener noreferrer"
-										className="inline-flex items-center gap-1.5 text-[13px] text-[var(--cds-link)] hover:underline"
-									>
-										View on CourtListener
-										<ExternalLinkIcon className="size-3.5" />
-									</a>
-								)}
-							</div>
-						</header>
-
-						<div
-							className="mt-4 [font-family:var(--font-plex-serif)] leading-[1.75]"
-							style={{ fontSize }}
-						>
-							{data.head_matter && (
-								<section id="syllabus" className="scroll-mt-4">
-									<SectionHeading>Syllabus</SectionHeading>
-									<OpinionBody text={data.head_matter} idPrefix="syllabus" />
-								</section>
-							)}
-							{data.opinions.map((op) => (
-								<section key={op.id} id={`op-${op.id}`} className="scroll-mt-4">
-									<SectionHeading>
-										{op.heading}
-										{op.per_curiam && (
-											<span className="ml-2 normal-case tracking-normal">
-												(Per Curiam)
-											</span>
-										)}
-									</SectionHeading>
-									{op.body_segments ? (
-										<SegmentBody
-											segments={op.body_segments}
-											idPrefix={`op-${op.id}`}
-										/>
-									) : op.has_content ? (
-										<OpinionBody text={op.body_text} idPrefix={`op-${op.id}`} />
-									) : (
-										<p className="mt-4 text-[var(--cds-text-2)] text-sm italic [font-family:var(--font-plex-sans)]">
-											No opinion text available.
+								<h1 className="mt-3 font-light text-3xl leading-[1.15] sm:text-4xl">
+									{data.case_name}
+								</h1>
+								{data.case_name_full &&
+									data.case_name_full !== data.case_name && (
+										<p className="mt-2 text-[var(--cds-text-2)] text-sm">
+											{data.case_name_full}
 										</p>
 									)}
-								</section>
-							))}
+								{data.citations.length > 0 && (
+									<p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 font-mono text-[13px]">
+										{data.citations.map((c, i) => (
+											<span
+												key={c}
+												className={cn(i > 0 && "text-[var(--cds-text-2)]")}
+											>
+												{i > 0 && (
+													<span className="mr-3 text-[var(--cds-border-strong)]">
+														·
+													</span>
+												)}
+												{c}
+											</span>
+										))}
+										<button
+											type="button"
+											onClick={copyCitation}
+											className="inline-flex h-6 items-center gap-1.5 border border-[var(--cds-border)] px-2 font-sans text-[12px] text-[var(--cds-link)] transition-colors hover:bg-[var(--cds-layer-hover)] print:hidden"
+										>
+											{copied ? (
+												<CheckIcon className="size-3" />
+											) : (
+												<CopyIcon className="size-3" />
+											)}
+											{copied ? "Copied" : "Copy"}
+										</button>
+									</p>
+								)}
+								<p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[var(--cds-text-2)]">
+									{data.docket_number && <span>No. {data.docket_number}</span>}
+									{data.precedential_status && (
+										<Tag kind="gray">{data.precedential_status}</Tag>
+									)}
+									{data.judges?.trim() && (
+										<span className="min-w-0 truncate">
+											{data.judges.trim()}
+										</span>
+									)}
+								</p>
+
+								<AuthorityStrip
+									data={data}
+									onCitedBy={openCiting}
+									onCites={openAuthorities}
+								/>
+							</header>
+
+							<div
+								className={cn("mt-2", bodyFont)}
+								style={{ fontSize: prefs.fontSize }}
+							>
+								{data.head_matter && (
+									<section id="syllabus" className="scroll-mt-4">
+										<SectionHeading label="Syllabus" />
+										<OpinionBody text={data.head_matter} idPrefix="syllabus" />
+									</section>
+								)}
+								{data.opinions.map((op) => (
+									<section
+										key={op.id}
+										id={`op-${op.id}`}
+										className="scroll-mt-4"
+									>
+										<SectionHeading
+											label={opinionLabel(op)}
+											right={opinionAuthor(op)}
+										/>
+										{op.body_segments ? (
+											<SegmentBody
+												segments={op.body_segments}
+												idPrefix={`op-${op.id}`}
+											/>
+										) : op.has_content ? (
+											<OpinionBody
+												text={op.body_text}
+												idPrefix={`op-${op.id}`}
+											/>
+										) : (
+											<p className="mt-4 text-[var(--cds-text-2)] text-sm italic [font-family:var(--font-plex-sans)]">
+												No opinion text available.
+											</p>
+										)}
+									</section>
+								))}
+							</div>
+						</div>
+					</article>
+
+					{/* Right rail — the citator */}
+					<aside
+						aria-label="Citator"
+						className="hidden w-[352px] shrink-0 flex-col border-[var(--cds-border)] border-l print:hidden xl:flex"
+					>
+						{citatorPanel(true)}
+					</aside>
+				</div>
+
+				{/* Below lg: bottom bar */}
+				<nav
+					aria-label="Reader panels"
+					className="fixed inset-x-0 bottom-0 z-30 flex h-14 border-[var(--cds-border)] border-t bg-[var(--cds-bg)] print:hidden lg:hidden"
+				>
+					<BarTab
+						icon={<ListIcon className="size-5" />}
+						label="Outline"
+						onClick={() => setPanel("outline")}
+					/>
+					<BarTab
+						icon={<ScaleIcon className="size-5" />}
+						label={`Citator · ${data.citing_count.toLocaleString()}`}
+						onClick={() => openCitator("citing")}
+					/>
+					<BarTab
+						icon={<MessageSquareTextIcon className="size-5" />}
+						label="Ask"
+						onClick={() => openCitator("ask")}
+					/>
+					<BarTab
+						icon={<TypeIcon className="size-5" />}
+						label="Display"
+						onClick={() => setPanel("display")}
+					/>
+				</nav>
+
+				{/* Drawers */}
+				<Drawer open={panel === "outline"} title="Outline" onClose={closePanel}>
+					<div className="flex flex-col gap-8 overflow-y-auto py-6">
+						<Outline sections={sections} active={active} onJump={jump} />
+						<Details data={data} />
+					</div>
+				</Drawer>
+				<Drawer open={panel === "citator"} title="Citator" onClose={closePanel}>
+					{citatorPanel(true)}
+				</Drawer>
+				<Drawer
+					open={panel === "ask"}
+					title="Ask about this case"
+					onClose={closePanel}
+				>
+					{citatorPanel(false)}
+				</Drawer>
+				<Drawer
+					open={panel === "display"}
+					title="Display"
+					onClose={closePanel}
+					className="sm:max-w-xs"
+				>
+					<div className="py-6">
+						<DisplayControls prefs={prefs} onChange={updatePrefs} />
+						<div className="mt-8 flex flex-col">
+							<button
+								type="button"
+								onClick={copyCitation}
+								className="flex h-11 items-center gap-3 px-4 text-left text-sm transition-colors hover:bg-[var(--cds-layer-hover)]"
+							>
+								{copied ? (
+									<CheckIcon className="size-4 text-[var(--cds-success-text)]" />
+								) : (
+									<CopyIcon className="size-4" />
+								)}
+								{copied ? "Copied" : "Copy citation"}
+							</button>
+							<button
+								type="button"
+								onClick={() => window.print()}
+								className="flex h-11 items-center gap-3 px-4 text-left text-sm transition-colors hover:bg-[var(--cds-layer-hover)]"
+							>
+								<PrinterIcon className="size-4" />
+								Print
+							</button>
 						</div>
 					</div>
-				</article>
-
-				{/* Right rail — cited authorities */}
-				{hasAuthorities && (
-					<aside
-						aria-label="Cited authorities"
-						className="hidden w-80 shrink-0 space-y-6 overflow-y-auto border-[var(--cds-border)] border-l p-5 print:hidden xl:block"
-					>
-						<Panel title="Cited authorities">
-							{data.cited_cases.length > 0 ? (
-								<div className="divide-y divide-[var(--cds-border)]">
-									{data.cited_cases.map((c) => (
-										<Link
-											key={c.case_id}
-											href={`/case/${c.case_id}`}
-											className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--cds-layer-hover)]"
-										>
-											<span className="min-w-0 flex-1 truncate text-[13px] group-hover:underline">
-												{c.case_name}
-											</span>
-											<span className="shrink-0 font-mono text-[11px] text-[var(--cds-helper)] tabular-nums">
-												×{c.count}
-											</span>
-										</Link>
-									))}
-								</div>
-							) : (
-								<p className="px-4 py-3 text-[13px] text-[var(--cds-text-2)]">
-									No in-corpus authorities cited.
-								</p>
-							)}
-							{data.external_citation_count > 0 && (
-								<p className="border-[var(--cds-border)] border-t px-4 py-2.5 text-[11px] text-[var(--cds-helper)]">
-									{data.external_citation_count} additional citation
-									{data.external_citation_count === 1 ? "" : "s"} to authorities
-									outside this corpus.
-								</p>
-							)}
-						</Panel>
-
-						<Panel title="Case facts">
-							<KVList
-								rows={[
-									["Cites in corpus", String(data.cited_cases.length)],
-									["External cites", String(data.external_citation_count)],
-									["Opinions", String(data.opinions.length)],
-								]}
-							/>
-						</Panel>
-					</aside>
-				)}
+				</Drawer>
 			</div>
-		</div>
+		</CiteHoverProvider>
 	);
+}
+
+// "020lead" → Opinion, "030concurrence" → Concurrence, "040dissent" →
+// Dissent, "035concurrenceinpart" → Concurring in part; else the heading.
+function opinionLabel(op: CaseOpinion): string {
+	const t = (op.type || "").toLowerCase();
+	if (t.includes("dissent") && t.includes("part")) return "Dissenting in part";
+	if (t.includes("concur") && t.includes("part")) return "Concurring in part";
+	if (t.includes("dissent")) return "Dissent";
+	if (t.includes("concur")) return "Concurrence";
+	if (t.includes("lead") || t.includes("combined") || t.includes("unanimous"))
+		return "Opinion";
+	if (t.includes("addendum")) return "Addendum";
+	return op.heading || "Opinion";
+}
+
+// "Larson, J." from author_str ("Larson") or the heading's parenthetical.
+function opinionAuthor(op: CaseOpinion): string {
+	if (op.per_curiam) return "Per curiam";
+	const raw = op.author_str?.trim();
+	if (raw) return raw;
+	const m = /\(([^)]+)\)\s*$/.exec(op.heading || "");
+	return m ? m[1] : "";
 }
 
 function ToolbarButton({
 	children,
+	className,
 	...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
 	return (
 		<button
 			type="button"
 			{...props}
-			className="flex h-9 items-center gap-2 px-3 text-[13px] text-[var(--cds-text-2)] transition-colors hover:bg-[var(--cds-layer-hover)] hover:text-[var(--cds-text)]"
+			className={cn(
+				"flex h-9 items-center gap-2 px-3 text-[13px] text-[var(--cds-text-2)] transition-colors hover:bg-[var(--cds-layer-hover)] hover:text-[var(--cds-text)]",
+				className,
+			)}
 		>
 			{children}
 		</button>
 	);
 }
 
-function SectionHeading({ children }: { children: ReactNode }) {
-	return (
-		<h2 className="mt-10 border-[var(--cds-border)] border-t pt-6 pb-3 font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.22em] [font-family:var(--font-plex-mono)]">
-			{children}
-		</h2>
-	);
-}
-
-// ---------------------------------------------------------------------------
-// Opinion rendering — Carbon skin over the shared lib/case-format structure.
-// ---------------------------------------------------------------------------
-
-// West star-pagination page breaks (e.g. *830) as "[*830]" in link blue.
-function renderInline(text: string): ReactNode[] {
-	return text.split(STAR).map((p, i) => {
-		if (/^\*\d{1,4}$/.test(p)) {
-			return (
-				<span
-					// biome-ignore lint/suspicious/noArrayIndexKey: static inline split
-					key={i}
-					className="mx-1 font-mono text-[0.8em] text-[var(--cds-link)]"
-				>
-					[{p}]
-				</span>
-			);
-		}
-		return p;
-	});
-}
-
-function renderBlock(b: Block, headingId?: string): ReactNode {
-	// A folded-in page marker renders inline at the start of the block.
-	const prefix = b.marker ? `${b.marker} ` : "";
-	switch (b.kind) {
-		case "byline":
-			return (
-				<p className="mt-4 mb-5 font-semibold text-[0.85em] uppercase tracking-wide">
-					{renderInline(prefix + b.text)}
-				</p>
-			);
-		case "heading":
-			return (
-				<h3
-					id={headingId}
-					className="mt-7 mb-3 scroll-mt-4 font-semibold text-[1.05em]"
-				>
-					{renderInline(prefix + b.text)}
-				</h3>
-			);
-		case "label":
-			return (
-				<p className="mt-6 mb-2 font-semibold text-[0.8em] text-[var(--cds-helper)] uppercase tracking-wide">
-					{renderInline(prefix + b.text)}
-				</p>
-			);
-		case "runin":
-			return (
-				<p className="mt-4 leading-[1.75]">
-					{b.marker ? renderInline(prefix) : null}
-					<strong className="font-semibold">{b.lead} </strong>
-					{renderInline(b.rest)}
-				</p>
-			);
-		default:
-			return (
-				<p className="mt-4 leading-[1.75]">{renderInline(prefix + b.text)}</p>
-			);
-	}
-}
-
-// Render the rich, citation-linked structure built from the source HTML.
-// Case references stay inside this reader.
-function renderRuns(runs: CaseSegment["runs"]): ReactNode[] {
-	return runs.map((r, i) => {
-		if (r.star) {
-			return (
-				<span
-					// biome-ignore lint/suspicious/noArrayIndexKey: static run list
-					key={i}
-					className="mx-1 font-mono text-[0.8em] text-[var(--cds-link)]"
-				>
-					[{r.star}]
-				</span>
-			);
-		}
-		if (r.sup) {
-			return (
-				// biome-ignore lint/suspicious/noArrayIndexKey: static run list
-				<sup key={i} className="font-mono text-[0.7em] text-[var(--cds-link)]">
-					{r.sup}
-				</sup>
-			);
-		}
-		const text = r.t ?? "";
-		if (r.case != null) {
-			return (
-				<Link
-					// biome-ignore lint/suspicious/noArrayIndexKey: static run list
-					key={i}
-					href={`/case/${r.case}`}
-					className="text-[var(--cds-link)] hover:underline"
-				>
-					{text}
-				</Link>
-			);
-		}
-		if (r.em) {
-			// biome-ignore lint/suspicious/noArrayIndexKey: static run list
-			return <em key={i}>{text}</em>;
-		}
-		return text;
-	});
-}
-
-function SegmentBody({
-	segments,
-	idPrefix,
+function BarTab({
+	icon,
+	label,
+	onClick,
 }: {
-	segments: CaseSegment[];
-	idPrefix: string;
+	icon: ReactNode;
+	label: string;
+	onClick: () => void;
 }) {
-	let headingCount = 0;
 	return (
-		<div>
-			{segments.map((b, i) => {
-				const text = b.runs
-					.map((r) => r.t ?? "")
-					.join("")
-					.trim();
-				if (b.k === "byline") {
-					return (
-						<p
-							// biome-ignore lint/suspicious/noArrayIndexKey: static, ordered blocks
-							key={i}
-							className="mt-4 mb-5 font-semibold text-[0.85em] uppercase tracking-wide"
-						>
-							{renderRuns(b.runs)}
-						</p>
-					);
-				}
-				if (b.k === "quote") {
-					return (
-						<blockquote
-							// biome-ignore lint/suspicious/noArrayIndexKey: static, ordered blocks
-							key={i}
-							className="my-4 border-[var(--cds-border-strong)] border-l-2 pl-5 text-[0.95em] italic"
-						>
-							{renderRuns(b.runs)}
-						</blockquote>
-					);
-				}
-				if (b.k === "fn") {
-					return (
-						<p
-							// biome-ignore lint/suspicious/noArrayIndexKey: static, ordered blocks
-							key={i}
-							className="mt-2 text-[0.85em] text-[var(--cds-text-2)] leading-relaxed"
-						>
-							{b.mark ? (
-								<sup className="mr-1 font-mono font-semibold text-[var(--cds-link)]">
-									{b.mark}
-								</sup>
-							) : null}
-							{renderRuns(b.runs)}
-						</p>
-					);
-				}
-				if (isHeadingLine(text)) {
-					const hid = `${idPrefix}-s${headingCount++}`;
-					return (
-						<h3
-							// biome-ignore lint/suspicious/noArrayIndexKey: static, ordered blocks
-							key={i}
-							id={hid}
-							className="mt-7 mb-3 scroll-mt-4 font-semibold text-[1.05em]"
-						>
-							{renderRuns(b.runs)}
-						</h3>
-					);
-				}
-				// Run-in subsection heading ("A. Prejudicial Hearsay. <text>"): bold
-				// the lead clause, which is plain text at the start of the first run.
-				const runin = RUNIN.exec(text);
-				const first = b.runs[0];
-				if (
-					runin &&
-					first?.t &&
-					!first.em &&
-					first.case == null &&
-					first.t.startsWith(runin[1])
-				) {
-					const rest = [
-						{ ...first, t: first.t.slice(runin[1].length) },
-						...b.runs.slice(1),
-					];
-					return (
-						<p
-							// biome-ignore lint/suspicious/noArrayIndexKey: static, ordered blocks
-							key={i}
-							className="mt-4 leading-[1.75]"
-						>
-							<strong className="font-semibold">{runin[1]}</strong>
-							{renderRuns(rest)}
-						</p>
-					);
-				}
-				return (
-					<p
-						// biome-ignore lint/suspicious/noArrayIndexKey: static, ordered blocks
-						key={i}
-						className="mt-4 leading-[1.75]"
-					>
-						{renderRuns(b.runs)}
-					</p>
-				);
-			})}
-		</div>
+		<button
+			type="button"
+			onClick={onClick}
+			className="flex flex-1 flex-col items-center justify-center gap-1 text-[11px] text-[var(--cds-text-2)] transition-colors hover:text-[var(--cds-text)]"
+		>
+			{icon}
+			{label}
+		</button>
 	);
 }
 
-function OpinionBody({ text, idPrefix }: { text: string; idPrefix: string }) {
-	const blocks = useMemo(() => parseOpinion(text), [text]);
-	let headingCount = 0;
+function SectionHeading({ label, right }: { label: string; right?: string }) {
 	return (
-		<div>
-			{blocks.map((b, i) => {
-				const hid =
-					b.kind === "heading" ? `${idPrefix}-s${headingCount++}` : undefined;
-				return (
-					// biome-ignore lint/suspicious/noArrayIndexKey: static, ordered opinion blocks
-					<Fragment key={i}>{renderBlock(b, hid)}</Fragment>
-				);
-			})}
+		<div className="mt-8 flex items-baseline justify-between gap-4 border-[var(--cds-border)] border-t pt-5 pb-2 font-mono text-[11px] text-[var(--cds-helper)] uppercase tracking-[0.22em] [font-family:var(--font-plex-mono)]">
+			<h2>{label}</h2>
+			{right && <span className="truncate tracking-[0.14em]">{right}</span>}
 		</div>
 	);
 }

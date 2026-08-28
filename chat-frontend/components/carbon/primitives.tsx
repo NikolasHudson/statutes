@@ -20,12 +20,21 @@ import {
 	type LucideIcon,
 	MenuIcon,
 	MoonIcon,
+	PanelLeftCloseIcon,
+	PanelLeftOpenIcon,
 	SunIcon,
 	XCircleIcon,
 } from "lucide-react";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
-import { createContext, useContext, useEffect, useId, useState } from "react";
+import {
+	createContext,
+	Fragment,
+	useContext,
+	useEffect,
+	useId,
+	useState,
+} from "react";
 import { appHost } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
@@ -48,8 +57,26 @@ const plexMono = IBM_Plex_Mono({
 
 export type ThemeName = "white" | "g100";
 
+// App side-nav tokens — Carbon Blue 90 in both themes. Like the g100 shell
+// header, the nav is chrome and doesn't follow the content theme; the same
+// navy sits against #ffffff and #161616 (SIDEBAR_PLAN.md). Beta tag and
+// warning marks stay #f1c21b on it.
+const NAV_TOKENS: Record<string, string> = {
+	"--cds-nav-bg": "#001d6c", // Blue 90
+	"--cds-nav-border": "#002d9c", // Blue 80
+	"--cds-nav-hover": "#002d9c",
+	"--cds-nav-selected": "#002d9c",
+	"--cds-nav-text": "#d0e2ff", // Blue 20
+	"--cds-nav-text-active": "#ffffff",
+	"--cds-nav-bar": "#78a9ff", // Blue 40 — active item's left bar
+	"--cds-nav-helper": "#a6c8ff", // Blue 30 — eyebrows, helper text
+	"--cds-nav-avatar-bg": "#78a9ff",
+	"--cds-nav-avatar-text": "#001141", // Blue 100
+};
+
 export const THEMES: Record<ThemeName, Record<string, string>> = {
 	white: {
+		...NAV_TOKENS,
 		"--cds-bg": "#ffffff",
 		"--cds-layer": "#f4f4f4",
 		"--cds-layer-hover": "#e8e8e8",
@@ -67,6 +94,7 @@ export const THEMES: Record<ThemeName, Record<string, string>> = {
 		"--cds-purple-text": "#6929c4",
 	},
 	g100: {
+		...NAV_TOKENS,
 		"--cds-bg": "#161616",
 		"--cds-layer": "#262626",
 		"--cds-layer-hover": "#333333",
@@ -135,6 +163,17 @@ export function CarbonRoot({ children }: { children: React.ReactNode }) {
 // UI shell — g100-dark header (both themes) + generic side nav
 // ---------------------------------------------------------------------------
 
+// The "Beta" chip that rides the wordmark in the shell header and the app
+// nav. inline-block keeps a parent link's hover underline from running
+// through it.
+export function BetaTag() {
+	return (
+		<span className="ml-2.5 inline-block border border-[#f1c21b] px-1.5 py-px align-[2px] font-mono text-[#f1c21b] text-[10px] uppercase tracking-[0.08em]">
+			Beta
+		</span>
+	);
+}
+
 export function ShellHeader({
 	homeHref = "/",
 	note,
@@ -142,6 +181,7 @@ export function ShellHeader({
 	onMenu,
 	mobileMenuOnly = false,
 	themeToggle = true,
+	className,
 }: {
 	homeHref?: string;
 	note?: string;
@@ -156,11 +196,19 @@ export function ShellHeader({
 	// Hide the header sun/moon switch when the shell surfaces the theme
 	// control elsewhere (e.g. the v2 user menu).
 	themeToggle?: boolean;
+	// Visibility overrides — the app shell hides the header at md+, where the
+	// brand lives in the side nav instead.
+	className?: string;
 }) {
 	const { theme, setTheme } = useTheme();
 	const next: ThemeName = theme === "g100" ? "white" : "g100";
 	return (
-		<header className="flex h-12 shrink-0 items-center border-[#393939] border-b bg-[#161616] text-white">
+		<header
+			className={cn(
+				"flex h-12 shrink-0 items-center border-[#393939] border-b bg-[#161616] text-white",
+				className,
+			)}
+		>
 			{onMenu && (
 				<button
 					type="button"
@@ -187,11 +235,7 @@ export function ShellHeader({
 			>
 				<span className="font-semibold">HUDSON</span>
 				<span className="ml-2 text-[#a8a8a8]">Corpus</span>
-				{/* inline-block keeps the link's hover underline from running
-				    through the tag */}
-				<span className="ml-2.5 inline-block border border-[#f1c21b] px-1.5 py-px align-[2px] font-mono text-[#f1c21b] text-[10px] uppercase tracking-[0.08em]">
-					Beta
-				</span>
+				<BetaTag />
 			</Link>
 
 			{note && (
@@ -235,33 +279,79 @@ export function NavGroupLabel({ children }: { children: React.ReactNode }) {
 	);
 }
 
+export type NavItem = {
+	href: string;
+	label: string;
+	icon: LucideIcon;
+	detail?: string;
+	// Match the href exactly instead of as a path prefix — for a group's
+	// root item (e.g. "/") that would otherwise swallow every subroute.
+	exact?: boolean;
+	// Extra path prefixes that light this item ("/" counts only for itself).
+	// Lets Library own every reading route (/case/*, /section/* …) without
+	// those pages needing nav entries of their own.
+	activeFor?: string[];
+};
+
 export type NavGroup = {
 	group: string;
-	items: {
-		href: string;
-		label: string;
-		icon: LucideIcon;
-		detail?: string;
-		// Match the href exactly instead of as a path prefix — for a group's
-		// root item (e.g. "/") that would otherwise swallow every subroute.
-		exact?: boolean;
-	}[];
+	items: NavItem[];
 };
+
+function underPrefix(path: string, prefix: string): boolean {
+	if (prefix === "/") return path === "/";
+	return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+export function isNavActive(item: NavItem, path: string): boolean {
+	if (item.activeFor?.some((p) => underPrefix(path, p))) return true;
+	return item.exact ? path === item.href : underPrefix(path, item.href);
+}
+
+// The three shapes of the app's navy nav (SIDEBAR_PLAN.md): the 48px icon
+// rail every route opens with, the 256px flyout that fans out over the content
+// on hover/focus, and the same 256px nav docked in flow when the user pins it.
+export type SideNavMode = "rail" | "flyout" | "docked";
 
 export function SideNav({
 	groups,
 	active,
 	footer,
 	className,
+	mode,
+	homeHref = "/",
+	brand = true,
+	onToggle,
+	expanded,
+	railFooter,
+	inert = false,
 }: {
 	groups: NavGroup[];
 	active: string;
-	// Defaults to the host the app is served from. Left undefined rather than
-	// computed in the signature because the fallback needs `window`: see below.
+	// Content under the bottom rule. The classic column falls back to the host
+	// the app is served from — left undefined rather than computed in the
+	// signature because the fallback needs `window`: see below.
 	footer?: React.ReactNode;
-	// Positioning/visibility overrides (e.g. the v2 shell's mobile drawer /
-	// desktop collapse) — merged after the defaults so they win conflicts.
+	// Positioning/visibility overrides (e.g. the app shell's mobile drawer /
+	// breakpoint gating) — merged after the defaults so they win conflicts.
 	className?: string;
+	// Navy app-shell modes. Unset → the classic light 256px column the mockup
+	// suite still renders.
+	mode?: SideNavMode;
+	homeHref?: string;
+	// flyout/docked: render the wordmark row at the top. The mobile drawer
+	// turns it off because the shell header above it already carries the brand.
+	brand?: boolean;
+	// rail: opens/closes the flyout (tap + keyboard). flyout: the "Keep open"
+	// row docks the nav. docked: the collapse control returns to the rail.
+	onToggle?: () => void;
+	// rail: mirrors the flyout's open state onto the toggle's aria-expanded.
+	expanded?: boolean;
+	// rail: 48px cells under the bottom rule (beta mark, avatar).
+	railFooter?: React.ReactNode;
+	// flyout: the shell keeps it mounted so it can animate closed; while
+	// parked it must be unreachable by Tab and assistive tech.
+	inert?: boolean;
 }) {
 	// The public mockup routes render this nav on the server, where appHost()
 	// has no window and no NEXT_PUBLIC_APP_URL to read, so resolving it during
@@ -269,8 +359,184 @@ export function SideNav({
 	// mount instead, when the two agree.
 	const [host, setHost] = useState("");
 	useEffect(() => setHost(appHost()), []);
-	const content = footer ?? (host ? `${host} · beta` : "beta");
 
+	if (mode === "rail") {
+		return (
+			<nav
+				aria-label="Main"
+				className={cn(
+					"flex w-12 shrink-0 flex-col border-[var(--cds-nav-border)] border-r bg-[var(--cds-nav-bg)] text-[var(--cds-nav-text)]",
+					className,
+				)}
+			>
+				<Link
+					href={homeHref}
+					title="Hudson Corpus"
+					aria-label="Hudson Corpus — home"
+					className="flex size-12 shrink-0 items-center justify-center border-[var(--cds-nav-border)] border-b"
+				>
+					<span className="flex size-7 items-center justify-center bg-white font-semibold text-[13px] text-[var(--cds-nav-bg)] tracking-[0.02em]">
+						H
+					</span>
+				</Link>
+				{onToggle && (
+					<button
+						type="button"
+						onClick={onToggle}
+						data-rail-toggle
+						aria-expanded={expanded}
+						aria-label={expanded ? "Hide navigation" : "Show navigation"}
+						title={expanded ? "Hide navigation" : "Show navigation"}
+						className="flex size-12 shrink-0 items-center justify-center transition-colors hover:bg-[var(--cds-nav-hover)] hover:text-[var(--cds-nav-text-active)]"
+					>
+						<PanelLeftOpenIcon className="size-4" strokeWidth={1.5} />
+					</button>
+				)}
+				<div className="flex flex-1 flex-col overflow-y-auto pt-2">
+					{groups.map((g, gi) => (
+						<Fragment key={g.group}>
+							{gi > 0 && (
+								<span
+									aria-hidden
+									className="mx-3 my-2 block h-px shrink-0 bg-[var(--cds-nav-border)]"
+								/>
+							)}
+							<div>
+								{g.items.map((it) => {
+									const isActive = isNavActive(it, active);
+									const Icon = it.icon;
+									return (
+										<Link
+											key={it.href}
+											href={it.href}
+											title={it.label}
+											aria-label={it.label}
+											aria-current={isActive ? "page" : undefined}
+											className={cn(
+												"flex size-12 items-center justify-center border-l-[3px] transition-colors",
+												isActive
+													? "border-[var(--cds-nav-bar)] bg-[var(--cds-nav-selected)] text-[var(--cds-nav-text-active)]"
+													: "border-transparent hover:bg-[var(--cds-nav-hover)] hover:text-[var(--cds-nav-text-active)]",
+											)}
+										>
+											<Icon className="size-4" strokeWidth={1.5} />
+										</Link>
+									);
+								})}
+							</div>
+						</Fragment>
+					))}
+				</div>
+				{railFooter && (
+					<div className="flex shrink-0 flex-col border-[var(--cds-nav-border)] border-t">
+						{railFooter}
+					</div>
+				)}
+			</nav>
+		);
+	}
+
+	if (mode === "flyout" || mode === "docked") {
+		return (
+			<nav
+				aria-label="Main"
+				inert={inert}
+				aria-hidden={inert || undefined}
+				className={cn(
+					"flex w-64 shrink-0 flex-col border-[var(--cds-nav-border)] border-r bg-[var(--cds-nav-bg)] text-[var(--cds-nav-text)]",
+					className,
+				)}
+			>
+				{brand && (
+					<div className="flex h-12 shrink-0 items-center border-[var(--cds-nav-border)] border-b pr-2 pl-4 text-[var(--cds-nav-text-active)] text-sm">
+						<Link href={homeHref} className="hover:underline">
+							<span className="font-semibold">HUDSON</span>
+							<span className="ml-2 text-[var(--cds-nav-helper)]">Corpus</span>
+							<BetaTag />
+						</Link>
+						{mode === "docked" && onToggle && (
+							<button
+								type="button"
+								onClick={onToggle}
+								aria-label="Collapse navigation to rail"
+								title="Collapse to rail  [ "
+								className="ml-auto flex size-8 items-center justify-center text-[var(--cds-nav-text)] transition-colors hover:bg-[var(--cds-nav-hover)] hover:text-[var(--cds-nav-text-active)]"
+							>
+								<PanelLeftCloseIcon className="size-4" strokeWidth={1.5} />
+							</button>
+						)}
+					</div>
+				)}
+				{mode === "flyout" && onToggle && (
+					<button
+						type="button"
+						onClick={onToggle}
+						className="flex h-12 shrink-0 items-center gap-3 border-[var(--cds-nav-border)] border-b px-3.5 text-[13px] transition-colors hover:bg-[var(--cds-nav-hover)] hover:text-[var(--cds-nav-text-active)]"
+					>
+						<PanelLeftCloseIcon className="size-4 shrink-0" strokeWidth={1.5} />
+						<span>Keep open</span>
+						<kbd className="ml-auto font-mono text-[11px] text-[var(--cds-nav-helper)]">
+							[
+						</kbd>
+					</button>
+				)}
+				<div className="flex-1 overflow-y-auto">
+					{groups.map((g) => (
+						<div key={g.group}>
+							<p className="px-4 pt-6 pb-2 font-mono text-[11px] text-[var(--cds-nav-helper)] uppercase tracking-[0.18em]">
+								{g.group}
+							</p>
+							{g.items.map((it) => {
+								const isActive = isNavActive(it, active);
+								const Icon = it.icon;
+								return (
+									<Link
+										key={it.href}
+										href={it.href}
+										aria-current={isActive ? "page" : undefined}
+										className={cn(
+											"flex w-full items-start gap-3 border-l-[3px] px-3.5 py-2 text-left transition-colors",
+											isActive
+												? "border-[var(--cds-nav-bar)] bg-[var(--cds-nav-selected)] text-[var(--cds-nav-text-active)]"
+												: "border-transparent hover:bg-[var(--cds-nav-hover)] hover:text-[var(--cds-nav-text-active)]",
+										)}
+									>
+										<Icon
+											className="mt-0.5 size-4 shrink-0"
+											strokeWidth={1.5}
+										/>
+										<span className="flex min-w-0 flex-col">
+											<span
+												className={cn(
+													"truncate text-sm",
+													isActive && "font-semibold",
+												)}
+											>
+												{it.label}
+											</span>
+											{it.detail && (
+												<span className="truncate text-[var(--cds-nav-helper)] text-xs tabular-nums">
+													{it.detail}
+												</span>
+											)}
+										</span>
+									</Link>
+								);
+							})}
+						</div>
+					))}
+				</div>
+				{footer && (
+					<div className="shrink-0 border-[var(--cds-nav-border)] border-t">
+						{footer}
+					</div>
+				)}
+			</nav>
+		);
+	}
+
+	// Classic light column (mockup suite).
+	const content = footer ?? (host ? `${host} · beta` : "beta");
 	return (
 		<nav
 			className={cn(
@@ -283,9 +549,7 @@ export function SideNav({
 					<div key={g.group}>
 						<NavGroupLabel>{g.group}</NavGroupLabel>
 						{g.items.map((it) => {
-							const isActive = it.exact
-								? active === it.href
-								: active === it.href || active.startsWith(`${it.href}/`);
+							const isActive = isNavActive(it, active);
 							const Icon = it.icon;
 							return (
 								<Link

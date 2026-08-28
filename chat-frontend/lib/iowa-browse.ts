@@ -108,10 +108,68 @@ export type CaseOpinion = {
   has_content: boolean;
 };
 
+// Citator flag cached on a decision by `annotate_treatment`. Absent/null =
+// no negative treatment was found (advisory), NOT a good-law certificate.
+export type TreatmentInfo = {
+  status: "good" | "caution" | "negative" | "unknown";
+  severity: number;
+  label: string;
+  by_citation: string;
+  excerpt: string;
+  source: string;
+  confidence: number;
+};
+
 export type CitedCase = {
   case_id: number;
   case_name: string;
+  // Times this opinion cites it (inline citation links).
   count: number;
+  court_id: string;
+  court_name: string;
+  date_filed: string;
+  // First reporter cite ("203 N.W.2d 301"), "" when none.
+  citation: string;
+  precedential_status: string;
+  treatment: TreatmentInfo | null;
+  // Distinct decisions citing it (citation graph), null when unknown.
+  cited_by: number | null;
+};
+
+// One decision that cites the case being read (citation graph, folded so
+// CourtListener's amended re-reports / duplicate imports appear once).
+export type CitingDecision = {
+  case_id: number;
+  case_name: string;
+  court_id: string;
+  court_name: string;
+  court_level: number | null;
+  date_filed: string;
+  citation: string;
+  precedential_status: string;
+  // Sum of graph weights — how many times its opinions cite this case.
+  depth: number;
+  // Raw imports folded into this row (1 = no duplicates).
+  folded: number;
+};
+
+export type CitingSort = "recent" | "oldest" | "depth";
+
+export type CitingResponse = {
+  results: CitingDecision[];
+  total: number;
+  citing_count: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+  sort: CitingSort;
+  court: string | null;
+  courts: {
+    court_id: string;
+    court_name: string;
+    court_level: number | null;
+    count: number;
+  }[];
 };
 
 export type CaseDetail = {
@@ -142,6 +200,13 @@ export type CaseDetail = {
   opinions: CaseOpinion[];
   cited_cases: CitedCase[];
   external_citation_count: number;
+  // Citator (see apps/api/browse.py case_detail): the cached flag, the raw
+  // distinct citing-decision count (matches the /results badge), the folded
+  // row count, and the first page of folded rows, most recent first.
+  treatment: TreatmentInfo | null;
+  citing_count: number;
+  citing_folded_count: number;
+  citing_decisions: CitingDecision[];
 };
 
 export type BrowseSearchResult = {
@@ -315,6 +380,28 @@ export const browseNode = (id: number) =>
 export const browseCase = (id: number) =>
   json<CaseDetail>(`/api/browse/cases/${id}`);
 
+// Citing decisions for the reader's citator rail — sort / court filter /
+// paging over the same folded rows the detail payload embeds.
+export const browseCaseCiting = (
+  id: number,
+  params: {
+    court?: string | null;
+    sort?: CitingSort;
+    limit?: number;
+    offset?: number;
+  } = {},
+) => {
+  const q = new URLSearchParams();
+  if (params.court) q.set("court", params.court);
+  if (params.sort) q.set("sort", params.sort);
+  if (params.limit) q.set("limit", String(params.limit));
+  if (params.offset) q.set("offset", String(params.offset));
+  const qs = q.toString();
+  return json<CitingResponse>(
+    `/api/browse/cases/${id}/citing${qs ? `?${qs}` : ""}`,
+  );
+};
+
 // Advanced-search filters. `source` scopes to a slug directly; `doc_type`
 // (code/rules/cases/all) is the friendly alias; the caselaw filters
 // (court/status/date) imply the cases scope server-side.
@@ -362,16 +449,6 @@ export type SearchDetection = {
 export type SnippetSegment = { text: string; hit: boolean };
 
 // Good-law flag from the citator (only present when a real signal exists).
-export type TreatmentInfo = {
-  status: "good" | "caution" | "negative" | "unknown";
-  severity: number;
-  label: string;
-  by_citation: string;
-  excerpt: string;
-  source: string;
-  confidence: number;
-};
-
 export type SearchFacets = {
   // "all_matches" = exact counts over the full match set (boolean mode);
   // "top_results" = counts within the ranked pool (natural mode).

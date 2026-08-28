@@ -65,6 +65,21 @@ serves both themes (see THEMES in the mockup files).
 | `--cds-placeholder` | `#a8a8a8` | `#6f6f6f` |
 | `--cds-link` | Blue 60 `#0f62fe` | Blue 40 `#78a9ff` |
 
+App side nav (theme-independent — Carbon Blue 90 chrome in both themes,
+see SIDEBAR_PLAN.md; set alongside the theme tokens in `NAV_TOKENS`):
+
+| Token (our var) | Hex | Usage |
+|---|---|---|
+| `--cds-nav-bg` (Blue 90) | `#001d6c` | rail / flyout / docked nav background |
+| `--cds-nav-border`, `-hover`, `-selected` (Blue 80) | `#002d9c` | rules, hover + active item background |
+| `--cds-nav-text` (Blue 20) | `#d0e2ff` | item text |
+| `--cds-nav-text-active` | `#ffffff` | active item, wordmark, user name |
+| `--cds-nav-bar` (Blue 40) | `#78a9ff` | active item's 3px left bar; avatar background |
+| `--cds-nav-helper` (Blue 30) | `#a6c8ff` | group eyebrows, helper text, "Corpus" in the wordmark |
+| `--cds-nav-avatar-text` (Blue 100) | `#001141` | initials on the avatar |
+
+Beta tag and the warning triangle keep `#f1c21b` on the navy.
+
 Action palette (theme-independent):
 
 | Role | Hex |

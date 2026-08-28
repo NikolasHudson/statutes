@@ -51,13 +51,16 @@ export type Block =
 	| { kind: "runin"; lead: string; rest: string; marker?: string };
 
 // A section/subsection title line (Roman "I."/"II.", bare "A.", or a lettered
-// "A. Title." subsection) — rendered bold.
+// "A. Title." subsection) — rendered bold. Roman-numeral headings are often
+// full questions ("I. Should We Adopt the Implied Warranty of Workmanship in
+// the Sale of Real Estate?"), so they get a longer cap than lettered ones;
+// a Roman line with more than one sentence is prose, not a title.
 export function isHeadingLine(text: string): boolean {
+	if (ROMAN_HEADING.test(text)) {
+		return text.length <= 200 && !/[.?!]\s+[A-Z]/.test(text.slice(4));
+	}
 	return (
-		text.length <= 80 &&
-		(ROMAN_HEADING.test(text) ||
-			LETTER_HEADING.test(text) ||
-			SUBHEADING.test(text))
+		text.length <= 80 && (LETTER_HEADING.test(text) || SUBHEADING.test(text))
 	);
 }
 

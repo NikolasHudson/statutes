@@ -634,6 +634,143 @@ class CaseDetailRouteTests(TestCase):
 
 
 @tag("postgres")
+class CaseCitatorTests(TestCase):
+    """Citator fields on /api/browse/cases/{id} and the /citing sub-route:
+    incoming graph edges folded per citing decision (duplicate imports
+    collapsed), the cached treatment flag passed through, hover-card fields
+    on cited authorities."""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Target T is cited (graph edges) by C1 (2020, iowa), C2 (2023, COA)
+        # and C2-dup — CourtListener's amended re-report of C2 (same court,
+        # same date, same docket with a "n / " prefix, no reporter cite).
+        cls.target, cls.t_op, cls.t_ver = make_caselaw_case(
+            cl_cluster_id=300, cl_opinion_id=3000, case_name="Target v. Case",
+            date_filed="2010-05-05", citations=["500 N.W.2d 1"],
+        )
+        cls.c1, cls.c1_op, cls.c1_ver = make_caselaw_case(
+            cl_cluster_id=301, cl_opinion_id=3010, case_name="First v. Citer",
+            date_filed="2020-01-15", docket_number="19-0001",
+            citations=["900 N.W.2d 10", "2020 WL 1"],
+        )
+        cls.c2, cls.c2_op, cls.c2_ver = make_caselaw_case(
+            cl_cluster_id=302, cl_opinion_id=3020, court_id="iowactapp",
+            case_name="Second v. Citer", date_filed="2023-03-03",
+            docket_number="22–0500", citations=["980 N.W.2d 5"],
+        )
+        cls.c2dup, cls.c2dup_op, cls.c2dup_ver = make_caselaw_case(
+            cl_cluster_id=303, cl_opinion_id=3030, court_id="iowactapp",
+            case_name="Amended April 1, 2023 Second v. Citer",
+            date_filed="2023-03-03", docket_number="7 / 22-0500",
+        )
+        for ver, w in ((cls.c1_ver, 2), (cls.c2_ver, 3), (cls.c2dup_ver, 1)):
+            CrossReference.objects.create(
+                from_version=ver, to_node=cls.t_op, weight=w,
+                kind=CrossReferenceKind.INTERNAL, source="caselaw_graph",
+            )
+        # T cites C1 inline (the authorities rail), and C1 is cited by T in
+        # the graph too so its hover card has a cited_by count.
+        CrossReference.objects.create(
+            from_version=cls.t_ver, to_node=cls.c1_op,
+            kind=CrossReferenceKind.INTERNAL, source="caselaw_link",
+        )
+        CrossReference.objects.create(
+            from_version=cls.t_ver, to_node=cls.c1_op, weight=1,
+            kind=CrossReferenceKind.INTERNAL, source="caselaw_graph",
+        )
+        cls.c1.source_metadata["treatment"] = {
+            "status": "negative", "severity": 5, "label": "overruled",
+            "by_citation": "Later v. Court", "excerpt": "First is overruled.",
+            "source": "graph_phrase", "confidence": 0.8,
+        }
+        cls.c1.save(update_fields=["source_metadata"])
+
+    def setUp(self):
+        self.client = Client()
+
+    def test_detail_folds_duplicate_imports_and_keeps_raw_count(self):
+        data = self.client.get(f"/api/browse/cases/{self.target.id}").json()
+        self.assertEqual(data["citing_count"], 3)  # raw, matches /results
+        self.assertEqual(data["citing_folded_count"], 2)
+        rows = data["citing_decisions"]
+        self.assertEqual([r["case_id"] for r in rows], [self.c2.id, self.c1.id])
+        c2 = rows[0]
+        # Representative = the import with the reporter cite; depth summed.
+        self.assertEqual(c2["citation"], "980 N.W.2d 5")
+        self.assertEqual(c2["case_name"], "Second v. Citer")
+        self.assertEqual(c2["depth"], 4)
+        self.assertEqual(c2["folded"], 2)
+        self.assertEqual(c2["court_id"], "iowactapp")
+        self.assertEqual(c2["court_level"], 2)
+        c1 = rows[1]
+        self.assertEqual(c1["citation"], "900 N.W.2d 10")  # WL cite skipped
+        self.assertEqual(c1["depth"], 2)
+
+    def test_detail_treatment_is_null_without_flag_and_passed_through(self):
+        data = self.client.get(f"/api/browse/cases/{self.target.id}").json()
+        self.assertIsNone(data["treatment"])
+        flagged = self.client.get(f"/api/browse/cases/{self.c1.id}").json()
+        self.assertEqual(flagged["treatment"]["status"], "negative")
+        self.assertEqual(flagged["treatment"]["label"], "overruled")
+        self.assertEqual(flagged["treatment"]["by_citation"], "Later v. Court")
+
+    def test_cited_cases_carry_hover_card_fields(self):
+        data = self.client.get(f"/api/browse/cases/{self.target.id}").json()
+        self.assertEqual(len(data["cited_cases"]), 1)
+        row = data["cited_cases"][0]
+        self.assertEqual(row["case_id"], self.c1.id)
+        self.assertEqual(row["citation"], "900 N.W.2d 10")
+        self.assertEqual(row["date_filed"], "2020-01-15")
+        self.assertEqual(row["court_id"], "iowa")
+        self.assertEqual(row["cited_by"], 1)  # T → C1 graph edge
+        self.assertEqual(row["treatment"]["label"], "overruled")
+
+    def test_citing_route_filters_sorts_and_pages(self):
+        base = f"/api/browse/cases/{self.target.id}/citing"
+        data = self.client.get(base).json()
+        self.assertEqual(data["total"], 2)
+        self.assertEqual(data["citing_count"], 3)
+        self.assertEqual(
+            [(c["court_id"], c["count"]) for c in data["courts"]],
+            [("iowa", 1), ("iowactapp", 1)],
+        )
+        self.assertEqual(data["results"][0]["case_id"], self.c2.id)
+
+        oldest = self.client.get(base, {"sort": "oldest"}).json()
+        self.assertEqual(oldest["results"][0]["case_id"], self.c1.id)
+
+        depth = self.client.get(base, {"sort": "depth"}).json()
+        self.assertEqual([r["case_id"] for r in depth["results"]],
+                         [self.c2.id, self.c1.id])
+
+        coa = self.client.get(base, {"court": "iowactapp"}).json()
+        self.assertEqual([r["case_id"] for r in coa["results"]], [self.c2.id])
+        self.assertEqual(coa["total"], 1)
+        # Facets ignore the court filter so the chips stay stable.
+        self.assertEqual(len(coa["courts"]), 2)
+
+        page = self.client.get(base, {"limit": 1, "offset": 1}).json()
+        self.assertEqual([r["case_id"] for r in page["results"]], [self.c1.id])
+        self.assertFalse(page["has_more"])
+        first = self.client.get(base, {"limit": 1}).json()
+        self.assertTrue(first["has_more"])
+
+    def test_citing_route_rejects_bad_sort_and_non_decisions(self):
+        base = f"/api/browse/cases/{self.target.id}/citing"
+        data = self.client.get(base, {"sort": "bogus"}).json()
+        self.assertEqual(data["sort"], "recent")
+        resp = self.client.get(f"/api/browse/cases/{self.t_op.id}/citing")
+        self.assertEqual(resp.status_code, 404)
+
+    def test_uncited_case_has_empty_citator(self):
+        data = self.client.get(f"/api/browse/cases/{self.c2.id}").json()
+        self.assertEqual(data["citing_count"], 0)
+        self.assertEqual(data["citing_decisions"], [])
+        self.assertIsNone(data["treatment"])
+
+
+@tag("postgres")
 class BrowseAdvancedSearchTests(TestCase):
     """The fielded /api/browse/search: caselaw hits carry a kind + decision id,
     statute hits don't; doc_type/court/date filters scope; caselaw rows dedup."""

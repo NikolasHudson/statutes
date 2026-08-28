@@ -17,8 +17,9 @@ import json
 import re
 
 from django.http import HttpResponse, HttpResponseNotModified, JsonResponse
-from django.db.models import Count, Q
-from django.db.models.fields.json import KeyTextTransform
+from django.db.models import Count, Q, Sum
+from django.db.models.fields.json import KeyTextTransform, KeyTransform
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from ninja import Router
 
@@ -493,6 +494,190 @@ def list_cases(
     )
 
 
+
+# ---------------------------------------------------------------------------
+# Citator helpers for the case reader: incoming citation-graph edges folded
+# per citing decision, plus the cached treatment flag.
+# ---------------------------------------------------------------------------
+
+# First page of citing decisions embedded in the detail payload; the rest is
+# served by ``/cases/{id}/citing``.
+CITING_EMBED_LIMIT = 50
+CITING_LIMIT_DEFAULT = 50
+CITING_LIMIT_MAX = 200
+CITING_SORTS = ("recent", "oldest", "depth")
+
+_TREATMENT_FIELDS = (
+    "status", "severity", "label", "by_citation", "excerpt", "source", "confidence",
+)
+_AMENDED_PREFIX = re.compile(r"^amended\s+[a-z]+\.?\s+\d{1,2},\s*\d{4}\s+", re.I)
+_DASHES = str.maketrans({"–": "-", "—": "-", "‒": "-"})
+
+
+def _treatment_of(md: dict) -> dict | None:
+    """The cached citator flag written by ``annotate_treatment`` (see
+    ``apps.corpus.services.treatment``), or None when the decision carries
+    none — absence means no negative treatment was found, not "good law"."""
+    td = (md or {}).get("treatment")
+    if not td or not isinstance(td, dict):
+        return None
+    return {k: td.get(k) for k in _TREATMENT_FIELDS}
+
+
+def _reporter_citation(citations) -> str:
+    """The first reporter cite (skipping LEXIS/WL vendor cites), or ""."""
+    for c in citations or []:
+        if c and "LEXIS" not in c and " WL " not in c:
+            return c
+    return ""
+
+
+def _norm_docket(docket: str) -> str:
+    """Docket key for folding duplicate imports: the last ``/``-separated
+    segment ("103 / 05–1996" → "05-1996"), dashes normalized, lower-cased."""
+    seg = (docket or "").split("/")[-1].strip().translate(_DASHES)
+    return re.sub(r"\s+", "", seg).lower()
+
+
+def _norm_case_name(name: str) -> str:
+    """Case-name key for folding when no docket exists: drops CourtListener's
+    "Amended February 23, 2015 " prefix and punctuation/case differences."""
+    n = _AMENDED_PREFIX.sub("", name or "")
+    return re.sub(r"[^a-z0-9]+", " ", n.lower()).strip()
+
+
+def _opinion_ids(decision_ids: list[int]) -> list[int]:
+    # Materialized on purpose: filtering the edge table by a LITERAL opinion-id
+    # list keeps the planner on the to_node FK index; the joined
+    # ``to_node__parent_id`` form seq-scans the whole edge table.
+    if not decision_ids:
+        return []
+    return list(
+        Node.objects.filter(parent_id__in=decision_ids).values_list("id", flat=True)
+    )
+
+
+def _cited_by_counts(decision_ids: list[int]) -> dict[int, int]:
+    """Distinct citing decisions per decision id (raw graph — the same number
+    the /results "Cited by" badge shows)."""
+    opinion_ids = _opinion_ids(decision_ids)
+    if not opinion_ids:
+        return {}
+    rows = (
+        CrossReference.objects.filter(
+            source="caselaw_graph", to_node_id__in=opinion_ids
+        )
+        .values("to_node__parent_id")
+        .annotate(n=Count("from_version__node__parent_id", distinct=True))
+    )
+    return {r["to_node__parent_id"]: r["n"] for r in rows}
+
+
+def _citing_decisions(decision: Node) -> tuple[list[dict], int]:
+    """Every decision that cites ``decision`` (incoming ``caselaw_graph``
+    edges, aggregated through the citing opinion's parent), most recent first.
+
+    Returns ``(rows, raw_count)``. ``raw_count`` is the distinct citing
+    decisions in the graph — consistent with ``_cited_by_counts`` and the
+    /results badge. ``rows`` folds CourtListener's duplicate imports (an
+    "Amended <date>" re-report of the same decision, or a second cluster for
+    the same docket filed the same day) into one row so the reader doesn't
+    list Luana Savings Bank three times; the fold key is court + date + docket
+    (or court + date + normalized name when the docket is blank). The
+    representative is the import with a reporter cite; ``depth`` sums the
+    graph weights (how many times the citing opinions cite this case)."""
+    opinion_ids = _opinion_ids([decision.id])
+    if not opinion_ids:
+        return [], 0
+    edge_rows = (
+        CrossReference.objects.filter(
+            source="caselaw_graph", to_node_id__in=opinion_ids
+        )
+        .exclude(from_version__node__parent_id=decision.id)
+        .values("from_version__node__parent_id")
+        .annotate(depth=Coalesce(Sum("weight"), 0))
+    )
+    depth = {r["from_version__node__parent_id"]: r["depth"] for r in edge_rows}
+    ids = [i for i in depth if i is not None]
+    if not ids:
+        return [], 0
+
+    # Lean fetch — only the keys the rail needs, not the whole metadata blob
+    # (the most-cited Iowa decisions have ~1,500 citing decisions).
+    nodes = (
+        Node.objects.filter(id__in=ids)
+        .annotate(
+            _date=KeyTextTransform("date_filed", "source_metadata"),
+            _court=KeyTextTransform("court_id", "source_metadata"),
+            _docket=KeyTextTransform("docket_number", "source_metadata"),
+            _status=KeyTextTransform("precedential_status", "source_metadata"),
+            _cites=KeyTransform("citations", "source_metadata"),
+        )
+        .values("id", "heading", "_date", "_court", "_docket", "_status", "_cites")
+    )
+    courts = {c.court_id: c for c in Court.objects.all()}
+
+    folded: dict[tuple, dict] = {}
+    for n in nodes:
+        court_id = n["_court"] or ""
+        date = n["_date"] or ""
+        docket = _norm_docket(n["_docket"] or "")
+        key = (
+            (court_id, date, docket)
+            if docket
+            else (court_id, date, "name:" + _norm_case_name(n["heading"]))
+        )
+        cite = _reporter_citation(n["_cites"])
+        court = courts.get(court_id)
+        row = {
+            "case_id": n["id"],
+            "case_name": _AMENDED_PREFIX.sub("", n["heading"] or ""),
+            "court_id": court_id,
+            "court_name": court.name if court else court_id,
+            "court_level": court.level if court else None,
+            "date_filed": date,
+            "citation": cite,
+            "precedential_status": n["_status"] or "",
+            "depth": int(depth.get(n["id"]) or 0),
+            "folded": 1,
+        }
+        # Representative of a fold: the import with a reporter cite, then the
+        # one without the "Amended …" re-report prefix, then the earlier id.
+        row["_rank"] = (
+            bool(cite),
+            not _AMENDED_PREFIX.match(n["heading"] or ""),
+            -n["id"],
+        )
+        prev = folded.get(key)
+        if prev is None:
+            folded[key] = row
+            continue
+        keep, drop = (row, prev) if row["_rank"] > prev["_rank"] else (prev, row)
+        keep["depth"] += drop["depth"]
+        keep["folded"] = prev["folded"] + 1
+        folded[key] = keep
+
+    for r in folded.values():
+        del r["_rank"]
+
+    rows = sorted(
+        folded.values(), key=lambda r: (r["date_filed"], r["case_id"]), reverse=True
+    )
+    return rows, len(ids)
+
+
+def _sort_citing(rows: list[dict], sort: str) -> list[dict]:
+    if sort == "oldest":
+        return sorted(rows, key=lambda r: (r["date_filed"], r["case_id"]))
+    if sort == "depth":
+        # Most-citing first; most recent among equals.
+        return sorted(
+            rows, key=lambda r: (r["depth"], r["date_filed"], r["case_id"]),
+            reverse=True,
+        )
+    return rows  # "recent" — the helper's native order
+
+
 @browse_router.get("/cases/{int:node_id}", auth=None)
 def case_detail(request, node_id: int):
     """One Iowa caselaw decision: case metadata + optional head-matter
@@ -575,12 +760,24 @@ def case_detail(request, node_id: int):
                     else cited
                 )
                 if case_node and case_node.id != decision.id:
+                    cmd = case_node.source_metadata or {}
                     row = cited_cases.setdefault(
                         case_node.id,
                         {
                             "case_id": case_node.id,
                             "case_name": case_node.heading,
                             "count": 0,
+                            # Hover-card fields (court/date/cite/treatment);
+                            # cited_by is filled in below in one query.
+                            "court_id": cmd.get("court_id", ""),
+                            "court_name": cmd.get("court_name", ""),
+                            "date_filed": cmd.get("date_filed", ""),
+                            "citation": _reporter_citation(cmd.get("citations")),
+                            "precedential_status": cmd.get(
+                                "precedential_status", ""
+                            ),
+                            "treatment": _treatment_of(cmd),
+                            "cited_by": None,
                         },
                     )
                     row["count"] += 1
@@ -611,6 +808,13 @@ def case_detail(request, node_id: int):
         )
 
     court = Court.objects.filter(court_id=md.get("court_id", "")).first()
+
+    # Citator: how often each cited authority is itself cited (hover card),
+    # and who cites THIS decision (the rail + authority strip).
+    for cid, n in _cited_by_counts(list(cited_cases)).items():
+        if cid in cited_cases:
+            cited_cases[cid]["cited_by"] = n
+    citing_rows, citing_count = _citing_decisions(decision)
 
     return _cached_json(request, {
         "id": decision.id,
@@ -645,6 +849,65 @@ def case_detail(request, node_id: int):
             cited_cases.values(), key=lambda r: (-r["count"], r["case_name"])
         ),
         "external_citation_count": len(external_texts),
+        # Citator. ``treatment`` is the cached negative-treatment flag or null
+        # (null = none found, which is advisory, not a good-law certificate).
+        # ``citing_count`` is the raw distinct count (matches /results);
+        # ``citing_decisions`` is the folded, most-recent-first first page —
+        # ``citing_folded_count`` rows in all, the rest via /cases/{id}/citing.
+        "treatment": _treatment_of(md),
+        "citing_count": citing_count,
+        "citing_folded_count": len(citing_rows),
+        "citing_decisions": citing_rows[:CITING_EMBED_LIMIT],
+    })
+
+
+@browse_router.get("/cases/{int:node_id}/citing", auth=None)
+def case_citing(
+    request,
+    node_id: int,
+    court: str | None = None,
+    sort: str = "recent",
+    limit: int = CITING_LIMIT_DEFAULT,
+    offset: int = 0,
+):
+    """Decisions citing one case, for the reader's citator rail: folded like
+    the detail payload, filterable by court (CourtListener slug), sortable
+    ``recent`` (default) / ``oldest`` / ``depth`` (most citations of this case
+    first). Court facet counts ignore the court filter so the chips stay
+    stable while one is selected. Public + edge-cached like the detail."""
+    decision = get_object_or_404(
+        Node.objects.only("id"), pk=node_id, node_type__key="decision"
+    )
+    rows, raw_count = _citing_decisions(decision)
+    if sort not in CITING_SORTS:
+        sort = "recent"
+    limit = max(1, min(limit, CITING_LIMIT_MAX))
+    offset = max(0, offset)
+
+    facet: dict[str, dict] = {}
+    for r in rows:
+        f = facet.setdefault(
+            r["court_id"],
+            {"court_id": r["court_id"], "court_name": r["court_name"],
+             "court_level": r["court_level"], "count": 0},
+        )
+        f["count"] += 1
+    courts = sorted(facet.values(), key=lambda f: (f["court_level"] or 99, f["court_id"]))
+
+    if court:
+        rows = [r for r in rows if r["court_id"] == court]
+    rows = _sort_citing(rows, sort)
+    page = rows[offset : offset + limit]
+    return _cached_json(request, {
+        "results": page,
+        "total": len(rows),
+        "citing_count": raw_count,
+        "limit": limit,
+        "offset": offset,
+        "has_more": offset + limit < len(rows),
+        "sort": sort,
+        "court": court or None,
+        "courts": courts,
     })
 
 
