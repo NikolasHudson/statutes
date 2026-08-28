@@ -294,7 +294,7 @@ class Command(BaseCommand):
             .values_list("pk", "source_metadata")
         )
 
-        confirmed = relabeled = dropped = kept = 0
+        confirmed = relabeled = dropped = kept = failed = 0
         for i, (dec, c) in enumerate(cands, 1):
             if i % 100 == 0:
                 self.stdout.write(f"    …{i:,}/{len(cands):,} classified")
@@ -312,6 +312,9 @@ class Command(BaseCommand):
                 citing_court_level=level,
                 paragraph=para,
             )
+            if v.error:
+                failed += 1  # API failure — v1 flag kept, but NOT a verdict
+                continue
             if v.confidence < min_conf:
                 kept += 1  # uncertain — leave the v1 advisory flag as-is
                 continue
@@ -330,8 +333,12 @@ class Command(BaseCommand):
 
         self.stdout.write(
             f"  --llm: {confirmed:,} confirmed ({relabeled:,} relabeled), "
-            f"{dropped:,} dropped as false positives, {kept:,} left as v1 (uncertain)."
+            f"{dropped:,} dropped as false positives, {kept:,} left as v1 (uncertain), "
+            f"{failed:,} API failures (v1 kept, unclassified)."
         )
+        if failed:
+            self.stdout.write(self.style.WARNING(
+                f"  --llm: {failed:,} candidates were NOT classified — re-run to cover them."))
 
     # ------------------------------------------------------------------
     def _severity_dist(self, best: dict[int, _Cand], prefix: str = "  severity:"):

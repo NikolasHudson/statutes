@@ -111,6 +111,25 @@ class ParagraphAroundTests(SimpleTestCase):
         self.assertIn("TRIGGER SENTENCE", para)
         self.assertLess(len(para), len(body))
 
+    def test_grouped_label_coerces_to_first_known_token(self):
+        # gpt-4o echoed a whole prompt group; must not degrade to UNKNOWN.
+        v = parse_verdict('{"label":"overruled / abrogated / superseded / repudiated",'
+                          '"target_is_subject":true,"evidence":"x","confidence":1.0}')
+        self.assertEqual(v.label, "overruled")
+        self.assertEqual(v.severity, 5)
+        self.assertTrue(v.is_negative)
+        self.assertEqual(parse_verdict('{"label":"limited, distinguished","confidence":0.9}').label,
+                         "limited")
+
+    def test_evidence_located_via_normalized_body(self):
+        # v1 evidence is a normalized sentence; raw body has a PDF \n\n mid-sentence.
+        body = "Lead-in context here. The court over-\n\nruled Target v. Case,\n\n1 N.W.2d 1 (Iowa 1990). Trailing context."
+        from apps.corpus.services.treatment import _normalize_body
+        ev = [s for s in _normalize_body(body).split(". ") if "Target" in s][0]
+        para = paragraph_around(body, ev, window=30)
+        self.assertIn("Target v. Case", para)
+        self.assertIn("context", para)  # surrounding window, not just the sentence
+
     def test_missing_evidence_falls_back_to_evidence(self):
         self.assertEqual(paragraph_around("body text", "not present here"),
                          "not present here")

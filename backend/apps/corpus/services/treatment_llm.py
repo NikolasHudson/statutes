@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -73,12 +74,17 @@ SYSTEM_PROMPT = (
     "law. You are given the target case's name and reporter citation, the citing "
     "case's name and court level, and a paragraph from the citing opinion that "
     "mentions the target.\n\n"
-    "Choose exactly one label for how the citing court treats the TARGET:\n"
-    "  • overruled / abrogated / superseded / repudiated — the target is no "
-    "longer good law (severity: invalidated).\n"
-    "  • disapproved / no-longer-good-law / declined-to-follow / criticized / "
+    "Choose exactly one label for how the citing court treats the TARGET. The "
+    "\"label\" field must be EXACTLY ONE of these tokens, verbatim, never a list "
+    "or a group: overruled, abrogated, superseded, repudiated, disapproved, "
+    "no-longer-good-law, declined-to-follow, criticized, questioned, limited, "
+    "distinguished, none.\n\n"
+    "What they mean:\n"
+    "  • overruled, abrogated, superseded, repudiated — the target is no "
+    "longer good law (severity: invalidated). Pick the one word the court uses.\n"
+    "  • disapproved, no-longer-good-law, declined-to-follow, criticized, "
     "questioned — the target is undercut but not formally killed.\n"
-    "  • limited / distinguished — the target survives; the court merely narrows "
+    "  • limited, distinguished — the target survives; the court merely narrows "
     "it or sets it aside on the facts (a caution, not an invalidation).\n"
     "  • none — the target is NOT treated negatively in this paragraph.\n\n"
     "Decide 'none' (this is the default — prefer it whenever unsure) when:\n"
@@ -112,6 +118,10 @@ class LLMTreatmentVerdict:
     target_is_subject: bool
     evidence: str
     confidence: float
+    # True when no verdict was obtained at all (API error, rate limit, parse
+    # failure) — distinct from a genuine low-confidence read so a batch can count
+    # failures instead of silently reporting them as "uncertain, kept v1".
+    error: bool = False
 
     @property
     def is_negative(self) -> bool:
@@ -129,6 +139,12 @@ class LLMTreatmentVerdict:
 UNKNOWN_VERDICT = LLMTreatmentVerdict(
     label="none", severity=0, status="unknown",
     target_is_subject=False, evidence="", confidence=0.0,
+)
+
+# UNKNOWN plus the error bit: the call itself failed, nothing was classified.
+FAILED_VERDICT = LLMTreatmentVerdict(
+    label="none", severity=0, status="unknown",
+    target_is_subject=False, evidence="", confidence=0.0, error=True,
 )
 
 
@@ -200,7 +216,9 @@ class OpenAITreatmentClassifier:
             kwargs["max_tokens"] = self.max_tokens
             kwargs["temperature"] = 0
         try:
-            client = OpenAI(api_key=key)
+            # Batch runs sit at the org's tokens-per-minute ceiling; the SDK's
+            # built-in backoff honors Retry-After on 429, so give it room.
+            client = OpenAI(api_key=key, max_retries=8)
             resp = client.chat.completions.create(**kwargs)
             # Token accounting (lazy import — see semantic_support for why).
             # Batch runs have no collector open, so these land unattributed —
@@ -211,8 +229,23 @@ class OpenAITreatmentClassifier:
             text = resp.choices[0].message.content or ""
         except Exception:  # noqa: BLE001 — a model failure must not crash a batch
             log.exception("treatment v2 classify failed")
-            return UNKNOWN_VERDICT
+            return FAILED_VERDICT
         return parse_verdict(text)
+
+
+def _coerce_label(raw) -> str | None:
+    """Map the model's ``label`` onto the fixed vocabulary. Exact match first;
+    otherwise, when the model echoes a whole prompt group ("overruled / abrogated
+    / superseded / repudiated" — observed on gpt-4o), take the FIRST token in that
+    group that is a known label (the groups are listed most-severe first). A
+    label with no known token at all is ``None``."""
+    label = str(raw or "").strip().lower()
+    if label in LABEL_SEVERITY:
+        return label
+    for tok in re.split(r"[\s/,|]+", label):
+        if tok in LABEL_SEVERITY:
+            return tok
+    return None
 
 
 def parse_verdict(text: str) -> LLMTreatmentVerdict:
@@ -229,8 +262,8 @@ def parse_verdict(text: str) -> LLMTreatmentVerdict:
     if not isinstance(data, dict):
         return UNKNOWN_VERDICT
 
-    label = str(data.get("label", "")).strip().lower()
-    if label not in LABEL_SEVERITY:
+    label = _coerce_label(data.get("label", ""))
+    if label is None:
         return UNKNOWN_VERDICT
     # Defensive like the other fields: a quoted-string boolean ("false") would
     # be truthy under a bare bool(), flipping a confident NOT-subject rejection
@@ -276,7 +309,15 @@ def paragraph_around(body: str, evidence: str, *, window: int = 700) -> str:
     probe = evidence[:80]
     idx = body.find(probe)
     if idx == -1:
-        return evidence
+        # The v1 evidence sentence comes from the NORMALIZED body (PDF hyphen
+        # wraps repaired, mid-sentence ``\n\n`` collapsed), so it rarely occurs
+        # verbatim in the raw text. Search the same normalization instead.
+        from apps.corpus.services.treatment import _normalize_body
+
+        body = _normalize_body(body)
+        idx = body.find(probe)
+        if idx == -1:
+            return evidence
     lo = max(0, idx - window)
     hi = min(len(body), idx + len(evidence) + window)
     return body[lo:hi]
