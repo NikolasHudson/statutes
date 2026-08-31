@@ -45,7 +45,7 @@ export const PLANS: Plan[] = [
 		name: "Solo",
 		price: "$49",
 		cadence: "/ month",
-		subPrice: "or $490 / year — two months free",
+		subPrice: "or $490 / year, two months free",
 		tagline: "For the individual practitioner who lives in research.",
 		badge: "7-day free trial",
 		// /start is the app's signup→checkout wizard; ?plan pre-selects the plan.
@@ -79,7 +79,7 @@ export const PLANS: Plan[] = [
 // promised prices would be announced before any charge; these pages are that
 // announcement, and they say so rather than implying billing is live.
 export const PRICING_NOTE = BILLING_LIVE
-	? "Every plan starts with a 7-day free trial — card up front, a reminder before the first charge, cancel any time during the trial."
+	? "Every plan starts with a 7-day free trial: card up front, a reminder before the first charge, cancel any time during the trial."
 	: "These are announced launch prices. Billing hasn't started: beta access is open, and current users get clear notice well before anything is charged.";
 
 export const COMPARE_PLANS_HREF = PRICING_HREF;

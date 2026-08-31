@@ -1,0 +1,84 @@
+{
+ "slug": "coverage-iowa",
+ "as_of": "2026-08-31",
+ "totals": {
+  "authorities": 247103,
+  "decisions": 183549,
+  "connections": 41231,
+  "sources": 6
+ },
+ "iowa_code": {
+  "sections": 28157,
+  "chapters": 1870,
+  "edition_years": [
+   2025,
+   2026
+  ]
+ },
+ "iowa_admin_code": {
+  "rules": 17690,
+  "chapters": 1820,
+  "agencies": 87
+ },
+ "iowa_acts": {
+  "sections": 16514,
+  "chapters": 1358,
+  "sessions": 8,
+  "first_year": 2019,
+  "last_year": 2026,
+  "first_ga": 88,
+  "last_ga": 91
+ },
+ "iowa_court_rules": {
+  "rules": 1193,
+  "chapters": 70
+ },
+ "iowa_caselaw": {
+  "decisions": 76796,
+  "first": "1839-07-15",
+  "last": "2026-08-19",
+  "courts": [
+   {
+    "key": "supreme",
+    "name": "Supreme Court of Iowa",
+    "decisions": 54093
+   },
+   {
+    "key": "appeals",
+    "name": "Court of Appeals of Iowa",
+    "decisions": 22703
+   }
+  ]
+ },
+ "federal_caselaw": {
+  "decisions": 106753,
+  "first": "1849-01-15",
+  "last": "2026-06-29",
+  "courts": [
+   {
+    "key": "ca8",
+    "name": "Court of Appeals for the Eighth Circuit",
+    "decisions": 99361
+   },
+   {
+    "key": "districts",
+    "name": "District Courts, N.D. and S.D. Iowa",
+    "decisions": 4662
+   },
+   {
+    "key": "bankruptcy",
+    "name": "Bankruptcy courts and the Eighth Circuit BAP",
+    "decisions": 2091
+   },
+   {
+    "key": "historical",
+    "name": "Historical circuit courts",
+    "decisions": 639
+   }
+  ]
+ },
+ "connections": {
+  "statute_rule": 22508,
+  "act_code": 18723
+ }
+}

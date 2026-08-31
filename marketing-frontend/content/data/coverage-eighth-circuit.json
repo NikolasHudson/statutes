@@ -1,0 +1,52 @@
+{
+ "slug": "coverage-eighth-circuit",
+ "as_of": "2026-08-31",
+ "totals": {
+  "decisions": 106753,
+  "cross_citations": 59371,
+  "states": 7
+ },
+ "ca8": {
+  "decisions": 99361,
+  "first": "1873-12-10",
+  "last": "2026-06-29"
+ },
+ "bap": {
+  "decisions": 1386,
+  "first": "1997-03-07",
+  "last": "2026-06-01"
+ },
+ "iowa_federal": {
+  "decisions": 5367,
+  "first": "1883-01-15",
+  "last": "2026-06-24",
+  "courts": [
+   {
+    "name": "District Court, N.D. Iowa",
+    "decisions": 2691
+   },
+   {
+    "name": "District Court, S.D. Iowa",
+    "decisions": 1971
+   },
+   {
+    "name": "United States Bankruptcy Court, N.D. Iowa",
+    "decisions": 533
+   },
+   {
+    "name": "United States Bankruptcy Court, S.D. Iowa",
+    "decisions": 172
+   }
+  ]
+ },
+ "historical": {
+  "decisions": 639,
+  "first": "1849-01-15",
+  "last": "1957-04-13"
+ },
+ "connections": {
+  "federal_to_iowa": 46094,
+  "iowa_to_federal": 13277,
+  "graph_edges": 1706400
+ }
+}

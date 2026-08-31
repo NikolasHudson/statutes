@@ -19,3 +19,6 @@ export const CONTACT_HREF = "/contact";
 export const PRICING_HREF = "/pricing";
 export const ABOUT_HREF = "/about";
 export const DATA_HREF = "/data";
+export const MOST_CITED_BRIEF_HREF = "/data/most-cited-cases";
+export const COVERAGE_IOWA_HREF = "/data/coverage/iowa";
+export const COVERAGE_EIGHTH_CIRCUIT_HREF = "/data/coverage/eighth-circuit";

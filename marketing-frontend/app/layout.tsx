@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
 	metadataBase: new URL(SITE_URL),
-	title: "Hudson Legal Technologies — Grounded legal AI",
+	title: "Hudson Legal Technologies: serious legal research for practicing attorneys",
 	description:
-		"Grounded, citable legal research for practitioners. Every answer traced to the effective text, with verified citations. Plus pragmatic technology consulting.",
+		"Hudson Corpus: the effective law of Iowa with an assistant that answers from the text and verifies every citation. Affordable, accessible, intuitive.",
 };
 
 export default function RootLayout({

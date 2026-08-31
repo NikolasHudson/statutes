@@ -6,10 +6,11 @@
 // a full-height Blue-60 CTA at the trailing edge, and a 3px blue bottom border
 // on the current page's item (Carbon's "current" treatment).
 //
-// Products is a mega menu, on IBM's masthead model: the item is a button that
-// drops a full-bleed dark panel — a left rail that says what the family IS and
-// links to the catalog, then the two products and the two other doors into
-// Hudson Corpus, each with a line of copy. It opens on hover AND on click,
+// Data is a mega menu, on IBM's masthead model (the machinery is the former
+// Products mega menu, which left with the product line-up on 2026-08-30): the
+// item is a button that drops a full-bleed dark panel — a left rail that says
+// what /data IS, then the two halves of the section, Data briefs and
+// Coverage, each entry with a line of copy. It opens on hover AND on click,
 // closes on Escape, on a click outside, on tabbing out, and on navigation.
 // Below md the same list becomes an accordion inside the mobile menu, where a
 // hover-opened panel would be unreachable.
@@ -18,41 +19,74 @@ import { ArrowRightIcon, ChevronDownIcon, MenuIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { PRODUCTS } from "@/lib/products";
 import { GET_STARTED_URL, SIGN_IN_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import {
 	ABOUT_HREF,
 	ARTICLES_HREF,
-	CONSULTING_HREF,
-	CONTACT_HREF,
+	COVERAGE_EIGHTH_CIRCUIT_HREF,
+	COVERAGE_IOWA_HREF,
 	DATA_HREF,
 	MARKETING_HOME,
+	MOST_CITED_BRIEF_HREF,
 	PRICING_HREF,
-	PRODUCTS_INDEX_HREF,
+	PRODUCT_HREF,
 } from "./chrome";
 
-// Products leads the nav but renders as the mega-menu trigger, not a link.
-const NAV_LINKS = [
-	{ label: "Consulting", href: CONSULTING_HREF },
-	{ label: "Articles", href: ARTICLES_HREF },
-	{ label: "Data", href: DATA_HREF },
+// The product leads the nav; Data renders as the mega-menu trigger between
+// Pricing and Articles, holding its old slot in the order.
+const NAV_LINKS_BEFORE = [
+	{ label: "Hudson Corpus", href: PRODUCT_HREF },
 	{ label: "Pricing", href: PRICING_HREF },
+];
+const NAV_LINKS_AFTER = [
+	{ label: "Articles", href: ARTICLES_HREF },
 	{ label: "About", href: ABOUT_HREF },
 ];
 
-// The panel's bottom rail: adjacent destinations a product shopper asks for
-// next, kept out of the product columns so those read as one list.
-const MEGA_FOOTER_LINKS = [
-	{ label: "Pricing", href: PRICING_HREF },
-	{ label: "Consulting", href: CONSULTING_HREF },
-	{ label: "Research & data", href: DATA_HREF },
-	{ label: "Talk to our team", href: CONTACT_HREF },
-];
-
-const TIERS: { key: "product" | "door"; label: string }[] = [
-	{ key: "product", label: "Practice tools" },
-	{ key: "door", label: "More ways in" },
+// The two halves of /data. Copy states what each destination IS — numbers
+// stay on the pages themselves, where they render from frozen snapshots.
+const DATA_COLUMNS: {
+	label: string;
+	entries: { title: string; tagline: string; href: string }[];
+}[] = [
+	{
+		label: "Data briefs",
+		entries: [
+			{
+				title: "The most-cited cases",
+				tagline:
+					"Brief 001. Which Iowa decisions do the work, measured across the whole citation graph.",
+				href: MOST_CITED_BRIEF_HREF,
+			},
+			{
+				title: "All briefs and the pipeline",
+				tagline: "Published briefs, plus the questions being prepared next.",
+				href: DATA_HREF,
+			},
+		],
+	},
+	{
+		label: "Coverage",
+		entries: [
+			{
+				title: "Coverage: Iowa",
+				tagline:
+					"The full inventory of what the corpus holds, counted from the live record.",
+				href: COVERAGE_IOWA_HREF,
+			},
+			{
+				title: "Coverage: Eighth Circuit",
+				tagline: "The federal courts above Iowa practice, court by court.",
+				href: COVERAGE_EIGHTH_CIRCUIT_HREF,
+			},
+			{
+				title: "Request coverage",
+				tagline: "Ask for the next state, court, or source.",
+				href: `${COVERAGE_IOWA_HREF}#request`,
+			},
+		],
+	},
 ];
 
 // Carbon header-name treatment: bold prefix, regular product name.
@@ -72,7 +106,7 @@ export function CarbonWordmark() {
 
 export function CarbonNav() {
 	const [menuOpen, setMenuOpen] = useState(false);
-	const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
+	const [mobileDataOpen, setMobileDataOpen] = useState(false);
 	const [megaOpen, setMegaOpen] = useState(false);
 	const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
@@ -80,7 +114,7 @@ export function CarbonNav() {
 
 	const isCurrent = (href: string) =>
 		pathname === href || pathname.startsWith(`${href}/`);
-	const onProducts = isCurrent(PRODUCTS_INDEX_HREF);
+	const onData = isCurrent(DATA_HREF);
 
 	// Hover intent: the panel sits flush under the bar, so a short grace period
 	// is all that's needed to cross from trigger to panel without a flicker.
@@ -105,7 +139,7 @@ export function CarbonNav() {
 	useEffect(() => {
 		setMegaOpen(false);
 		setMenuOpen(false);
-		setMobileProductsOpen(false);
+		setMobileDataOpen(false);
 	}, [pathname]);
 
 	useEffect(
@@ -130,6 +164,19 @@ export function CarbonNav() {
 		return () => document.removeEventListener("keydown", onKey);
 	}, [megaOpen]);
 
+	const navLink = (l: { label: string; href: string }) => (
+		<Link
+			key={l.label}
+			href={l.href}
+			className={cn(
+				"flex items-center border-transparent border-b-[3px] px-4 text-sm transition-colors hover:bg-[#292929] hover:text-white",
+				isCurrent(l.href) ? "border-[#0f62fe] text-white" : "text-[#c6c6c6]",
+			)}
+		>
+			{l.label}
+		</Link>
+	);
+
 	return (
 		<header
 			data-print="hide"
@@ -141,11 +188,12 @@ export function CarbonNav() {
 				</div>
 
 				<nav className="hidden items-stretch md:flex">
+					{NAV_LINKS_BEFORE.map(navLink)}
 					<button
 						type="button"
 						ref={triggerRef}
 						aria-expanded={megaOpen}
-						aria-controls="products-mega"
+						aria-controls="data-mega"
 						onClick={() => (megaOpen ? setMegaOpen(false) : openMega())}
 						// Pointer events, filtered to a real mouse: a tap on a touch
 						// device synthesizes mouseenter before click, so hover-to-open
@@ -158,13 +206,13 @@ export function CarbonNav() {
 						}}
 						className={cn(
 							"flex items-center gap-1.5 border-transparent border-b-[3px] px-4 text-sm transition-colors hover:bg-[#292929] hover:text-white",
-							onProducts || megaOpen
+							onData || megaOpen
 								? "border-[#0f62fe] text-white"
 								: "text-[#c6c6c6]",
 							megaOpen && "bg-[#292929]",
 						)}
 					>
-						Products
+						Data
 						<ChevronDownIcon
 							aria-hidden
 							className={cn(
@@ -183,7 +231,7 @@ export function CarbonNav() {
 							<button
 								type="button"
 								tabIndex={-1}
-								aria-label="Close products menu"
+								aria-label="Close data menu"
 								onClick={() => setMegaOpen(false)}
 								onMouseEnter={scheduleClose}
 								className="fixed inset-x-0 top-12 bottom-0 cursor-default bg-black/50"
@@ -195,20 +243,7 @@ export function CarbonNav() {
 							/>
 						</>
 					)}
-					{NAV_LINKS.map((l) => (
-						<Link
-							key={l.label}
-							href={l.href}
-							className={cn(
-								"flex items-center border-transparent border-b-[3px] px-4 text-sm transition-colors hover:bg-[#292929] hover:text-white",
-								isCurrent(l.href)
-									? "border-[#0f62fe] text-white"
-									: "text-[#c6c6c6]",
-							)}
-						>
-							{l.label}
-						</Link>
-					))}
+					{NAV_LINKS_AFTER.map(navLink)}
 				</nav>
 
 				<div className="ms-auto hidden items-stretch md:flex">
@@ -222,7 +257,7 @@ export function CarbonNav() {
 						href={GET_STARTED_URL}
 						className="flex items-center gap-6 bg-[#0f62fe] px-4 text-sm text-white transition-colors hover:bg-[#0353e9]"
 					>
-						Get started
+						Start researching
 						<ArrowRightIcon className="size-4" />
 					</a>
 				</div>
@@ -244,50 +279,63 @@ export function CarbonNav() {
 			{menuOpen && (
 				<div className="border-[#393939] border-t bg-[#161616] md:hidden">
 					<nav className="flex flex-col">
+						{NAV_LINKS_BEFORE.map((l) => (
+							<Link
+								key={l.label}
+								href={l.href}
+								onClick={() => setMenuOpen(false)}
+								className={cn(
+									"border-[#292929] border-b px-5 py-3.5 text-sm transition-colors hover:bg-[#292929] hover:text-white",
+									isCurrent(l.href) ? "text-white" : "text-[#c6c6c6]",
+								)}
+							>
+								{l.label}
+							</Link>
+						))}
 						<button
 							type="button"
-							aria-expanded={mobileProductsOpen}
-							onClick={() => setMobileProductsOpen(!mobileProductsOpen)}
+							aria-expanded={mobileDataOpen}
+							onClick={() => setMobileDataOpen(!mobileDataOpen)}
 							className={cn(
 								"flex items-center justify-between border-[#292929] border-b px-5 py-3.5 text-sm transition-colors hover:bg-[#292929] hover:text-white",
-								onProducts ? "text-white" : "text-[#c6c6c6]",
+								onData ? "text-white" : "text-[#c6c6c6]",
 							)}
 						>
-							Products
+							Data
 							<ChevronDownIcon
 								aria-hidden
 								className={cn(
 									"size-4 transition-transform",
-									mobileProductsOpen && "rotate-180",
+									mobileDataOpen && "rotate-180",
 								)}
 							/>
 						</button>
-						{mobileProductsOpen && (
+						{mobileDataOpen && (
 							<div className="border-[#292929] border-b bg-[#0b0b0b]">
-								{PRODUCTS.map((p) => (
+								{DATA_COLUMNS.flatMap((col) => col.entries).map((e) => (
 									<Link
-										key={p.key}
-										href={p.href}
+										key={e.href}
+										href={e.href}
 										onClick={() => setMenuOpen(false)}
 										className="block px-5 py-3 transition-colors hover:bg-[#292929]"
 									>
-										<span className="block text-sm text-white">{p.title}</span>
+										<span className="block text-sm text-white">{e.title}</span>
 										<span className="mt-0.5 block text-[#a8a8a8] text-xs leading-snug">
-											{p.tagline}
+											{e.tagline}
 										</span>
 									</Link>
 								))}
 								<Link
-									href={PRODUCTS_INDEX_HREF}
+									href={DATA_HREF}
 									onClick={() => setMenuOpen(false)}
 									className="flex items-center justify-between px-5 py-3 text-[#78a9ff] text-sm transition-colors hover:bg-[#292929]"
 								>
-									All products
+									All of Data
 									<ArrowRightIcon className="size-4" />
 								</Link>
 							</div>
 						)}
-						{NAV_LINKS.map((l) => (
+						{NAV_LINKS_AFTER.map((l) => (
 							<Link
 								key={l.label}
 								href={l.href}
@@ -310,7 +358,7 @@ export function CarbonNav() {
 							href={GET_STARTED_URL}
 							className="flex items-center justify-between bg-[#0f62fe] px-5 py-3.5 text-sm text-white transition-colors hover:bg-[#0353e9]"
 						>
-							Get started
+							Start researching
 							<ArrowRightIcon className="size-4" />
 						</a>
 					</nav>
@@ -336,7 +384,7 @@ function MegaPanel({
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: hover intent for a menu the keyboard reaches by tabbing
 		<div
-			id="products-mega"
+			id="data-mega"
 			onMouseEnter={onMouseEnter}
 			onMouseLeave={onMouseLeave}
 			onBlur={(e) => {
@@ -349,46 +397,46 @@ function MegaPanel({
 				<div className="grid gap-10 lg:grid-cols-[0.85fr_1fr_1fr] lg:gap-0">
 					<div className="lg:pr-12">
 						<p className="font-mono text-[#a8a8a8] text-[11px] uppercase tracking-[0.22em]">
-							Products
+							Data
 						</p>
 						<p className="mt-6 font-light text-2xl leading-snug">
-							One platform for Iowa practice.
+							Research from the record itself.
 						</p>
 						<p className="mt-4 text-[#a8a8a8] text-sm leading-relaxed">
-							Research that shows its work, and filings that land in your own
-							files. Everything holds to one standard: accountable to the
-							source.
+							Original analysis of Iowa law, and a public inventory of what the
+							corpus holds. Every number is computed from the full record,
+							frozen, and citable.
 						</p>
 						<Link
-							href={PRODUCTS_INDEX_HREF}
+							href={DATA_HREF}
 							className="group mt-7 inline-flex items-center gap-2 font-medium text-[#78a9ff] text-sm hover:underline"
 						>
-							All products
+							All of Data
 							<ArrowRightIcon className="size-4 transition-transform group-hover:translate-x-0.5" />
 						</Link>
 					</div>
 
-					{TIERS.map((tier) => (
+					{DATA_COLUMNS.map((col) => (
 						<div
-							key={tier.key}
+							key={col.label}
 							// pr-8 buys room for the link rows' -mx-4 hover bleed: with
 							// gap-0 columns, a column's content box ends exactly on the
 							// next one's border-l, so the highlight would cross the rule.
 							className="lg:border-[#393939] lg:border-l lg:pr-8 lg:pl-12"
 						>
 							<p className="font-mono text-[#a8a8a8] text-[11px] uppercase tracking-[0.22em]">
-								{tier.label}
+								{col.label}
 							</p>
 							<ul className="mt-4">
-								{PRODUCTS.filter((p) => p.tier === tier.key).map((p) => (
-									<li key={p.key}>
+								{col.entries.map((e) => (
+									<li key={e.href}>
 										<Link
-											href={p.href}
+											href={e.href}
 											className="group -mx-4 block px-4 py-4 transition-colors hover:bg-[#292929]"
 										>
 											<span className="flex items-center justify-between gap-4">
 												<span className="text-[15px] text-white">
-													{p.title}
+													{e.title}
 												</span>
 												<ArrowRightIcon
 													aria-hidden
@@ -396,25 +444,13 @@ function MegaPanel({
 												/>
 											</span>
 											<span className="mt-1 block text-[#a8a8a8] text-[13px] leading-relaxed">
-												{p.tagline}
+												{e.tagline}
 											</span>
 										</Link>
 									</li>
 								))}
 							</ul>
 						</div>
-					))}
-				</div>
-
-				<div className="mt-10 flex flex-wrap gap-x-10 gap-y-3 border-[#393939] border-t pt-6">
-					{MEGA_FOOTER_LINKS.map((l) => (
-						<Link
-							key={l.label}
-							href={l.href}
-							className="text-[#c6c6c6] text-sm transition-colors hover:text-white hover:underline"
-						>
-							{l.label}
-						</Link>
 					))}
 				</div>
 			</div>

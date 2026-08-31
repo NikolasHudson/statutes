@@ -1,21 +1,27 @@
-// Marketing home — the Carbon (IBM design system) home: editorial ink bands
-// alternating with light ones, hairline rules instead of cards, Plex-light
-// display type, square Blue-60 actions. Chrome + primitives live in
-// components/marketing/carbon.tsx (shared by all Carbon pages). Promoted from
-// /home-2 on 2026-07-10; the legacy Geist/navy home is gone.
+// Marketing home — the single-product, mission-first page (2026-08-30).
 //
-// Rebalanced 2026-08-15: the page used to give each product a full band of its
-// own, which read as a two-item product catalogue. The work is wider than that
-// — we build the corpus, publish original analysis of it, ship tools on top of
-// it, and advise on the rest — so research now takes the first section, the
-// latest data brief is on the page, and both products share the second band.
+// One product launches: Hudson Corpus. The email assistant and EDMSpro are off
+// the page (and off the nav and footer) because a product line-up was diluting
+// the mission; MCP stays, but as a door into the corpus, not a product.
+//
+// The page walks the three classical appeals in order — the structure Nick
+// asked for — with the Greek kept to the small mono eyebrows:
+//   01 Ethos   who we are, and the standard we hold
+//   02 Pathos  the stakes: an attorney using AI will outperform one who isn't,
+//              and the threat to the profession is AI only big firms can afford
+//   03 Logos   the proof: the corpus itself, how an answer is made, the three
+//              tests (accessible / affordable / intuitive) with receipts
+//   04 Pricing affordability is the mission, so the announced prices sit here
+//
+// House rule for this page: no em dashes in rendered copy. Numbers come off the
+// live corpus (lib/api) and the frozen citation-graph snapshot (lib/briefs);
+// prices render from lib/pricing so they cannot drift from /pricing.
 
 import type { Metadata } from "next";
-import Link from "next/link";
-import { FeaturedBrief } from "@/components/marketing/briefs/featured-brief";
 import {
 	CarbonPage,
 	Eyebrow,
+	Frame,
 	HairlineLink,
 	INK,
 	SectionHead,
@@ -23,73 +29,70 @@ import {
 	TextLink,
 } from "@/components/marketing/carbon";
 import {
-	ARTICLES_HREF,
-	CONSULTING_HREF,
-	DATA_HREF,
-	EDMS_PRODUCT_HREF,
+	ABOUT_HREF,
+	PRICING_HREF,
 	PRODUCT_HREF,
-	PRODUCTS_INDEX_HREF,
 } from "@/components/marketing/chrome";
 import { HeroCodeRain } from "@/components/marketing/hero-code-rain";
-import {
-	type CorpusSource,
-	type CorpusStats,
-	corpusSourceNames,
-	fetchCorpusStats,
-	formatCount,
-} from "@/lib/api";
-import { MOST_CITED_CASES } from "@/lib/briefs";
-import { APP_HOST, GET_STARTED_URL } from "@/lib/site";
+import { type CorpusStats, fetchCorpusStats, formatCount } from "@/lib/api";
+import { formatAsOf, MOST_CITED_CASES } from "@/lib/briefs";
+import { COMPARE_PLANS_HREF, PLANS, PRICING_NOTE } from "@/lib/pricing";
+import { GET_STARTED_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
 	title:
-		"Hudson Legal Technologies — Legal technology, accountable to the source",
+		"Hudson Legal Technologies: serious legal research, within reach of every practicing attorney",
 	description:
-		"We work across legal AI: the Iowa corpus underneath it, original data briefs on what the record actually says, research tools with every citation verified against the effective text, and consulting for the teams adopting it.",
+		"Hudson Corpus is the effective law of Iowa: the Code, the administrative and court rules, and every appellate decision, with an assistant that answers from the text and verifies every citation before you see it. Priced for a solo, learnable in an afternoon.",
 };
 
+// The one frozen number on the page: the citation graph, from the same brief
+// snapshot as /data (which carries the as-of date rendered beside it).
+const EDGES = MOST_CITED_CASES.totals.edges;
+
+const SOLO = PLANS[0];
+const FIRM = PLANS[1];
+
 export default async function HomePage() {
-	// Every number on this page comes off the live corpus (see lib/api.ts). The
-	// figures that used to sit here as literals were 18k documents and a whole
-	// source out of date, and understated the breadth that is our actual lead.
 	const stats = await fetchCorpusStats();
 	return (
 		<CarbonPage>
 			<Hero stats={stats} />
-			<Research />
-			<Products stats={stats} />
-			<Principles />
-			<WhatWeDo />
+			<Ethos />
+			<Pathos />
+			<Logos stats={stats} />
+			<Pricing />
+			<CtaBand />
 		</CarbonPage>
 	);
 }
 
 // ---------------------------------------------------------------------------
-// Hero — the company speaks; the numbers close the band
+// Hero — the mission speaks; the numbers (and the price) close the band
 // ---------------------------------------------------------------------------
 
-// The statutory tiers and the caselaw tier, counted separately: they sum to the
-// total, and a lawyer reads "46,752 statutes and rules" very differently from
-// "76,672 decisions". The last tile is the citation graph we built over those
-// decisions — the only frozen number in the row (it comes off the same brief
-// snapshot as § 01, which carries the as-of date), and the one that says we do
-// something with the corpus besides serve it.
 function facts(stats: CorpusStats): { value: string; label: string }[] {
-	const of = (kind: CorpusSource["kind"]) =>
-		stats.sources
-			.filter((s) => s.kind === kind)
-			.reduce((n, s) => n + s.entries, 0);
+	const caselaw = stats.sources
+		.filter((s) => s.kind === "caselaw")
+		.reduce((n, s) => n + s.entries, 0);
 	return [
-		{ value: formatCount(stats.documents), label: "Documents in the corpus" },
 		{
-			value: formatCount(of("statutes")),
-			label: "Statutes, administrative rules and court rules",
+			value: formatCount(stats.documents),
+			label: "Documents of effective Iowa law in the corpus",
 		},
-		{ value: formatCount(of("caselaw")), label: "Iowa decisions" },
 		{
-			value: formatCount(MOST_CITED_CASES.totals.edges),
-			label: "Citations mapped between those decisions",
+			value: formatCount(caselaw),
+			label: `Iowa appellate decisions, with ${formatCount(EDGES)} citations mapped between them`,
+		},
+		{
+			value: SOLO.price,
+			label: "A month for the Solo plan, the announced launch price",
+		},
+		{
+			value: "1",
+			label:
+				"Product. No suite, no add-ons. The corpus and the assistant over it.",
 		},
 	];
 }
@@ -114,27 +117,26 @@ function Hero({ stats }: { stats: CorpusStats }) {
 					<Eyebrow tone="dark">Hudson Legal Technologies</Eyebrow>
 
 					<h1 className="mt-8 max-w-5xl font-light text-4xl leading-[1.1] sm:text-5xl lg:text-[4.25rem]">
-						Legal technology,
+						Serious legal research, within reach
 						<br />
-						accountable to the source.
+						of every practicing attorney.
 					</h1>
 
 					<div aria-hidden className="mt-10 h-0.5 w-24 bg-[#0f62fe]" />
 
 					<p className="mt-10 max-w-2xl text-[#c6c6c6] text-lg leading-relaxed">
-						We work across legal AI — the corpus it has to be grounded in, the
-						research into what is actually in that record, and the tools
-						practitioners use every day. One standard runs through all of it:
-						nothing is asserted that cannot be traced back to the text.
+						We make one product. Hudson Corpus is the effective law of Iowa: the
+						Code, the administrative and court rules, and every appellate
+						decision, with an assistant that answers from the text and verifies
+						every citation before you see it. Priced for a solo. Learnable in an
+						afternoon. Built by a lawyer who believes the advantage AI gives a
+						practice should belong to the whole profession, not only the firms
+						that can afford it.
 					</p>
 
 					<div className="mt-12 flex flex-col gap-3 sm:flex-row sm:items-center">
-						<SolidLink href={PRODUCTS_INDEX_HREF}>
-							Explore the products
-						</SolidLink>
-						<HairlineLink href={DATA_HREF}>
-							Read our latest analysis
-						</HairlineLink>
+						<SolidLink href={GET_STARTED_URL}>Start researching</SolidLink>
+						<HairlineLink href={PRICING_HREF}>See pricing</HairlineLink>
 					</div>
 				</div>
 
@@ -157,70 +159,80 @@ function Hero({ stats }: { stats: CorpusStats }) {
 }
 
 // ---------------------------------------------------------------------------
-// 01 — Research: the data-brief series, with the latest brief on the page
+// 01 — Ethos: who we are, and the standard we hold
 // ---------------------------------------------------------------------------
 
-// The series contract, condensed from the three rules stated in full on /data.
-// It belongs next to the card because it is the reason to believe the card:
-// anyone can publish a chart, and the argument for these is that they are
-// frozen, sourced, and answerable.
-const SERIES_RULES: { title: string; body: string }[] = [
+const STANDARD: { title: string; body: string }[] = [
 	{
-		title: "An argument, not a dashboard",
-		body: "One question per brief, with a point of view — not a filter panel handed to the reader.",
+		title: "Nothing is asserted that cannot be traced to the text.",
+		body: "Every answer traces to effective, citable law and is checked before it is delivered. Where the source does not exist, the system says so.",
 	},
 	{
-		title: "The method is on the page",
-		body: "How it was measured, what it misses, and the full data behind every figure.",
+		title: "Serious tools belong within reach of the whole profession.",
+		body: "We build for solo practitioners, small firms and in-house teams, not only the institutions with procurement departments.",
 	},
 	{
-		title: "Frozen and citable",
-		body: "Published with an as-of date and no drift. A refresh is a deliberate, reviewed re-export.",
+		title: "What we learn from the corpus, we publish.",
+		body: "The analysis that makes the product work goes out as data briefs and articles, frozen, sourced and open to being checked.",
 	},
 ];
 
-function Research() {
+function Ethos() {
 	return (
-		<section className={cn("text-white", INK)}>
+		<section className="bg-background">
 			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
 				<SectionHead
-					n="01"
-					label="Research"
-					title="We study the record, not just search it."
-					tone="dark"
+					label="01 · Ethos · Who we are"
+					title="A lawyer who builds software, and a standard we won't ship without."
 				/>
 
 				<div className="mt-12 grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-20">
-					<p className="max-w-xl text-[#c6c6c6] text-[17px] leading-[1.75]">
-						Building a research system means computing things about the law that
-						nobody had computed before: every citation between every Iowa
-						appellate decision, every act that has amended the Code, every rule
-						an agency hangs off a statute. Our data briefs publish that work —
-						original analysis of the Iowa record, answered from the whole of it
-						rather than a sample, and written so a lawyer can check it.
-					</p>
+					<div className="max-w-xl space-y-5 text-[17px] text-foreground/85 leading-[1.75]">
+						<p>
+							Hudson Legal Technologies was started by a practicing attorney who
+							writes software: the two things he cares most about, and a choice
+							he refused to make. The company exists for one reason: to bring
+							affordable, accessible, intuitive tools to the lawyers who
+							actually practice.
+						</p>
+						<p>
+							That focus is deliberate. We do not make a suite. We make one
+							research system, we build the corpus underneath it ourselves, and
+							what we learn from that corpus we publish, with the method and the
+							data attached, so a lawyer can check it.
+						</p>
+						<div className="pt-2">
+							<p className="text-[15px] text-foreground">Nick Hudson</p>
+							<p className="mt-1 font-mono text-[11px] text-muted-foreground uppercase tracking-[0.18em]">
+								Founder, Hudson Legal Technologies
+							</p>
+						</div>
+						<div className="pt-1">
+							<TextLink href={ABOUT_HREF}>About the company</TextLink>
+						</div>
+					</div>
 
-					<ul className="border-[#393939] border-t">
-						{SERIES_RULES.map((r) => (
-							<li key={r.title} className="border-[#393939] border-b py-4">
-								<h3 className="font-semibold text-[14.5px]">{r.title}</h3>
-								<p className="mt-1.5 text-[#a8a8a8] text-[13.5px] leading-relaxed">
-									{r.body}
-								</p>
-							</li>
-						))}
-					</ul>
-				</div>
-
-				<FeaturedBrief className="mt-14" />
-
-				<div className="mt-12 flex flex-wrap gap-x-12 gap-y-4">
-					<TextLink href={DATA_HREF} tone="dark">
-						All data briefs
-					</TextLink>
-					<TextLink href={ARTICLES_HREF} tone="dark">
-						Notes on building it
-					</TextLink>
+					<div>
+						<Eyebrow>The standard</Eyebrow>
+						<ul className="mt-4 border-border border-t">
+							{STANDARD.map((s, i) => (
+								<li
+									key={s.title}
+									className="grid grid-cols-[40px_1fr] gap-x-4 border-border border-b py-5"
+								>
+									<span className="pt-0.5 font-mono text-[#0f62fe] text-[13px]">
+										0{i + 1}
+									</span>
+									<div>
+										<h3 className="text-[17px] leading-snug">{s.title}</h3>
+										<p className="mt-1.5 text-[14px] text-muted-foreground leading-relaxed">
+											{s.body}
+										</p>
+									</div>
+								</li>
+							))}
+						</ul>
+					</div>
 				</div>
 			</div>
 		</section>
@@ -228,164 +240,300 @@ function Research() {
 }
 
 // ---------------------------------------------------------------------------
-// 02 — Products: both of them, one band. Hudson Corpus leads (it is the
-// flagship and the only one with a screenshot worth the space); Hudson EDMSpro
-// follows below the hairline in a compact block.
+// 02 — Pathos: the stakes. The argument, in Nick's framing: the threat to the
+// profession is not AI; it is AI that only the largest firms can afford.
 // ---------------------------------------------------------------------------
 
-// The source list is rendered from the same payload as the counts, so it cannot
-// drift from what we actually serve — and it grows by itself the day a new
-// source is ingested to production.
-function specs(stats: CorpusStats): { term: string; detail: string }[] {
-	return [
-		{ term: "Jurisdiction", detail: "Iowa" },
-		{ term: "Sources", detail: corpusSourceNames(stats) || "—" },
-		{ term: "Status", detail: "Live in beta" },
-		{ term: "Access", detail: "Web · MCP · Email" },
-	];
-}
-
-const EDMS_SPECS: { term: string; detail: string }[] = [
-	{ term: "Surface", detail: "Chrome extension" },
-	{ term: "Works with", detail: "Iowa EDMS" },
-	{ term: "Status", detail: "Rolling out — early access" },
-	{ term: "Included with", detail: "Solo & Firm plans" },
-];
-
-const CAPABILITIES: { title: string; body: string }[] = [
+const NEEDS: { title: string; body: string }[] = [
 	{
-		title: "Grounded answers",
-		body: "Responses are drawn from the effective text of the law — not from a model's recollection of it.",
+		title: "It has to be where the work already happens.",
+		body: "A browser tab, and the AI tools a practice already runs. Not another portal to remember to open.",
 	},
 	{
-		title: "Verified citations",
-		body: "Every citation is checked against the source before the answer is delivered. Failures are surfaced, not smoothed over.",
+		title: "It has to cost what a practice can pay.",
+		body: "A solo's research budget is real money. The price belongs on the website, not behind a sales call.",
 	},
 	{
-		title: "A unified corpus",
-		body: "Statutes, administrative rules, court rules, and caselaw in one searchable system — semantic and keyword retrieval, fused and reranked.",
-	},
-	{
-		title: "Open integration",
-		body: "The same grounded research runs in the browser, over a production MCP endpoint, and as an assistant that answers your email.",
+		title: "It has to be usable the day it arrives.",
+		body: "A five-lawyer firm has no training week to spare. If it needs one, it will not get used.",
 	},
 ];
 
-const EDMS_POINTS: { title: string; body: string }[] = [
-	{
-		title: "Docket-side preview",
-		body: "Read any filing in a panel beside the docket — no downloads-folder detour, no losing your place in the list.",
-	},
-	{
-		title: "Smart download",
-		body: "Filings land under clean, consistent names from your own rules instead of the court's — one at a time, or the whole docket at once.",
-	},
-	{
-		title: "Never through our servers",
-		body: "Documents move from the court straight to you. Hudson never receives, stores, or reads a filing — by construction, not by policy.",
-	},
-];
-
-function SpecList({ items }: { items: { term: string; detail: string }[] }) {
+function Pathos() {
 	return (
-		<dl className="border-border border-t">
-			{items.map((s) => (
-				<div
-					key={s.term}
-					className="flex items-baseline justify-between gap-6 border-border border-b py-3.5"
-				>
-					<dt className="font-mono text-[11px] text-muted-foreground uppercase tracking-[0.18em]">
-						{s.term}
-					</dt>
-					<dd className="text-right font-medium text-sm">{s.detail}</dd>
-				</div>
-			))}
-		</dl>
-	);
-}
-
-function Products({ stats }: { stats: CorpusStats }) {
-	return (
-		<section className="bg-background">
+		<section className={cn("text-white", INK)}>
 			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
 				<SectionHead
-					n="02"
-					label="Products"
-					title="Tools built on the same record."
+					label="02 · Pathos · Why it matters"
+					title="An attorney using AI will outperform one who isn't."
+					tone="dark"
 				/>
 
 				<div className="mt-12 grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-20">
-					<div className="max-w-xl">
-						<Eyebrow>Flagship — research</Eyebrow>
-						<h3 className="mt-4 font-light text-3xl">Hudson Corpus</h3>
-						<p className="mt-5 text-[17px] text-foreground/80 leading-[1.75]">
-							A grounded research assistant for practitioners. Ask a question in
-							plain language; it searches the corpus, reads the controlling
-							text, and answers with citations that link to the source — each
-							one verified before you see it. When the law is silent, it says
-							so.
+					<div className="max-w-xl space-y-5 text-[#c6c6c6] text-[17px] leading-[1.75]">
+						<p>
+							Anyone can now ask an AI a legal question and get a fluent answer
+							in seconds. Your clients are doing it before they call you.
+							Opposing counsel is doing it before they file.
 						</p>
+						<p>
+							The firms that have put AI to work are doing in an hour what used
+							to take a day, and they will outperform the attorney who hasn't:
+							on speed, on price, on the matters they can take on. That is the
+							competitive reality of practicing law now, not a forecast.
+						</p>
+						<p>
+							The threat to the profession isn't AI. It's AI that only the
+							largest firms can afford. If the advantage stays with the
+							institutions with procurement departments, the solo and the small
+							firm fall behind, and so do the clients who depend on them. Hudson
+							exists so that isn't how it goes: research as capable as what the
+							big firms are buying, priced for one lawyer, in the browser they
+							already have open. And because this is law, built so every answer
+							can be checked.
+						</p>
+					</div>
+
+					<div className="space-y-10">
+						<figure className="border-[#393939] border-t pt-6">
+							<blockquote className="font-light text-2xl leading-[1.35]">
+								“The threat to the profession isn't AI. It's a profession where
+								only the biggest firms have it.”
+							</blockquote>
+							<figcaption className="mt-4 font-mono text-[#a8a8a8] text-[11px] uppercase tracking-[0.18em]">
+								Nick Hudson, Founder
+							</figcaption>
+						</figure>
+
+						<div>
+							<Eyebrow tone="dark">
+								For every attorney to have it, it has to be
+							</Eyebrow>
+							<ul className="mt-4 border-[#393939] border-t">
+								{NEEDS.map((n) => (
+									<li key={n.title} className="border-[#393939] border-b py-4">
+										<h3 className="text-[16px] leading-snug">{n.title}</h3>
+										<p className="mt-1.5 text-[#a8a8a8] text-[14px] leading-relaxed">
+											{n.body}
+										</p>
+									</li>
+								))}
+							</ul>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// 03 — Logos: the proof. The corpus itself, how an answer is made, and the
+// three tests with receipts.
+// ---------------------------------------------------------------------------
+
+// The tile grid names the four corpus pillars explicitly (terms a lawyer
+// recognizes); counts come off the live /api/browse/sources payload by source
+// name, so they move the day the corpus does. A source the backend doesn't
+// serve renders its degraded state rather than a stale number.
+const CORPUS_TILES: { name: string; term: string; detail: string }[] = [
+	{
+		name: "Iowa Caselaw",
+		term: "Caselaw",
+		detail: "Decisions of the Iowa Supreme Court and Court of Appeals",
+	},
+	{
+		name: "Iowa Code",
+		term: "Code",
+		detail: "Sections of the Iowa Code in force",
+	},
+	{
+		name: "Iowa Administrative Code",
+		term: "Administrative Code",
+		detail: "Rules of the Iowa Administrative Code, agency by agency",
+	},
+	{
+		name: "Iowa Court Rules",
+		term: "Court Rules",
+		detail: "Rules: civil, criminal, appellate, evidence, professional conduct",
+	},
+];
+
+const STEPS: { title: string; body: string }[] = [
+	{
+		title: "Ask in plain language, or by citation number.",
+		body: "The assistant shows its work as it goes: what it searched and which sections it read.",
+	},
+	{
+		title: "It answers from the controlling text, and nothing else.",
+		body: "Retrieval runs against the human-reviewed corpus. No support in the record, no answer.",
+	},
+	{
+		title: "Every quote and citation is verified before you see it.",
+		body: "A deterministic pass checks each one against its source; anything superseded or overruled is flagged, not quietly served. The source is one click away.",
+	},
+];
+
+const TESTS: { n: string; title: string; body: string; receipt: string }[] = [
+	{
+		n: "01",
+		title: "Accessible: where you already work.",
+		body: "In the browser, and over MCP for Claude and any MCP client: the same corpus and the same verification, inside the AI tools a practice already runs.",
+		receipt: "Web · MCP",
+	},
+	{
+		n: "02",
+		title: "Affordable: priced for a practice.",
+		body: `Solo at ${SOLO.price} a month or $490 a year. Firm at ${FIRM.price} a month with three seats. Public pricing, no per-search charges, and no sales call to find out what it costs.`,
+		receipt: `Solo ${SOLO.price} / mo · Firm ${FIRM.price} / mo`,
+	},
+	{
+		n: "03",
+		title: "Intuitive: learnable in an afternoon.",
+		body: "Ask, read the answer with every citation linked, open the source. That is the whole workflow. Nothing to configure and nothing to train.",
+		receipt: "Plain language in · Cited text out",
+	},
+];
+
+function Logos({ stats }: { stats: CorpusStats }) {
+	const byName = new Map(stats.sources.map((s) => [s.name, s.entries]));
+	return (
+		<section className="bg-card">
+			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
+				<SectionHead
+					label="03 · Logos · The proof"
+					title="One corpus of the effective law. Every answer checked against it."
+				/>
+
+				<p className="mt-10 max-w-2xl text-[17px] text-foreground/85 leading-[1.75]">
+					Hudson Corpus is one research surface over the effective law of Iowa,
+					retrieved, quoted and cited by an assistant that cannot answer from
+					memory. The difference is what happens before you see the answer.
+				</p>
+
+				<div className="mt-16">
+					<Eyebrow>The corpus</Eyebrow>
+					<dl className="mt-6 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+						{CORPUS_TILES.map((t) => (
+							<div key={t.term} className="border-border border-t pt-5">
+								<dt className="font-mono text-[11px] text-muted-foreground uppercase tracking-[0.22em]">
+									{t.term}
+								</dt>
+								<dd className="mt-4 font-light text-3xl tabular-nums lg:text-4xl">
+									{formatCount(byName.get(t.name) ?? 0)}
+								</dd>
+								<dd className="mt-2 text-[13px] text-muted-foreground leading-snug">
+									{t.detail}
+								</dd>
+							</div>
+						))}
+					</dl>
+					<p className="mt-8 font-mono text-[11px] text-muted-foreground uppercase tracking-[0.18em]">
+						Live counts · {formatCount(EDGES)} citations mapped between the
+						decisions as of {formatAsOf(MOST_CITED_CASES.as_of)}
+					</p>
+				</div>
+
+				<div className="mt-16 grid gap-12 lg:grid-cols-[1fr_1.15fr] lg:gap-16">
+					<div>
+						<Eyebrow>How an answer is made</Eyebrow>
+						<ul className="mt-4 border-border border-t">
+							{STEPS.map((s, i) => (
+								<li
+									key={s.title}
+									className="grid grid-cols-[40px_1fr] gap-x-4 border-border border-b py-5"
+								>
+									<span className="pt-0.5 font-mono text-[#0f62fe] text-[13px]">
+										0{i + 1}
+									</span>
+									<div>
+										<h3 className="text-[16px] leading-snug">{s.title}</h3>
+										<p className="mt-1.5 text-[14px] text-muted-foreground leading-relaxed">
+											{s.body}
+										</p>
+									</div>
+								</li>
+							))}
+						</ul>
 						<div className="mt-7">
 							<TextLink href={PRODUCT_HREF}>Explore Hudson Corpus</TextLink>
 						</div>
 					</div>
 
-					<SpecList items={specs(stats)} />
-				</div>
-
-				<figure className="mt-14 border border-border bg-card">
-					<figcaption className="flex items-center justify-between border-border border-b px-4 py-2.5 font-mono text-[11px] text-muted-foreground">
-						<span>Hudson Corpus — Assistant</span>
-						<span>{APP_HOST}</span>
-					</figcaption>
-					{/* biome-ignore lint/performance/noImgElement: static marketing capture, no next/image needed */}
-					<img
+					<Frame
 						src="/marketing/corpus/assistant.png"
 						alt="Hudson Corpus answering an Iowa medical-malpractice limitations question, with the research run and verified citations visible"
-						className="w-full"
+						caption="Hudson Corpus · Assistant"
 					/>
-				</figure>
-
-				<div className="mt-14 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-					{CAPABILITIES.map((c) => (
-						<div key={c.title} className="border-border border-t pt-5">
-							<h4 className="font-semibold text-[15px]">{c.title}</h4>
-							<p className="mt-2 text-[13.5px] text-muted-foreground leading-relaxed">
-								{c.body}
-							</p>
-						</div>
-					))}
 				</div>
 
-				<div className="mt-20 grid gap-12 border-border border-t pt-12 lg:grid-cols-[1.2fr_1fr] lg:gap-20">
-					<div className="max-w-xl">
-						<Eyebrow>New — court filings</Eyebrow>
-						<h3 className="mt-4 font-light text-3xl">Hudson EDMSpro</h3>
-						<p className="mt-5 text-[17px] text-foreground/80 leading-[1.75]">
-							Research is half the day; the other half is paper. A Chrome
-							extension for Iowa's EDMS that turns docket work into one click —
-							preview a filing beside the docket, then download it named the way
-							your office actually files things, straight from the court to you.
-						</p>
-						<div className="mt-7">
-							<TextLink href={EDMS_PRODUCT_HREF}>
-								Explore Hudson EDMSpro
-							</TextLink>
-						</div>
+				<div className="mt-20">
+					<Eyebrow>Three tests, and the receipts</Eyebrow>
+					<div className="mt-6 grid gap-x-8 gap-y-10 sm:grid-cols-3">
+						{TESTS.map((t) => (
+							<div key={t.n} className="border-border border-t pt-5">
+								<span className="font-mono text-[#0f62fe] text-sm">{t.n}</span>
+								<h3 className="mt-4 text-[19px] leading-snug">{t.title}</h3>
+								<p className="mt-2.5 max-w-md text-[14px] text-muted-foreground leading-relaxed">
+									{t.body}
+								</p>
+								<p className="mt-6 font-mono text-[#0f62fe] text-[11px] uppercase tracking-[0.18em]">
+									{t.receipt}
+								</p>
+							</div>
+						))}
 					</div>
-
-					<SpecList items={EDMS_SPECS} />
 				</div>
+			</div>
+		</section>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// 04 — Pricing: affordability is the mission, so the announced prices sit on
+// the home page, rendered from lib/pricing so they cannot drift from /pricing.
+// ---------------------------------------------------------------------------
+
+function Pricing() {
+	return (
+		<section className="bg-background">
+			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
+				<SectionHead
+					label="04 · Pricing"
+					title="Announced before launch, and the same for everyone."
+				/>
 
 				<div className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-3">
-					{EDMS_POINTS.map((c) => (
-						<div key={c.title} className="border-border border-t pt-5">
-							<h4 className="font-semibold text-[15px]">{c.title}</h4>
-							<p className="mt-2 text-[13.5px] text-muted-foreground leading-relaxed">
-								{c.body}
+					{PLANS.map((p) => (
+						<div key={p.key} className="border-border border-t pt-6">
+							<p className="font-mono text-[11px] text-muted-foreground uppercase tracking-[0.18em]">
+								{p.name}
+							</p>
+							<div className="mt-2 flex items-baseline gap-2">
+								<span className="font-light text-4xl lg:text-5xl">
+									{p.price}
+								</span>
+								{p.cadence && (
+									<span className="text-muted-foreground text-sm">
+										{p.cadence}
+									</span>
+								)}
+							</div>
+							<p className="mt-2 min-h-[1.25rem] text-[13px] text-muted-foreground">
+								{p.subPrice}
+							</p>
+							<p className="mt-3 max-w-xs text-[15px] text-foreground/85 leading-relaxed">
+								{p.tagline}
 							</p>
 						</div>
 					))}
+				</div>
+
+				<p className="mt-10 max-w-2xl text-[13px] text-muted-foreground leading-relaxed">
+					{PRICING_NOTE}
+				</p>
+				<div className="mt-6">
+					<TextLink href={COMPARE_PLANS_HREF}>Compare the plans</TextLink>
 				</div>
 			</div>
 		</section>
@@ -393,143 +541,25 @@ function Products({ stats }: { stats: CorpusStats }) {
 }
 
 // ---------------------------------------------------------------------------
-// 03 — Principles. White (card) rather than the page's light gray: it follows
-// the products band, and two light bands running together need the step.
+// CTA band
 // ---------------------------------------------------------------------------
 
-const PRINCIPLES: { n: string; claim: string; body: string }[] = [
-	{
-		n: "01",
-		claim: "An answer that cannot be verified is not an answer.",
-		body: "Every response traces to effective, citable text and is checked before it is delivered. Where the source does not exist, the system says so.",
-	},
-	{
-		n: "02",
-		claim: "What we learn from the corpus, we publish.",
-		body: "The analysis that makes the products work is worth reading on its own — so it goes out as briefs and articles, with the method and the data attached.",
-	},
-	{
-		n: "03",
-		claim: "Serious tools should be within reach of the whole profession.",
-		body: "We build for solo practitioners, small firms, and in-house teams — not only the institutions with procurement departments.",
-	},
-	{
-		n: "04",
-		claim: "We advise only on what we have built.",
-		body: "Our consulting practice draws on software we design, ship, and operate ourselves — the diagram comes after the work.",
-	},
-];
-
-function Principles() {
-	return (
-		<section className="bg-card">
-			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
-				<SectionHead
-					n="03"
-					label="Operating principles"
-					title="The standard we build against."
-				/>
-
-				<div className="mt-14 grid gap-x-12 gap-y-12 sm:grid-cols-2">
-					{PRINCIPLES.map((p) => (
-						<div key={p.n} className="border-border border-t pt-6">
-							<span className="font-mono text-[#0f62fe] text-sm">{p.n}</span>
-							<h3 className="mt-4 text-xl leading-snug">{p.claim}</h3>
-							<p className="mt-3 max-w-md text-[15px] text-muted-foreground leading-relaxed">
-								{p.body}
-							</p>
-						</div>
-					))}
-				</div>
-			</div>
-		</section>
-	);
-}
-
-// ---------------------------------------------------------------------------
-// 04 — What we do: ruled tiles, whole tile clickable, arrow on the baseline;
-// the page's CTA closes the band (keeps the light/ink rhythm intact)
-// ---------------------------------------------------------------------------
-
-const DISCIPLINES: {
-	tag: string;
-	title: string;
-	body: string;
-	cta: string;
-	href: string;
-}[] = [
-	{
-		tag: "Research",
-		title: "Data briefs & analysis",
-		body: "Original analysis of the Iowa record — which cases do the work, what changes, who regulates — published frozen, sourced, and open to being checked.",
-		cta: "Read the latest brief",
-		href: DATA_HREF,
-	},
-	{
-		tag: "Products",
-		title: "Tools for Iowa practice",
-		body: "Hudson Corpus in the browser, over MCP, and by email — and Hudson EDMSpro for court filings. The research is verified; the filings stay yours.",
-		cta: "Explore the products",
-		href: PRODUCTS_INDEX_HREF,
-	},
-	{
-		tag: "Consulting",
-		title: "Technology consulting",
-		body: "Strategy, custom software, data, and applied AI for teams that need it built correctly — delivered against the same standard we hold our own products to.",
-		cta: "Engage our team",
-		href: CONSULTING_HREF,
-	},
-];
-
-function WhatWeDo() {
+function CtaBand() {
 	return (
 		<section className={cn("text-white", INK)}>
-			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
-				<SectionHead
-					n="04"
-					label="What we do"
-					title="Three disciplines. One standard."
-					tone="dark"
-				/>
-
-				<div className="mt-14 grid divide-y divide-[#393939] border border-[#393939] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
-					{DISCIPLINES.map((d) => (
-						<Link
-							key={d.tag}
-							href={d.href}
-							className="group flex min-h-[280px] flex-col bg-[#161616] p-8 transition-colors hover:bg-[#292929]"
-						>
-							<Eyebrow tone="dark">{d.tag}</Eyebrow>
-							<h3 className="mt-5 text-2xl">{d.title}</h3>
-							<p className="mt-3 text-[#a8a8a8] text-[15px] leading-relaxed">
-								{d.body}
-							</p>
-							<span className="mt-auto flex items-center justify-between pt-10 font-medium text-[#78a9ff] text-sm">
-								{d.cta}
-								<span
-									aria-hidden
-									className="transition-transform group-hover:translate-x-0.5"
-								>
-									→
-								</span>
-							</span>
-						</Link>
-					))}
-				</div>
-
-				<div className="mt-16 flex flex-col gap-10 border-[#393939] border-t pt-10 lg:flex-row lg:items-end lg:justify-between">
+			<div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-24">
+				<div className="flex flex-col gap-10 border-[#393939] border-t pt-10 lg:flex-row lg:items-end lg:justify-between">
 					<div className="max-w-2xl">
 						<h2 className="font-light text-3xl sm:text-4xl">
-							Evaluate it on real questions.
+							See what grounded research feels like.
 						</h2>
 						<p className="mt-4 text-[#c6c6c6] text-lg leading-relaxed">
-							Hudson Corpus is live in beta. Ask a question you already know the
-							answer to — then follow every citation to its source.
+							In beta now. Ask a question, follow the citation to the source.
 						</p>
 					</div>
 					<div className="flex shrink-0 flex-col gap-3 sm:flex-row">
-						<SolidLink href={GET_STARTED_URL}>Open Hudson Corpus</SolidLink>
-						<HairlineLink href={CONSULTING_HREF}>Talk to our team</HairlineLink>
+						<SolidLink href={GET_STARTED_URL}>Start researching</SolidLink>
+						<HairlineLink href={PRICING_HREF}>See pricing</HairlineLink>
 					</div>
 				</div>
 			</div>

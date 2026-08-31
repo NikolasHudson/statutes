@@ -23,9 +23,9 @@ import {
 	ARTICLES_HREF,
 	CONSULTING_HREF,
 	CONTACT_HREF,
+	COVERAGE_EIGHTH_CIRCUIT_HREF,
+	COVERAGE_IOWA_HREF,
 	DATA_HREF,
-	EDMS_PRODUCT_HREF,
-	EMAIL_PRODUCT_HREF,
 	MCP_PRODUCT_HREF,
 	PRICING_HREF,
 	PRODUCT_HREF,
@@ -371,22 +371,24 @@ const FOOTER_COLS: {
 	links: { label: string; href: string }[];
 }[] = [
 	{
-		heading: "Products",
+		// One product. The former EDMSpro / email-assistant links left with the
+		// product line-up (2026-08-30); MCP stays as the developer door into the
+		// corpus, not a product of its own.
+		heading: "Product",
 		links: [
 			{ label: "Hudson Corpus", href: PRODUCT_HREF },
-			{ label: "Hudson EDMSpro", href: EDMS_PRODUCT_HREF },
 			{ label: "MCP endpoint", href: MCP_PRODUCT_HREF },
-			{ label: "Email assistant", href: EMAIL_PRODUCT_HREF },
+			{ label: "Pricing", href: PRICING_HREF },
 			{ label: "Open the app", href: APP_URL },
 		],
 	},
 	{
-		heading: "Resources",
+		heading: "Research",
 		links: [
-			{ label: "Articles", href: ARTICLES_HREF },
 			{ label: "Data briefs", href: DATA_HREF },
-			{ label: "Pricing", href: PRICING_HREF },
-			{ label: "Documentation", href: APP_URL },
+			{ label: "Coverage: Iowa", href: COVERAGE_IOWA_HREF },
+			{ label: "Coverage: Eighth Circuit", href: COVERAGE_EIGHTH_CIRCUIT_HREF },
+			{ label: "Articles", href: ARTICLES_HREF },
 		],
 	},
 	{
@@ -401,7 +403,7 @@ const FOOTER_COLS: {
 		heading: "Legal",
 		// Both live on the app origin and both resolve: /privacy redirects to
 		// /terms#privacy, which is where the data practices actually are. There is
-		// no standalone privacy policy yet — when one is written, PRIVACY_URL is
+		// no standalone privacy policy yet - when one is written, PRIVACY_URL is
 		// the single place this footer, and both lead forms, learn about it.
 		links: [
 			{ label: "Terms of Service", href: TERMS_URL },
@@ -421,7 +423,8 @@ export function CarbonFooter() {
 					<div className="max-w-xs">
 						<CarbonWordmark />
 						<p className="mt-4 text-[#a8a8a8] text-sm leading-relaxed">
-							Grounded, citable legal research for practitioners.
+							Affordable, accessible, intuitive research for the lawyers who
+							actually practice. One product, one standard.
 						</p>
 					</div>
 					{FOOTER_COLS.map((col) => (

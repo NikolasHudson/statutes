@@ -1,5 +1,5 @@
 // Favicon, generated at build time (no binary asset to maintain): the square
-// Carbon "H" monogram — ink #161616 tile, Blue-60 base rule.
+// Carbon "H" monogram — solid Blue-90 navy tile, matching the app's nav rail.
 
 import { ImageResponse } from "next/og";
 
@@ -15,11 +15,10 @@ export default function Icon() {
 				display: "flex",
 				alignItems: "center",
 				justifyContent: "center",
-				background: "#161616",
+				background: "#001d6c",
 				color: "#ffffff",
 				fontSize: 22,
 				fontWeight: 600,
-				borderBottom: "3px solid #0f62fe",
 			}}
 		>
 			H

@@ -8,7 +8,7 @@ import { SITE_URL } from "@/lib/site";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt =
-	"Hudson Legal Technologies — grounded, citable AI for the practice of law";
+	"Hudson Legal Technologies: serious legal research, within reach of every practicing attorney";
 
 export default function OpenGraphImage() {
 	return new ImageResponse(
@@ -46,10 +46,10 @@ export default function OpenGraphImage() {
 						maxWidth: 980,
 					}}
 				>
-					Grounded, citable AI for the practice of law.
+					Serious legal research, within reach of every practicing attorney.
 				</div>
 				<div style={{ marginTop: 32, fontSize: 28, color: "#c6c6c6" }}>
-					Every answer anchored to the source — and verified against it.
+					Every answer traced to the text, every citation verified.
 				</div>
 			</div>
 			{/* The card is the one place the domain is printed as an image — a
