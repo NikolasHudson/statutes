@@ -35,6 +35,7 @@ from apps.billing.api import billing_router
 from apps.edms.api import edms_router
 from apps.mail.api import mail_router
 from apps.marketing.api import marketing_router
+from apps.resources.api import resources_router
 
 from .accounts import account_router, auth_router
 from .admin_articles import admin_articles_router
@@ -109,6 +110,11 @@ api.add_router("/billing", billing_router)
 # X-API-Key OR session — three clients, one policy (apps/edms/auth.py) — and
 # every route is gated on the `edms` plan feature.
 api.add_router("/edms", edms_router)
+# Reference datasets that are NOT law (apps.resources): the Iowa SOS business
+# entity registry today, licensing/UCC later. Session auth + paid access on
+# every route and no bulk export — the registry names private individuals at
+# home addresses. Nothing in it touches the corpus.
+api.add_router("/resources", resources_router)
 
 
 # ---------------------------------------------------------------------------

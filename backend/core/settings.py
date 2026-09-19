@@ -532,6 +532,10 @@ INSTALLED_APPS = [
     "apps.marketing",
     "apps.citations",
     "apps.edms",
+    # Non-corpus reference datasets (RESOURCES_PLAN.md). Own tables, own
+    # search; no Node/Source rows, no embeddings, no import in either
+    # direction with apps.corpus.
+    "apps.resources",
     "apps.ingestion_iowa_code",
     "apps.ingestion_iowa_rules",
     "apps.ingestion_iowa_admin_code",

@@ -14,6 +14,7 @@ import {
 	ChevronsUpDownIcon,
 	CloudIcon,
 	CreditCardIcon,
+	DatabaseIcon,
 	GitCompareArrowsIcon,
 	LogOutIcon,
 	MessageSquareTextIcon,
@@ -81,6 +82,14 @@ const NAV: NavGroup[] = [
 				href: "/compare",
 				label: "Compare editions",
 				icon: GitCompareArrowsIcon,
+			},
+			// Reference datasets that are not law (RESOURCES_PLAN.md). Shown
+			// to everyone: the routes are paywalled server-side, and whether a
+			// scoped product should hide the entry is still open (§9.3).
+			{
+				href: "/resources",
+				label: "Resources",
+				icon: DatabaseIcon,
 			},
 		],
 	},
