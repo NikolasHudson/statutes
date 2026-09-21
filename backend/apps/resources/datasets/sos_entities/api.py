@@ -225,34 +225,22 @@ def _fetch_ordered(ids: list[int]) -> list[BusinessEntity]:
     return [by_id[i] for i in ids if i in by_id]
 
 
-@sos_router.get("/search", auth=session_auth)
-def search(
-    request,
+def run_search(
+    *,
     q: str = "",
     agent: str = "",
     city: str = "",
-    zip: str = "",  # noqa: A002 — the query-string name users expect
-    type: str = "",  # noqa: A002 — ditto
+    zip_code: str = "",
+    entity_type: str = "",
     include_inactive: bool = False,
     page: int = 1,
     page_size: int = PAGE_SIZE_DEFAULT,
-):
-    _gate(request, "search")
-
-    q = _clean(q)
-    agent = _clean(agent)
-    city = _clean(city)
-    zip_code = _clean(zip)
-    entity_type = _clean(type)
-
-    # No unfiltered listing: this is a registry of named people at named
-    # addresses, and "show me everything" is not a research query.
-    if not any((q, agent, city, zip_code)):
-        raise HttpError(
-            422,
-            "Provide at least one of: q (name or corp number), agent, city, zip.",
-        )
-
+) -> dict:
+    """The search itself, free of any transport: already-cleaned filters in,
+    JSON-able payload out. The HTTP route below and the MCP tool
+    (``.tool.lookup_business_entity_tool``) both answer from this, so the two
+    surfaces cannot drift on ranking, clamps or the candidate pool. Callers own
+    the no-filter refusal, since each words it for its own audience."""
     page = max(1, page)
     page_size = max(1, min(page_size, PAGE_SIZE_MAX))
     offset = (page - 1) * page_size
@@ -305,17 +293,57 @@ def search(
     # where an entity's name normalizes to the digits that are also a corp
     # number, which nothing in the current data does.
     total_with_pin = total + (1 if pinned else 0)
+    return {
+        "query": q,
+        "page": page,
+        "page_size": page_size,
+        "total": min(total_with_pin, CANDIDATE_POOL),
+        # True when the pool filled: the UI should render "1,000+".
+        "total_capped": total >= CANDIDATE_POOL,
+        "as_of": _as_of_iso(),
+        "results": results,
+    }
+
+
+@sos_router.get("/search", auth=session_auth)
+def search(
+    request,
+    q: str = "",
+    agent: str = "",
+    city: str = "",
+    zip: str = "",  # noqa: A002 — the query-string name users expect
+    type: str = "",  # noqa: A002 — ditto
+    include_inactive: bool = False,
+    page: int = 1,
+    page_size: int = PAGE_SIZE_DEFAULT,
+):
+    _gate(request, "search")
+
+    q = _clean(q)
+    agent = _clean(agent)
+    city = _clean(city)
+    zip_code = _clean(zip)
+    entity_type = _clean(type)
+
+    # No unfiltered listing: this is a registry of named people at named
+    # addresses, and "show me everything" is not a research query.
+    if not any((q, agent, city, zip_code)):
+        raise HttpError(
+            422,
+            "Provide at least one of: q (name or corp number), agent, city, zip.",
+        )
+
     return no_store(
-        {
-            "query": q,
-            "page": page,
-            "page_size": page_size,
-            "total": min(total_with_pin, CANDIDATE_POOL),
-            # True when the pool filled: the UI should render "1,000+".
-            "total_capped": total >= CANDIDATE_POOL,
-            "as_of": _as_of_iso(),
-            "results": results,
-        }
+        run_search(
+            q=q,
+            agent=agent,
+            city=city,
+            zip_code=zip_code,
+            entity_type=entity_type,
+            include_inactive=include_inactive,
+            page=page,
+            page_size=page_size,
+        )
     )
 
 
@@ -324,14 +352,14 @@ def search(
 # ---------------------------------------------------------------------------
 
 
-@sos_router.get("/entities/{corp_number}", auth=session_auth)
-def entity_detail(request, corp_number: str):
-    _gate(request)
+def entity_detail_payload(corp_number: str) -> dict | None:
+    """The full record for one corp number, or None. Transport-free for the
+    same reason as :func:`run_search`."""
     if not _CORP_NUMBER_RE.match(corp_number or ""):
-        raise HttpError(404, "No such entity.")
+        return None
     entity = BusinessEntity.objects.filter(corp_number=corp_number).first()
     if entity is None:
-        raise HttpError(404, "No such entity.")
+        return None
 
     # "Other entities with this registered agent": same normalized agent at the
     # same agent ZIP. The ZIP is what keeps two unrelated "JOHN SMITH"s apart;
@@ -378,6 +406,15 @@ def entity_detail(request, corp_number: str):
             "as_of": _as_of_iso(),
         }
     )
+    return payload
+
+
+@sos_router.get("/entities/{corp_number}", auth=session_auth)
+def entity_detail(request, corp_number: str):
+    _gate(request)
+    payload = entity_detail_payload(corp_number)
+    if payload is None:
+        raise HttpError(404, "No such entity.")
     return no_store(payload)
 
 

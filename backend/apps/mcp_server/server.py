@@ -60,7 +60,7 @@ def build_server():
     from asgiref.sync import sync_to_async
     from mcp.server.fastmcp import FastMCP
 
-    from . import tools
+    from . import resources_tools, tools
 
     # stateless_http + json_response are what make this safe to run behind App
     # Platform's load balancer, which has NO session affinity:
@@ -263,6 +263,57 @@ def build_server():
         return await sync_to_async(
             tools.audit_brief_tool, thread_sensitive=True
         )(text, since)
+
+    @mcp.tool(
+        description=(
+            "Look up a business in the Iowa Secretary of State business-entity "
+            "registry: corporations, LLCs, nonprofits, partnerships and "
+            "foreign entities registered in Iowa. Returns the legal name, corp "
+            "number, entity type, formation date, active/inactive status and "
+            "registered agent. Search by ``query`` (entity name, typo-tolerant, "
+            "or a corp number), and/or ``agent`` (registered agent name), "
+            "``city``, ``zip_code``, ``entity_type``; at least one of query, "
+            "agent, city or zip_code is required and the registry cannot be "
+            "listed unfiltered. Pass ``corp_number`` alone to get one entity's "
+            "full record, including registered-agent and home-office addresses "
+            "and how many other entities share that agent. Inactive entities "
+            "are hidden unless ``include_inactive`` is true. Results are the "
+            "top ``limit`` matches (max 25) and cannot be paged: narrow the "
+            "search instead. "
+            "THIS IS REGISTRY DATA, NOT LAW: never cite it as legal authority, "
+            "and do not pass it to the citation or quote verification tools. "
+            "It comes from a periodic extract, so always report the ``as_of`` "
+            "date and tell the user to confirm status and registered agent "
+            "against the official Secretary of State search (``verify_url``) "
+            "before relying on it, e.g. for service of process. "
+            "Use whenever the user asks: who is the registered agent for X, is "
+            "this LLC active / in good standing on the registry, what is the "
+            "exact legal name of this company, when was it formed, what "
+            "entities does this agent represent."
+        )
+    )
+    async def lookup_business_entity(
+        query: str = "",
+        corp_number: str = "",
+        agent: str = "",
+        city: str = "",
+        zip_code: str = "",
+        entity_type: str = "",
+        include_inactive: bool = False,
+        limit: int = 10,
+    ) -> dict:
+        return await sync_to_async(
+            resources_tools.lookup_business_entity_tool, thread_sensitive=True
+        )(
+            query=query,
+            corp_number=corp_number,
+            agent=agent,
+            city=city,
+            zip_code=zip_code,
+            entity_type=entity_type,
+            include_inactive=include_inactive,
+            limit=limit,
+        )
 
     return mcp
 

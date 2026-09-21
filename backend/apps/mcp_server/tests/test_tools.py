@@ -336,5 +336,6 @@ class ToolRegistrationTests(TestCase):
                 "validate_citations",
                 "verify_quote",
                 "audit_brief",
+                "lookup_business_entity",
             },
         )

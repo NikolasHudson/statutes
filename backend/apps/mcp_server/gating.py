@@ -21,10 +21,17 @@ import json
 from apps.accounts.models import APIKey
 from apps.api.auth import enforce_rate_limit, require_feature
 
+from .resources_tools import RESOURCE_TOOLS, enforce_resources_rate_limit
+
 # MCP tool name -> the feature string in ``apps.api.auth.FEATURES_BY_TIER``.
 # Free tier gets {"lookup", "search"} (lookup_citation + search_statutes);
 # every other tool is SOLO+. Keep this in lockstep with the @mcp.tool
 # registrations in server.py.
+#
+# ``entities`` is the one non-corpus feature: the Iowa SOS business-entity
+# registry (apps.resources). It lists registered agents, who are often private
+# people at home addresses, so it is never in the free set and it carries a
+# second, per-user throttle below.
 TOOL_FEATURES: dict[str, str] = {
     "lookup_citation": "lookup",
     "search_statutes": "search",
@@ -36,6 +43,7 @@ TOOL_FEATURES: dict[str, str] = {
     "validate_citations": "validate",
     "verify_quote": "validate",
     "audit_brief": "validate",
+    "lookup_business_entity": "entities",
 }
 
 # An unknown tool name maps to the most-restrictive gate so a newly-added tool
@@ -85,5 +93,7 @@ def gate_request(api_key: APIKey, body: bytes) -> None:
 
     for name in names:
         require_feature(api_key, TOOL_FEATURES.get(name, _DEFAULT_FEATURE))
-    for _ in names:
+    for name in names:
         enforce_rate_limit(api_key)
+        if name in RESOURCE_TOOLS:
+            enforce_resources_rate_limit(api_key)

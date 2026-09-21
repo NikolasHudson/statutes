@@ -9,7 +9,9 @@ their own tests in ``apps.accounts`` / ``apps.api``; here we verify the wiring.
 
 from __future__ import annotations
 
+import functools
 import json
+from unittest import mock
 
 from django.core.cache import cache
 from django.test import SimpleTestCase
@@ -17,12 +19,14 @@ from ninja.errors import HttpError
 
 from apps.accounts.models import Tier
 from apps.api import auth as rest_auth
+from apps.mcp_server import resources_tools
 from apps.mcp_server.gating import gate_request, tool_names
 
 
 class _User:
-    def __init__(self, tier: str):
+    def __init__(self, tier: str, pk: int | None = None):
         self.tier = tier
+        self.pk = pk
 
 
 class _Key:
@@ -125,3 +129,54 @@ class GateRequestTests(SimpleTestCase):
             gate_request(key, _call("audit_brief", text="x"))  # 403, no charge
         # The one allowed call still goes through.
         gate_request(key, _call("search_statutes"))
+
+
+class BusinessEntityGateTests(SimpleTestCase):
+    """The registry tool is paid, and carries the resources per-user throttle
+    on top of the per-key quota."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    def _registry_limit(self, limit: int) -> None:
+        # Reached through the adapter: nothing else under apps/mcp_server may
+        # import apps.resources, and test_isolation holds tests to that too.
+        real = resources_tools.enforce_user_rate_limit
+        patcher = mock.patch.object(
+            resources_tools,
+            "enforce_user_rate_limit",
+            functools.partial(real, limit=limit),
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_free_tier_is_403(self):
+        key = _Key(pk=20, tier=Tier.FREE)
+        with self.assertRaises(HttpError) as ctx:
+            gate_request(key, _call("lookup_business_entity", query="acme"))
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_paid_tiers_pass(self):
+        for pk, tier in enumerate((Tier.SOLO, Tier.FIRM, Tier.CUSTOM), start=21):
+            gate_request(_Key(pk=pk, tier=tier), _call("lookup_business_entity", query="acme"))
+
+    def test_user_throttle_is_shared_across_credentials(self):
+        self._registry_limit(2)
+        # Two credentials, one person: the third call is refused even though it
+        # arrives on a key that has never been used.
+        first, second = _Key(pk=30, tier=Tier.SOLO), _Key(pk=31, tier=Tier.SOLO)
+        first.user.pk = second.user.pk = 900
+        gate_request(first, _call("lookup_business_entity", query="a"))
+        gate_request(first, _call("lookup_business_entity", query="b"))
+        with self.assertRaises(HttpError) as ctx:
+            gate_request(second, _call("lookup_business_entity", query="c"))
+        self.assertEqual(ctx.exception.status_code, 429)
+
+    def test_corpus_tools_do_not_spend_the_registry_budget(self):
+        self._registry_limit(1)
+        key = _Key(pk=32, tier=Tier.SOLO)
+        key.user.pk = 901
+        for _ in range(3):
+            gate_request(key, _call("search_statutes", query="theft"))
+        gate_request(key, _call("lookup_business_entity", query="a"))

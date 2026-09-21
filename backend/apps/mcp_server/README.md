@@ -18,6 +18,7 @@ client like Claude Desktop can call into it directly.
 | `validate_citations` | Bulk pass/fail of every Iowa Code citation in a passage — in force / repealed / never existed, with same-chapter candidates and byte-spans for inline highlighting. |
 | `verify_quote` | Checks whether quoted statutory language actually appears verbatim in its cited section (catches paraphrases and invented quotes). |
 | `audit_brief` | One-call brief audit: `validate_citations` + `verify_quote` + a post-`since` amendment check, with pre-rendered Markdown tables. |
+| `lookup_business_entity` | **Not a corpus tool.** Iowa Secretary of State business-entity registry (`apps.resources`): name / corp number / registered agent lookup. Solo and above (`entities` feature), plus a per-user throttle shared with the web search. Top `limit` rows (max 25), no paging, no unfiltered listing. Every payload is labelled `kind: registry_record` with a not-legal-authority notice, an `as_of` date and a `verify_url`. Reaches `apps.resources` only through `resources_tools.py`. |
 
 Every response includes `as_of_date` plus `effective_from` / `effective_to`
 on each version, and an `official_url` for the section. The brief calls

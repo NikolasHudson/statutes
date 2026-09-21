@@ -49,15 +49,15 @@ FEATURES_BY_TIER: dict[str, set[str]] = {
     Tier.FREE: {"lookup", "search"},
     Tier.SOLO: {
         "lookup", "search", "history", "at_date", "cross_refs",
-        "definitions", "amendments", "validate", "edms",
+        "definitions", "amendments", "validate", "edms", "entities",
     },
     Tier.FIRM: {
         "lookup", "search", "history", "at_date", "cross_refs",
-        "definitions", "amendments", "validate", "edms",
+        "definitions", "amendments", "validate", "edms", "entities",
     },
     Tier.CUSTOM: {
         "lookup", "search", "history", "at_date", "cross_refs",
-        "definitions", "amendments", "validate", "edms",
+        "definitions", "amendments", "validate", "edms", "entities",
     },
 }
 

@@ -12,6 +12,9 @@ it mounts, and neither is negotiable per-route:
   private individual at a home address — so this data stays behind a login and
   out of search engines. The same reasoning rules out a bulk-export endpoint;
   do not add one.
+  The one other way in is the MCP tool ``lookup_business_entity``
+  (``datasets/sos_entities/tool.py``): API-key / OAuth authenticated, paid
+  tiers only, the same per-user throttle, and no paging at all.
 * **``private, no-store``.** See ``apps.resources.responses``.
 """
 
