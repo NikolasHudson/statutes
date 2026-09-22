@@ -113,7 +113,7 @@ function Hero({ stats }: { stats: CorpusStats }) {
 				}}
 			/>
 			<div className="relative mx-auto max-w-7xl px-5 sm:px-8">
-				<div className="border-[#393939] border-b py-20 lg:py-28">
+				<div className="py-20 lg:py-28">
 					<Eyebrow tone="dark">Hudson Legal Technologies</Eyebrow>
 
 					{/* Three stacked lines from sm up: comma / "every" / close. Below sm
