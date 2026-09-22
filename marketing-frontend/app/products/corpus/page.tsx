@@ -21,7 +21,6 @@ import type { Metadata } from "next";
 import {
 	CarbonPage,
 	Eyebrow,
-	Frame,
 	HairlineLink,
 	SolidLink,
 } from "@/components/marketing/carbon";
@@ -33,6 +32,7 @@ import {
 	MCP_PRODUCT_HREF,
 	PRICING_HREF,
 } from "@/components/marketing/chrome";
+import { DemoPlayer } from "@/components/marketing/demo/player";
 import { ProductFamily } from "@/components/marketing/product-family";
 import {
 	FeatureTabs,
@@ -147,15 +147,17 @@ function Lead({ stats }: { stats: CorpusStats }) {
 				</>
 			}
 			visual={
-				// Cropped: the leadspace wants the answer and its verification
-				// steps, not the whole workspace. The uncropped capture is the
-				// Ask tab's, below.
-				<Frame
-					src="/marketing/corpus/assistant.png"
-					alt="The Hudson Corpus assistant answering a question with verified citations"
-					caption="Assistant — answer with verified citations"
-					aspect="16 / 10"
-					className="border-[#393939]"
+				// The assistant loop, playing where the capture sat: ask, research
+				// run, verified citations, source on hover. Compact: no caption row
+				// in the leadspace.
+				<DemoPlayer
+					demo="assistant"
+					compact
+					tone="dark"
+					poster={{
+						src: "/marketing/corpus/assistant.png",
+						alt: "The Hudson Corpus assistant answering a question with verified citations",
+					}}
 				/>
 			}
 		/>
@@ -204,6 +206,7 @@ function features(stats: CorpusStats): ProductFeature[] {
 	return [
 		{
 			id: "ask",
+			demo: "assistant",
 			label: "Ask",
 			title: "Ask in plain English. Get the citation.",
 			body: "The assistant shows its work as it goes — what it searched, which sections it read, and how many citations and quotations survived verification — then answers from that record and nothing else.",
@@ -236,6 +239,7 @@ function features(stats: CorpusStats): ProductFeature[] {
 		},
 		{
 			id: "read",
+			demo: "reader",
 			label: "Read",
 			title: "Read the source, not a summary.",
 			body: "Open the effective text with its citation, effective date, and enacting session law attached — and follow inline links straight to the official publication.",
@@ -252,6 +256,7 @@ function features(stats: CorpusStats): ProductFeature[] {
 		},
 		{
 			id: "search",
+			demo: "search",
 			label: "Search",
 			title: "Search that finds what you mean.",
 			body: "Full-text, trigram, and vector embeddings fused with Reciprocal Rank Fusion — type a citation number or describe the issue, and the on-point provision surfaces either way.",

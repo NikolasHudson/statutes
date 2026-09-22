@@ -21,7 +21,6 @@ import type { Metadata } from "next";
 import {
 	CarbonPage,
 	Eyebrow,
-	Frame,
 	HairlineLink,
 	INK,
 	SectionHead,
@@ -33,6 +32,7 @@ import {
 	PRICING_HREF,
 	PRODUCT_HREF,
 } from "@/components/marketing/chrome";
+import { DemoPlayer } from "@/components/marketing/demo/player";
 import { HeroCodeRain } from "@/components/marketing/hero-code-rain";
 import { type CorpusStats, fetchCorpusStats, formatCount } from "@/lib/api";
 import { formatAsOf, MOST_CITED_CASES } from "@/lib/briefs";
@@ -359,21 +359,6 @@ const CORPUS_TILES: { name: string; term: string; detail: string }[] = [
 	},
 ];
 
-const STEPS: { title: string; body: string }[] = [
-	{
-		title: "Ask in plain language, or by citation number.",
-		body: "The assistant shows its work as it goes: what it searched and which sections it read.",
-	},
-	{
-		title: "It answers from the controlling text, and nothing else.",
-		body: "Retrieval runs against the human-reviewed corpus. No support in the record, no answer.",
-	},
-	{
-		title: "Every quote and citation is verified before you see it.",
-		body: "A deterministic pass checks each one against its source; anything superseded or overruled is flagged, not quietly served. The source is one click away.",
-	},
-];
-
 const TESTS: { n: string; title: string; body: string; receipt: string }[] = [
 	{
 		n: "01",
@@ -434,37 +419,22 @@ function Logos({ stats }: { stats: CorpusStats }) {
 					</p>
 				</div>
 
-				<div className="mt-16 grid gap-12 lg:grid-cols-[1fr_1.15fr] lg:gap-16">
-					<div>
-						<Eyebrow>How an answer is made</Eyebrow>
-						<ul className="mt-4 border-border border-t">
-							{STEPS.map((s, i) => (
-								<li
-									key={s.title}
-									className="grid grid-cols-[40px_1fr] gap-x-4 border-border border-b py-5"
-								>
-									<span className="pt-0.5 font-mono text-[#0f62fe] text-[13px]">
-										0{i + 1}
-									</span>
-									<div>
-										<h3 className="text-[16px] leading-snug">{s.title}</h3>
-										<p className="mt-1.5 text-[14px] text-muted-foreground leading-relaxed">
-											{s.body}
-										</p>
-									</div>
-								</li>
-							))}
-						</ul>
-						<div className="mt-7">
-							<TextLink href={PRODUCT_HREF}>Explore Hudson Corpus</TextLink>
-						</div>
-					</div>
-
-					<Frame
-						src="/marketing/corpus/assistant.png"
-						alt="Hudson Corpus answering an Iowa medical-malpractice limitations question, with the research run and verified citations visible"
-						caption="Hudson Corpus · Assistant"
+				<div className="mt-16">
+					<Eyebrow>How an answer is made</Eyebrow>
+					{/* The living shot: the assistant loop plays where the still sat,
+					    and the three steps under it light as the loop reaches them. */}
+					<DemoPlayer
+						demo="assistant"
+						steps
+						className="mt-6"
+						poster={{
+							src: "/marketing/corpus/assistant.png",
+							alt: "Hudson Corpus answering an Iowa medical-malpractice limitations question, with the research run and verified citations visible",
+						}}
 					/>
+					<div className="mt-8">
+						<TextLink href={PRODUCT_HREF}>Explore Hudson Corpus</TextLink>
+					</div>
 				</div>
 
 				<div className="mt-20">

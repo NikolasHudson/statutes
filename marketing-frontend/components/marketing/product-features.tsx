@@ -15,6 +15,7 @@
 
 import { useRef, useState } from "react";
 import { CodeFrame, Frame, INK, TextLink } from "@/components/marketing/carbon";
+import { type DemoKey, DemoPlayer } from "@/components/marketing/demo/player";
 import { cn } from "@/lib/utils";
 
 export type ProductFeature = {
@@ -28,6 +29,8 @@ export type ProductFeature = {
 	links?: { label: string; href: string }[];
 	/** A product capture… */
 	shot?: { src: string; alt: string; caption: string; url?: string };
+	/** …played as a living shot (the capture stays as its poster)… */
+	demo?: DemoKey;
 	/** …or a config/code block, for the products whose surface is text. */
 	code?: { caption: string; code: string; url?: string };
 };
@@ -135,7 +138,15 @@ export function FeatureTabs({ features }: { features: ProductFeature[] }) {
 					</div>
 				)}
 
-				{f.shot && (
+				{f.shot && f.demo && (
+					<DemoPlayer
+						key={f.id}
+						className="mt-10"
+						demo={f.demo}
+						poster={{ src: f.shot.src, alt: f.shot.alt }}
+					/>
+				)}
+				{f.shot && !f.demo && (
 					<Frame
 						className="mt-10"
 						src={f.shot.src}
