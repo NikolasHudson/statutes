@@ -116,12 +116,11 @@ function Hero({ stats }: { stats: CorpusStats }) {
 				<div className="border-[#393939] border-b py-20 lg:py-28">
 					<Eyebrow tone="dark">Hudson Legal Technologies</Eyebrow>
 
-					{/* Two lines from lg up, broken after "every"; sized so the long
-					    first line fits the lg (960px), xl (1216px) and 2xl (1472px)
-					    containers. Below lg it wraps naturally. */}
-					<h1 className="mt-8 font-light text-4xl leading-[1.1] sm:text-5xl lg:text-[3rem] xl:text-[3.75rem] 2xl:text-[4.25rem]">
-						Serious legal research, within&nbsp;reach of every{" "}
-						<br className="hidden lg:block" />
+					{/* Three stacked lines from sm up: comma / "every" / close. Below sm
+					    it wraps naturally, with "within reach" bound. */}
+					<h1 className="mt-8 font-light text-4xl leading-[1.1] sm:text-5xl lg:text-[4.25rem]">
+						Serious legal research, <br className="hidden sm:block" />
+						within&nbsp;reach of every <br className="hidden sm:block" />
 						practicing attorney.
 					</h1>
 
